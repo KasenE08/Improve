@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#060a18">
+<title>Improve · Style B Holo</title>
+<link rel="stylesheet" href="base.css">
+<style>
+@font-face { font-family: 'Exo 2'; font-weight: 400; font-display: swap; src: url(fonts/exo-2-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: 'Exo 2'; font-weight: 600; font-display: swap; src: url(fonts/exo-2-latin-600-normal.woff2) format('woff2'); }
+@font-face { font-family: 'Exo 2'; font-weight: 800; font-display: swap; src: url(fonts/exo-2-latin-800-normal.woff2) format('woff2'); }
+@font-face { font-family: Inter; font-weight: 400; font-display: swap; src: url(fonts/inter-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Inter; font-weight: 500; font-display: swap; src: url(fonts/inter-latin-500-normal.woff2) format('woff2'); }
+@font-face { font-family: Inter; font-weight: 600; font-display: swap; src: url(fonts/inter-latin-600-normal.woff2) format('woff2'); }
+
+:root {
+  --bg: #060a18; --glass: rgba(140, 180, 255, .055); --glass-2: rgba(140, 180, 255, .1);
+  --edge: rgba(130, 175, 255, .18);
+  --accent: #3d8bff; --accent-2: #00d4ff; --grad: linear-gradient(90deg, #3d5bff, #00d4ff);
+  --text: #eaf2ff; --muted: #8796b8;
+  --r: 20px;
+  --f-head: 'Exo 2', system-ui, sans-serif; --f-body: Inter, system-ui, sans-serif;
+}
+body { color: var(--text); font: 400 15px/1.35 var(--f-body); background: var(--bg);
+  background-image:
+    radial-gradient(circle at 15% -5%, rgba(61, 91, 255, .45), transparent 45%),
+    radial-gradient(circle at 105% 35%, rgba(0, 212, 255, .2), transparent 40%),
+    radial-gradient(circle at -10% 90%, rgba(61, 139, 255, .18), transparent 40%);
+  background-attachment: fixed; }
+.num { font-family: var(--f-head); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.panel { padding: 16px; border-radius: var(--r); background: linear-gradient(180deg, var(--glass-2), var(--glass));
+  border: 1px solid var(--edge); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .08); }
+.panel-head { margin-bottom: 10px; }
+.panel-head h2 { font: 800 19px var(--f-head); letter-spacing: .01em; }
+.count { font-size: 13px; color: var(--muted); padding: 3px 10px; border-radius: 99px; background: var(--glass-2); }
+.count .ic { color: var(--accent-2); width: 18px; height: 18px; }
+
+/* HUD */
+.hud { padding-top: 22px; }
+.lvl { width: 68px; height: 68px; border-radius: 50%;
+  background: conic-gradient(from 0deg, #3d5bff, #00d4ff calc(var(--p) * 360deg), rgba(255,255,255,.08) 0);
+  box-shadow: 0 0 24px rgba(0, 170, 255, .35); }
+.lvl::before { content: ""; position: absolute; inset: 5px; border-radius: 50%; background: radial-gradient(circle at 50% 30%, #17234a, #0a1028); }
+.lvl > * { position: relative; }
+.lvl-label { font: 600 10px var(--f-head); letter-spacing: .2em; color: var(--muted); margin-bottom: -2px; }
+.lvl-num { font: 800 28px/1 var(--f-head); background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.name { font: 800 22px var(--f-head); }
+.rank { font-size: 12px; font-weight: 600; color: var(--accent-2); padding: 3px 10px; border-radius: 99px; background: rgba(0, 212, 255, .12); }
+.xpbar { height: 10px; margin: 8px 0 6px; border-radius: 99px; background: rgba(255, 255, 255, .08); }
+.xpbar-fill { border-radius: 99px; background: var(--grad); box-shadow: 0 0 14px rgba(0, 200, 255, .6); overflow: hidden; }
+.xpbar-fill::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.5) 50%, transparent 70%);
+  transform: translateX(-100%); animation: shimmer 2.8s ease-in-out infinite; }
+@keyframes shimmer { 60%, 100% { transform: translateX(100%); } }
+.hud-meta { font-size: 13px; color: var(--muted); }
+.today { color: var(--accent-2); font-weight: 600; }
+.today .ic { width: 16px; height: 16px; }
+
+/* Habits */
+.list { gap: 8px; }
+.habit { padding: 12px; border-radius: 14px; background: rgba(255, 255, 255, .03); border: 1px solid transparent; transition: background .2s, border-color .2s, transform .1s; }
+.habit:active { transform: scale(.98); }
+.habit.is-done { background: rgba(61, 139, 255, .12); border-color: rgba(61, 139, 255, .35); }
+.check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .22); color: #fff; transition: all .2s; }
+.is-done .check { border-color: transparent; background: var(--grad); box-shadow: 0 0 12px rgba(0, 200, 255, .55); }
+.check .ic { width: 15px; height: 15px; }
+.habit-name { font-weight: 600; font-size: 15px; }
+.is-done .habit-name { color: var(--muted); }
+.habit-sub { font-size: 12px; color: var(--muted); }
+.habit-sub .ic { width: 14px; height: 14px; color: var(--accent-2); }
+.pip { width: 16px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .1); }
+.pip.on { background: var(--grad); }
+.xp-chip { font: 600 13px var(--f-head); color: #8eeaff; padding: 4px 10px; border-radius: 99px; background: rgba(0, 212, 255, .1); }
+.xp-chip small { font-size: 10px; opacity: .75; }
+.is-done .xp-chip { background: var(--grad); color: #fff; }
+.xp-float { font: 800 14px var(--f-head); color: #8eeaff; }
+
+/* Stats */
+.stats { gap: 12px; }
+.stat-ic { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 10px; background: rgba(61, 139, 255, .14); color: var(--accent-2); }
+.stat-ic .ic { width: 18px; height: 18px; }
+.stat-name { font-weight: 600; font-size: 14px; }
+.statbar { height: 8px; border-radius: 99px; background: rgba(255, 255, 255, .07); }
+.statbar-fill { border-radius: 99px; background: var(--grad); }
+.stat-val { font-size: 14px; }
+
+/* Buttons */
+.btn-row { margin-bottom: 14px; }
+.btn { font: 600 15px var(--f-head); padding: 12px 20px; border-radius: 99px; transition: transform .1s, filter .15s; }
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--grad); color: #fff; box-shadow: 0 6px 20px rgba(0, 150, 255, .4); }
+.btn-secondary { background: var(--glass-2); border: 1px solid var(--edge); }
+.btn-ghost { color: var(--accent-2); }
+.type { padding-top: 12px; border-top: 1px solid var(--edge); }
+.type-h { font: 800 24px var(--f-head); }
+.type-b { font-size: 15px; }
+.type-n { font: 600 17px var(--f-head); color: var(--accent-2); }
+.type-cap { font-size: 12px; color: var(--muted); }
+
+/* Floating glass tab bar */
+.tabbar { left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 456px; margin: 0 auto; padding: 8px;
+  border-radius: 24px; background: rgba(14, 20, 44, .72); border: 1px solid var(--edge);
+  backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+.tab { color: var(--muted); padding: 6px 0; border-radius: 16px; font-size: 11px; font-weight: 500; transition: background .2s, color .2s; }
+.tab.is-active { color: #fff; background: rgba(61, 139, 255, .22); }
+.tab.is-active .ic { color: var(--accent-2); }
+</style>
+</head>
+<body data-style="holo" data-default-set="ph" data-fonts="Exo 2 (headings + numbers) · Inter (body) — both free, OFL">
+<div id="app"></div>
+<script src="icons.js"></script>
+<script src="sample.js"></script>
+</body>
+</html>
