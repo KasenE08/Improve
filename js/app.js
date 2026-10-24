@@ -1,9 +1,12 @@
 // App shell: HUD header, tab routing, midnight rollover, service worker.
 import * as H from './habits.js';
+import * as R from './rewards.js';
+import * as Stats from './stats.js';
 import { dayKey, prettyDate } from './dates.js';
-import { esc, icon, lvl, xpbar, pct } from './ui.js';
+import { esc, icon, lvl, xpbar, meter, pct } from './ui.js';
 import * as Today from './screens/today.js';
-import { renderSoon, renderProfile, bindProfile, openNameSheet } from './screens/other.js';
+import { renderSoon } from './screens/other.js';
+import * as Profile from './screens/profile.js';
 
 const TABS = [
   ['today', 'Today', 'today'],
@@ -18,7 +21,10 @@ const screen = document.getElementById('screen');
 const tabbar = document.getElementById('tabbar');
 let shownDay = dayKey();
 
-H.init();
+// First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
+const foundSchema = H.init();
+if (foundSchema === 1) R.awardPastPerfectDays();
+R.sync();
 
 function currentTab() {
   const t = location.hash.replace('#', '');
@@ -26,22 +32,17 @@ function currentTab() {
 }
 
 function renderHud() {
-  const today = dayKey();
-  const log = H.getLog();
-  const habits = H.getAllHabits();
-  const byId = new Map(habits.map((h) => [h.id, h]));
-  const earned = H.xpOnDay(today, log);
-  // Max for today = every active daily habit + whatever weekly/monthly XP was earned today
-  const dailyMax = H.getHabits().filter((h) => h.frequency === 'daily').reduce((s, h) => s + h.xp * h.target, 0);
-  const bonus = Object.entries(log[today] || {}).reduce((s, [id, e]) => (byId.get(id)?.frequency === 'daily' ? s : s + e.n * e.xp), 0);
-  const max = dailyMax + bonus;
+  const st = Stats.compute();
+  const t = Stats.today();
   const name = H.getProfile().name;
+  const o = st.overall;
 
-  hud.innerHTML = `${lvl(1)}
+  hud.innerHTML = `${lvl(o.level)}
     <div class="hud__main">
-      <div class="hud__top"><button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button><span class="hud__date">${prettyDate()}</span></div>
-      ${xpbar(pct(earned, max))}
-      <div class="hud__meta"><span>${earned} / ${max} XP</span><span class="hud__today">${icon('xp')}+${earned} today</span></div>
+      <div class="hud__top"><button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button><span class="hud__rank">${esc(st.rank.name)}</span></div>
+      ${xpbar(o.pct)}
+      <div class="hud__meta"><span>${o.into} / ${o.need} XP</span><span class="hud__date">${prettyDate()}</span></div>
+      ${meter('Today', pct(t.earned, t.max), `${icon('xp')}+${t.earned}`)}
     </div>`;
 }
 
@@ -56,18 +57,18 @@ function refresh() {
   renderHud();
   renderTabs(tab);
   if (tab === 'today') Today.render(screen, refresh);
-  else if (tab === 'profile') renderProfile(screen);
+  else if (tab === 'profile') Profile.render(screen);
   else renderSoon(screen, tab);
 }
 
 Today.bind(screen);
-bindProfile(screen, refresh);
-hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) openNameSheet(refresh); });
+Profile.bind(screen, refresh);
+hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
 
 window.addEventListener('hashchange', () => { refresh(); window.scrollTo(0, 0); });
 
 // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-const checkDay = () => { if (dayKey() !== shownDay) refresh(); };
+const checkDay = () => { if (dayKey() !== shownDay) { R.sync(); refresh(); } };
 setInterval(checkDay, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
 window.addEventListener('focus', checkDay);

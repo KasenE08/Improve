@@ -246,3 +246,40 @@
 @media (prefers-reduced-motion: reduce) {
   .imp-root *, .imp-root *::before, .imp-root *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---- Meter row (label + bar + value) ----------------------------------------
+   <div class="imp-meter"><span class="imp-meter__label">Today</span>
+     <div class="imp-xpbar imp-xpbar--sm" style="--p:40%"><div class="imp-xpbar__fill"></div></div>
+     <span class="imp-meter__val">+60</span></div> */
+.imp-meter { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.imp-meter__label { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.imp-meter__val { display: inline-flex; align-items: center; gap: 3px; font-size: 19px; color: var(--imp-accent); white-space: nowrap; }
+.imp-meter__val .imp-icon { width: 16px; height: 16px; }
+
+/* ---- Streak tag -------------------------------------------------------------
+   <span class="imp-streak"><svg class="imp-icon">…#flame</svg>5</span>  (+ is-pending when not done yet this period) */
+.imp-streak { display: inline-flex; align-items: center; gap: 3px; font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-warn); text-transform: uppercase; }
+.imp-streak .imp-icon { width: 13px; height: 13px; }
+.imp-streak.is-pending { color: var(--imp-muted); }
+
+/* ---- Category level row (icon, name + LV, bar, XP) ------------------------- */
+.imp-attr { display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; align-items: center; padding: 7px 0; }
+.imp-attr__icon { grid-row: span 2; width: 24px; height: 24px; color: var(--imp-accent); }
+.imp-attr__top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.imp-attr__name { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-attr__lv { font: 700 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-accent); white-space: nowrap; }
+.imp-attr__xp { font-size: 17px; color: var(--imp-muted); white-space: nowrap; }
+
+/* ---- Big moment overlay (level up, perfect day) -----------------------------
+   Built by burst() in js/ui.js. Tap anywhere to dismiss. */
+.imp-burst { position: fixed; inset: 0; z-index: 70; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .78); }
+.imp-burst__box { min-width: 240px; max-width: 340px; text-align: center; padding: 22px 20px 20px; background: var(--imp-surface); display: grid; gap: 10px; justify-items: center;
+  box-shadow: 0 -4px 0 var(--imp-accent), 0 4px 0 var(--imp-accent), -4px 0 0 var(--imp-accent), 4px 0 0 var(--imp-accent), 0 10px 0 4px #000;
+  animation: imp-pop .3s steps(3); }
+.imp-burst__icon { width: 56px; height: 56px; color: var(--imp-accent); }
+.imp-burst__title { font: 700 22px var(--imp-font-head); color: var(--imp-accent); letter-spacing: .04em; animation: imp-blink .5s steps(1) 4; }
+.imp-burst__big { font: 700 34px/1 var(--imp-font-head); }
+.imp-burst__sub { color: var(--imp-muted); font-size: 21px; }
+.imp-burst__hint { font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); text-transform: uppercase; margin-top: 6px; }
+@keyframes imp-pop { from { transform: scale(.5); } to { transform: none; } }
+.imp-attr .imp-meter { grid-template-columns: 1fr auto; }

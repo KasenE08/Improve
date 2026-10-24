@@ -14,7 +14,7 @@ Live examples with copy-paste markup: `styleguide.html`.
 - All classes start with `imp-` so they won't collide with the calorie tracker or planner code.
 - Restyle by changing variables in `assets/css/tokens.css`. Components only read those variables.
 - Resets use `:where()` (zero specificity), so a component class always wins.
-- JS helpers that build the same markup live in `js/ui.js` (`panel()`, `xpbar()`, `statRow()`, `check()`, `chip()`, `pips()`, `lvl()`, `empty()`, `sheet.open()`, `toast()`, `icon()`).
+- JS helpers that build the same markup live in `js/ui.js` (`panel()`, `xpbar()`, `statRow()`, `check()`, `chip()`, `pips()`, `lvl()`, `empty()`, `sheet.open()`, `toast()`, `icon()`, `meter()`, `attrRow()`, `streakTag()`, `burst()`).
 
 ## Components
 
@@ -33,6 +33,10 @@ Live examples with copy-paste markup: `styleguide.html`.
 | Bottom sheet | `imp-sheet` (+ `is-open`), `__backdrop`, `__panel`, `__body` (use `sheet.open()` from `js/ui.js`) |
 | Tab bar | `imp-tabbar` > `imp-tab` (+ `is-active`) |
 | Empty state | `imp-empty`, `__icon`, `__text` |
+| Meter row | `imp-meter`, `__label`, `__val` (wraps an `imp-xpbar--sm`) |
+| Category level | `imp-attr`, `__icon`, `__top`, `__name`, `__lv`, `__xp` |
+| Streak tag | `imp-streak` (+ `is-pending`) |
+| Big moment overlay | `imp-burst`, `__box`, `__icon`, `__title`, `__big`, `__sub` (use `burst()` from `js/ui.js`) |
 | Misc | `imp-icon`, `imp-title`, `imp-label`, `imp-accent`, `imp-muted`, `imp-frame`, `imp-toast`, `imp-float`, `imp-blink` |
 
 ## Icons
@@ -45,14 +49,26 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `1` |
+| `imp_schema` | `2` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
-| `imp_log` | `{ "YYYY-MM-DD": { habitId: { n, xp } } }`, completions per day with the XP value at the time |
+| `imp_log` | `{ "YYYY-MM-DD": { habitId: { n, xp, c } } }`, completions per day with the XP value and category at the time |
+| `imp_bonus` | `{ "YYYY-MM-DD": { "perfect" \| "streak:<habitId>": { type, xp, … } } }`, bonus XP on the day it was earned |
+| `imp_ranks` | `[{ min, name }]`, editable on Profile |
+| `imp_last_backup` | ISO date of the last export |
 
 Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
 `auto` marks habits that later phases will check off automatically (`food:calories`, `food:protein`, `planner:work`, `money:log`).
+
+## Leveling (Phase 2)
+
+- **Three meters:** Today (XP today ÷ most possible today), Overall (player level), and one per category.
+- **Overall curve:** XP from level L to L+1 = `150 + 30 × (L − 1)` (`js/levels.js`). LV 10 at 2,430 XP, LV 50 at 42,630.
+- **Category curves:** the same curve × the category's share of weekly XP you can earn (`js/stats.js`), so equal consistency means equal pace.
+- **Ranks:** Initiate 1, Apprentice 5, Adept 10, Veteran 20, Elite 30, Master 40, Legend 50, Mythic 75, Ascended 100 (editable).
+- **Bonuses** (`js/rewards.js`): Perfect Day +50 (all dailies done). Streak milestones +25 at 7, +100 at 30, +300 at 100 and every 100 after. Undoing a check-in removes a bonus it unlocked; missed periods reset streaks but never remove XP.
+- Levels are never stored: they're calculated from `imp_log` + `imp_bonus`, so curve changes apply instantly.
 
 ## Deploying
 

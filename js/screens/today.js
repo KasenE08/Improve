@@ -1,7 +1,9 @@
 // Today tab: Daily / This Week / This Month checklists, grouped by category.
 import * as H from '../habits.js';
+import * as R from '../rewards.js';
+import * as Stats from '../stats.js';
 import { daysLeft } from '../dates.js';
-import { esc, icon, panel, check, chip, pips, statRow, pct, floatXP, toast, sheet, PICKER_ICONS } from '../ui.js';
+import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
@@ -16,7 +18,11 @@ export function render(root, refresh) {
   const habits = H.getHabits();
   const cats = H.getCategories();
   const log = H.getLog();
-  const prog = new Map(habits.map((h) => [h.id, H.progress(h, new Date(), log)]));
+  const now = new Date();
+  const prog = new Map(habits.map((h) => [h.id, H.progress(h, now, log)]));
+  const counts = H.countsIndex(log);
+  const streaks = new Map(habits.map((h) => [h.id, R.streak(h, now, counts)]));
+  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id));
 
   const toolbar = editMode
     ? `<div class="today-toolbar">
@@ -36,24 +42,19 @@ export function render(root, refresh) {
     const groups = cats.map((c) => {
       const items = list.filter((h) => h.category === c.id);
       if (!items.length) return '';
-      return `<div class="imp-panel__sub">${icon(c.icon)}${esc(c.name)}</div>` + items.map((h) => row(h, prog.get(h.id))).join('');
+      return `<div class="imp-panel__sub">${icon(c.icon)}${esc(c.name)}</div>` + items.map(row).join('');
     }).join('');
     // Habits whose category was removed
     const orphans = list.filter((h) => !cats.some((c) => c.id === h.category));
-    const orphanHtml = orphans.length ? `<div class="imp-panel__sub">${icon('scroll')}Other</div>` + orphans.map((h) => row(h, prog.get(h.id))).join('') : '';
+    const orphanHtml = orphans.length ? `<div class="imp-panel__sub">${icon('scroll')}Other</div>` + orphans.map(row).join('') : '';
     return panel({ title: SECTION[freq], meta: `${done}/${list.length}${left}`, body: groups + orphanHtml });
   }).join('');
 
-  const stats = cats.map((c) => {
-    const items = habits.filter((h) => h.category === c.id);
-    if (!items.length) return '';
-    const sum = items.reduce((s, h) => s + Math.min(prog.get(h.id), h.target) / h.target, 0);
-    const p = pct(sum, items.length);
-    return statRow({ icon: c.icon, name: c.name, value: p + '%', p });
-  }).join('');
+  const st = Stats.compute();
+  const attrs = st.categories.filter((c) => habits.some((h) => h.category === c.id)).map(attrRow).join('');
 
   root.innerHTML = `<div class="screen">${toolbar}${sections || emptyList()}
-    ${stats ? panel({ title: 'Category status', meta: icon('trophy', 'imp-accent'), body: `<div class="today-stats">${stats}</div><p class="today-note">Share of each category's habits done for the current day / week / month.</p>` }) : ''}
+    ${attrs ? panel({ title: 'Attributes', meta: icon('trophy', 'imp-accent'), body: `<div class="today-stats">${attrs}</div><p class="today-note">Each category levels up from its own XP. Curves are scaled so small categories keep pace.</p>` }) : ''}
   </div>`;
 }
 
@@ -61,12 +62,13 @@ function emptyList() {
   return panel({ title: 'No habits', body: `<p class="imp-muted" style="padding:8px 0">Tap Edit → New habit to add one.</p>` });
 }
 
-function row(h, n) {
+function habitRow(h, n, st) {
   const multi = h.target > 1;
   const done = n >= h.target;
+  const fire = st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : '';
   const sub = multi
-    ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}</span>${pips(Math.min(n, h.target), h.target)}`
-    : '';
+    ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
+    : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : chip(h.xp, done);
   return `<button class="imp-row${done ? ' is-done' : ''}" data-id="${esc(h.id)}" aria-pressed="${done}">
     ${check(done, multi && n > 0 ? n : '')}
@@ -114,6 +116,7 @@ export function bind(root) {
 function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
+  const before = Stats.compute();
   let change;
   if (delta > 0 && h.target === 1 && H.progress(h) >= 1) change = H.step(h, -1); // tap on a checked single habit unchecks it
   else change = H.step(h, delta);
@@ -121,9 +124,27 @@ function apply(id, delta) {
     if (delta > 0) toast('Maxed out · hold to undo');
     return;
   }
+  const added = R.sync();
   ctx.refresh();
   const el = ctx.root.querySelector(`.imp-row[data-id="${CSS.escape(id)}"]`);
   if (el) floatXP(el, change);
+  celebrate(before, Stats.compute(), added);
+}
+
+// Bonus + level-up feedback
+export function celebrate(before, after, added) {
+  for (const b of added) {
+    if (b.type === 'perfect') burst({ icon: 'star', title: 'Perfect day!', big: `+${b.xp} XP`, sub: 'Every daily habit done' });
+    if (b.type === 'streak') burst({ icon: 'flame', title: `${b.n}-${b.unit.replace(/s$/, '')} streak!`, big: `+${b.xp} XP`, sub: b.name });
+  }
+  if (after.overall.level > before.overall.level) {
+    const rankUp = after.rank.name !== before.rank.name;
+    burst({ icon: 'trophy', title: 'Level up!', big: `LV ${after.overall.level}`, sub: rankUp ? `New rank: ${after.rank.name}` : after.rank.name });
+  }
+  for (const c of after.categories) {
+    const old = before.categories.find((x) => x.id === c.id);
+    if (old && c.level > old.level) toast(`${c.name} → LV ${c.level}`);
+  }
 }
 
 // ---- Habit editor ----
@@ -161,6 +182,7 @@ function openHabitForm(h) {
         const target = clampInt(b.querySelector('#f-target').value, 1, 31, 1);
         const xp = clampInt(b.querySelector('#f-xp').value, 0, 999, 10);
         H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp });
+        R.sync();
         sheet.close();
         ctx.refresh();
         toast(isNew ? 'Habit added' : 'Saved');
@@ -168,6 +190,7 @@ function openHabitForm(h) {
       b.querySelector('#f-del')?.addEventListener('click', () => {
         if (!confirm(`Delete "${h.name}"? Its past history is kept.`)) return;
         H.archiveHabit(h.id);
+        R.sync();
         sheet.close();
         ctx.refresh();
         toast('Deleted');
