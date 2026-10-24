@@ -283,3 +283,8 @@
 .imp-burst__hint { font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); text-transform: uppercase; margin-top: 6px; }
 @keyframes imp-pop { from { transform: scale(.5); } to { transform: none; } }
 .imp-attr .imp-meter { grid-template-columns: 1fr auto; }
+
+/* XP bar color variants: protein (orange) and over goal (red) */
+.imp-xpbar--protein .imp-xpbar__fill { background: repeating-linear-gradient(90deg, var(--imp-protein) 0 8px, transparent 8px 11px); }
+.imp-xpbar--over { box-shadow: 0 0 0 var(--imp-px) var(--imp-danger-deep); }
+.imp-xpbar--over .imp-xpbar__fill { background: repeating-linear-gradient(90deg, var(--imp-danger) 0 8px, transparent 8px 11px); }

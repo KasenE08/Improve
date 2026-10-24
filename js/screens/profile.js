@@ -85,6 +85,7 @@ export function render(root) {
 
 export function bind(root, refresh) {
   root.addEventListener('click', async (e) => {
+    if (root.dataset.tab !== 'profile') return;
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'edit-name') openNameSheet(refresh);
     if (act === 'edit-ranks') openRanks(refresh);
@@ -99,7 +100,7 @@ export function bind(root, refresh) {
     if (act === 'import') root.querySelector('#importFile')?.click();
   });
   root.addEventListener('change', async (e) => {
-    if (e.target.id !== 'importFile' || !e.target.files[0]) return;
+    if (root.dataset.tab !== 'profile' || e.target.id !== 'importFile' || !e.target.files[0]) return;
     const text = await e.target.files[0].text();
     e.target.value = '';
     const res = Backup.parseBackup(text);

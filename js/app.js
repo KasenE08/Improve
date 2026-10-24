@@ -6,6 +6,7 @@ import { dayKey, prettyDate } from './dates.js';
 import { esc, icon, lvl, xpbar, meter, pct } from './ui.js';
 import * as Today from './screens/today.js';
 import { renderSoon } from './screens/other.js';
+import * as Food from './screens/food.js';
 import * as Profile from './screens/profile.js';
 
 const TABS = [
@@ -24,6 +25,7 @@ let shownDay = dayKey();
 // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
 const foundSchema = H.init();
 if (foundSchema === 1) R.awardPastPerfectDays();
+Food.recheckToday();
 R.sync();
 
 function currentTab() {
@@ -56,19 +58,22 @@ function refresh() {
   const tab = currentTab();
   renderHud();
   renderTabs(tab);
+  screen.dataset.tab = tab;
   if (tab === 'today') Today.render(screen, refresh);
+  else if (tab === 'food') Food.render(screen, refresh);
   else if (tab === 'profile') Profile.render(screen);
   else renderSoon(screen, tab);
 }
 
 Today.bind(screen);
+Food.bind(screen);
 Profile.bind(screen, refresh);
 hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
 
 window.addEventListener('hashchange', () => { refresh(); window.scrollTo(0, 0); });
 
 // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-const checkDay = () => { if (dayKey() !== shownDay) { R.sync(); refresh(); } };
+const checkDay = () => { Food.recheckToday(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
 setInterval(checkDay, 30000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
 window.addEventListener('focus', checkDay);
