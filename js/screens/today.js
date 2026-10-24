@@ -6,8 +6,9 @@ import { daysLeft } from '../dates.js';
 import { recheck } from '../food/autocheck.js';
 import { AUTO, isAuto, autoTab } from '../auto.js';
 import { recheckPlanner } from '../planner-auto.js';
+import { recheckMoney } from '../money/autocheck.js';
 import { appDateFor } from '../food/logic.js';
-const recheckFood = () => { recheck(appDateFor(new Date())); recheckPlanner(); };
+const recheckFood = () => { recheck(appDateFor(new Date())); recheckPlanner(); recheckMoney(); };
 import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };

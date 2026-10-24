@@ -35,7 +35,7 @@ eq(L.rankFor(100).name, 'Ascended', 'rank LV100');
 const day0 = new Date(2026, 9, 20, 9); // Tue
 mem.imp_schema = '1';
 H.init(); // would seed if fresh; schema 1 must NOT be reseeded
-eq(mem.imp_schema, '2', 'schema bumped to 2');
+eq(mem.imp_schema, String(H.SCHEMA), 'schema bumped to current');
 mem.imp_schema = '1';
 delete mem.imp_habits; delete mem.imp_categories;
 const { DEFAULT_HABITS, DEFAULT_CATEGORIES } = await import(J('defaults.js'));

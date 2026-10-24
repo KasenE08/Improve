@@ -18,7 +18,7 @@ import * as store from './store.js';
 import { dayKey, periodRange } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
-export const SCHEMA = 2;
+export const SCHEMA = 3;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -31,6 +31,12 @@ export function init() {
     store.set('profile', DEFAULT_PROFILE);
     store.set('log', {});
     store.set('bonus', {});
+  }
+  // Schema 3 (Money tab): "Save % of paycheck" and "Budget review" tick from the Money tab;
+  // "Log spending" stays a manual tap.
+  if (found > 0 && found < 3) {
+    const MONEY_AUTO = { 'save-paycheck': 'money:save', 'budget-review': 'money:review', 'log-spending': null };
+    store.set('habits', store.get('habits', []).map((h) => (h.id in MONEY_AUTO ? { ...h, auto: MONEY_AUTO[h.id] } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
@@ -123,6 +129,28 @@ export function setDone(habit, day, done) {
   else {
     delete log[day][habit.id];
     if (!Object.keys(log[day]).length) delete log[day];
+  }
+  saveLog(log);
+  return true;
+}
+
+// Weekly / monthly version for auto-checks: done = exactly one completion somewhere in the
+// period containing `date` (added on that date if missing); not done = none in the period.
+// Returns true if anything changed.
+export function setPeriodDone(habit, date, done) {
+  if (habit.frequency === 'daily') return setDone(habit, dayKey(date), done);
+  const log = getLog();
+  const [start, end] = periodRange(habit.frequency, date);
+  const days = Object.keys(log).filter((d) => d >= start && d <= end && log[d][habit.id]);
+  if (done) {
+    if (days.length) return false;
+    (log[dayKey(date)] ||= {})[habit.id] = { n: 1, xp: habit.xp, c: habit.category };
+  } else {
+    if (!days.length) return false;
+    for (const d of days) {
+      delete log[d][habit.id];
+      if (!Object.keys(log[d]).length) delete log[d];
+    }
   }
   saveLog(log);
   return true;
