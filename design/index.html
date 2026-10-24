@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070c">
+<title>Improve · Design Picks</title>
+<style>
+:root { --bg: #05070c; --card: #0c111a; --edge: #1c2533; --text: #e8eef7; --muted: #8a97ab; --accent: #22d3ee; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 -apple-system, system-ui, sans-serif; }
+main { max-width: 760px; margin: 0 auto; padding: max(24px, env(safe-area-inset-top)) 16px 48px; }
+h1 { font-size: 26px; margin: 0 0 4px; }
+h2 { font-size: 19px; margin: 36px 0 12px; }
+p { margin: 0 0 12px; color: var(--muted); }
+a { color: var(--accent); }
+.styles { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.style { display: block; color: inherit; text-decoration: none; background: var(--card); border: 1px solid var(--edge); border-radius: 14px; overflow: hidden; }
+.style img { display: block; width: 100%; aspect-ratio: 390 / 560; object-fit: cover; object-position: top; background: #000; }
+.style div { padding: 12px 14px 14px; }
+.style b { display: block; font-size: 16px; }
+.style span { font-size: 13px; color: var(--muted); }
+.sets { display: grid; gap: 12px; }
+.set { background: var(--card); border: 1px solid var(--edge); border-radius: 14px; padding: 14px; }
+.set-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.set-top b { font-size: 16px; }
+.tag { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: #13202c; color: var(--accent); white-space: nowrap; }
+.tag.warn { background: #2a1f0e; color: #fbbf24; }
+.icons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 12px 0 8px; }
+.icons figure { margin: 0; display: grid; justify-items: center; gap: 4px; padding: 10px 0 6px; background: #070b12; border-radius: 10px; color: var(--accent); }
+.icons svg { width: 28px; height: 28px; }
+.icons figcaption { font-size: 10px; color: var(--muted); }
+.set p { font-size: 13px; margin: 0; }
+.note { background: var(--card); border-left: 3px solid var(--accent); padding: 10px 14px; border-radius: 6px; font-size: 14px; color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Improve — pick a style</h1>
+  <p>Phase 1, Part A. Three original HUD directions built from the same components. Tap one to try it — the checklist works, and each page has an icon-set switcher at the top.</p>
+
+  <div class="styles">
+    <a class="style" href="tactical.html"><img src="shots/tactical.png" alt="Style A Tactical preview"><div><b>A · Tactical</b><span>Chamfered panels, hex level badge, grid backdrop, segmented glowing bars. Sci-fi ops console.</span></div></a>
+    <a class="style" href="holo.html"><img src="shots/holo.png" alt="Style B Holo preview"><div><b>B · Holo</b><span>Frosted glass panels, ring-progress level badge, gradient pill bars, floating tab bar. Cleanest and most iOS-native.</span></div></a>
+    <a class="style" href="pixel.html"><img src="shots/pixel.png" alt="Style C Pixel preview"><div><b>C · Pixel</b><span>Notched pixel frames, block XP bars, scanlines, arcade fonts. Most game-like, least "app" feeling.</span></div></a>
+  </div>
+
+  <h2>Icon sets</h2>
+  <p>All free. Any set works with any style. Same six icons shown for each: Body, Diet, Skin, Mind, Money, People.</p>
+  <div class="sets" id="sets"></div>
+
+  <h2>What I need from you</h2>
+  <div class="note">Reply with a style (A / B / C) and an icon set (Lucide / Phosphor / Tabler / Game-icons). Mixing is fine, e.g. “B with Phosphor” or “A but with B’s tab bar”.</div>
+</main>
+<script src="icons.js"></script>
+<script>
+const sets = [
+  ['lucide', 'Lucide', 'ISC', false, '~2,000 icons', 'Clean 2px outline icons. Very consistent; the most "app-like" look. No in-app credit needed — just keep the license notice in the repo.'],
+  ['ph', 'Phosphor (duotone)', 'MIT', false, '~9,000 icons (6 weights)', 'Duotone weight adds a translucent fill layer that reads well as glowing HUD icons. Also has thin/regular/bold/fill. No in-app credit needed.'],
+  ['tabler', 'Tabler', 'MIT', false, '~6,000 icons', 'Outline icons like Lucide but bigger catalog and slightly more technical feel. No in-app credit needed.'],
+  ['game-icons', 'Game-icons.net', 'CC BY 3.0', true, '~4,100 icons', 'Bold silhouette RPG icons — the most "game" flavor. Attribution required: I would add a Credits line on the Profile tab naming the artists (Lorc, Delapouite & contributors) with a link to game-icons.net and the license.'],
+];
+const keys = [['body', 'Body'], ['diet', 'Diet'], ['skin', 'Skin'], ['mind', 'Mind'], ['money', 'Money'], ['people', 'People']];
+document.getElementById('sets').innerHTML = sets.map(([k, name, lic, attr, count, desc]) => `
+  <div class="set">
+    <div class="set-top"><b>${name}</b><span><span class="tag">${lic}</span> <span class="tag${attr ? ' warn' : ''}">${attr ? 'Attribution required' : 'No attribution required'}</span></span></div>
+    <div class="icons">${keys.map(([ik, il]) => `<figure>${IMP_ICONS[k][ik]}<figcaption>${il}</figcaption></figure>`).join('')}</div>
+    <p>${count}. ${desc}</p>
+  </div>`).join('');
+</script>
+</body>
+</html>

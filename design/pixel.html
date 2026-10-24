@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07070d">
+<title>Improve · Style C Pixel</title>
+<link rel="stylesheet" href="base.css">
+<style>
+@font-face { font-family: Silkscreen; font-weight: 400; font-display: swap; src: url(fonts/silkscreen-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(fonts/silkscreen-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: VT323; font-weight: 400; font-display: swap; src: url(fonts/vt323-latin-400-normal.woff2) format('woff2'); }
+
+:root {
+  --bg: #07070d; --panel: #0c1020; --panel-head: #10213a; --frame: #1c4a66;
+  --accent: #29f0ff; --accent-dim: #0f6f80; --accent-deep: #08414d; --on-accent: #07070d;
+  --text: #e2fbff; --muted: #6b86a0;
+  --px: 3px;
+  --f-head: Silkscreen, ui-monospace, monospace; --f-body: VT323, ui-monospace, monospace;
+}
+body { background: var(--bg); color: var(--text); font: 400 21px/1.05 var(--f-body);
+  background-image: radial-gradient(rgba(41, 240, 255, .08) 1px, transparent 1px); background-size: 12px 12px; }
+body::after { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 30;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .22) 0 1px, transparent 1px 3px); }
+.num { font-family: var(--f-body); }
+
+/* Notched pixel frame */
+.panel { background: var(--panel); margin: var(--px); padding: 0 14px 10px;
+  box-shadow: 0 calc(-1 * var(--px)) 0 0 var(--frame), 0 var(--px) 0 0 var(--frame),
+              calc(-1 * var(--px)) 0 0 0 var(--frame), var(--px) 0 0 0 var(--frame),
+              0 calc(var(--px) * 3) 0 0 #000; }
+.panel-head { margin: 0 -14px 6px; padding: 8px 14px; background: var(--panel-head); }
+.panel-head h2 { font: 700 13px var(--f-head); color: var(--accent); letter-spacing: .04em; text-transform: uppercase; }
+.panel-head h2::before { content: "\25B8  "; }
+.count { font-size: 20px; color: var(--muted); }
+.count .ic { color: var(--accent); width: 20px; height: 20px; }
+
+/* HUD */
+.hud { padding-top: 22px; }
+.lvl { width: 62px; height: 62px; background: var(--accent); color: var(--on-accent);
+  box-shadow: 4px 4px 0 var(--accent-deep), inset -4px -4px 0 rgba(0, 0, 0, .18), inset 4px 4px 0 rgba(255, 255, 255, .35); }
+.lvl-label { font: 700 10px var(--f-head); }
+.lvl-num { font: 700 26px/1 var(--f-head); }
+.name { font: 700 18px var(--f-head); letter-spacing: .04em; }
+.rank { font: 400 11px var(--f-head); color: var(--accent); }
+.rank::before { content: "["; } .rank::after { content: "]"; }
+.xpbar { height: 16px; margin: 8px 0 4px; background: #000; box-shadow: 0 0 0 var(--px) var(--frame); }
+.xpbar-fill { inset: 3px auto 3px 3px; width: calc(var(--p) - 6px); background: repeating-linear-gradient(90deg, var(--accent) 0 8px, transparent 8px 11px); }
+.hud-meta { font-size: 19px; color: var(--muted); }
+.today { color: var(--accent); }
+.today .ic { width: 16px; height: 16px; }
+.today b { font-weight: 400; }
+
+/* Habits */
+.habit { padding: 9px 0; border-bottom: var(--px) dotted #1a2a40; }
+.habit:last-child { border-bottom: 0; }
+.habit:active { background: rgba(41, 240, 255, .07); }
+.check { width: 24px; height: 24px; background: #000; color: var(--on-accent);
+  box-shadow: 0 0 0 var(--px) var(--accent-dim); margin: var(--px); }
+.is-done .check { background: var(--accent); box-shadow: 0 0 0 var(--px) var(--accent), 3px 3px 0 var(--px) var(--accent-deep); }
+.check .ic { width: 16px; height: 16px; }
+.habit-name { font-size: 23px; }
+.is-done .habit-name { color: var(--muted); }
+.habit-sub { font: 400 10px var(--f-head); color: var(--muted); text-transform: uppercase; }
+.habit-sub .ic { width: 13px; height: 13px; color: var(--accent); }
+.pip { width: 14px; height: 8px; background: #1a2a40; }
+.pip.on { background: var(--accent); }
+.xp-chip { font-size: 21px; color: var(--accent); }
+.xp-chip::before { content: "["; color: var(--muted); } .xp-chip::after { content: "]"; color: var(--muted); }
+.xp-chip small { font-size: 15px; }
+.is-done .xp-chip { color: var(--on-accent); background: var(--accent); }
+.is-done .xp-chip::before, .is-done .xp-chip::after { color: var(--accent-deep); }
+.xp-float { font: 700 13px var(--f-head); color: var(--accent); animation-timing-function: steps(6); }
+
+/* Stats */
+.stats { padding: 6px 0 4px; }
+.stat-ic { color: var(--accent); }
+.stat-ic .ic { width: 20px; height: 20px; }
+.stat-name { font: 400 11px var(--f-head); text-transform: uppercase; }
+.statbar { height: 12px; background: #000; box-shadow: 0 0 0 2px var(--frame); }
+.statbar-fill { background: repeating-linear-gradient(90deg, var(--accent) 0 9px, transparent 9px 12px); }
+.stat-val { color: var(--accent); }
+
+/* Buttons */
+.btn-row { padding: 10px 0 8px; gap: 14px; }
+.btn { font: 700 12px var(--f-head); text-transform: uppercase; padding: 10px 14px; }
+.btn:active { transform: translateY(3px); box-shadow: none !important; }
+.btn-primary { background: var(--accent); color: var(--on-accent); box-shadow: 0 4px 0 var(--accent-deep); }
+.btn-secondary { color: var(--accent); background: #000;
+  box-shadow: 0 -3px 0 var(--accent-dim), 0 3px 0 var(--accent-dim), -3px 0 0 var(--accent-dim), 3px 0 0 var(--accent-dim); }
+.btn-ghost { color: var(--muted); }
+.btn-ghost::before { content: "> "; }
+.type { padding-top: 10px; margin-top: 4px; border-top: var(--px) dotted #1a2a40; }
+.type-h { font: 700 18px var(--f-head); }
+.type-b { font-size: 22px; }
+.type-n { font-size: 22px; color: var(--accent); }
+.type-cap { font-size: 17px; color: var(--muted); }
+
+/* Tab bar */
+.tabbar { background: #0a0d18; border-top: var(--px) solid var(--frame); box-shadow: 0 -6px 0 #000; }
+.tab { color: var(--muted); padding: 4px 0; font: 400 10px var(--f-head); text-transform: uppercase; }
+.tab.is-active { color: var(--on-accent); }
+.tab.is-active .ic { background: var(--accent); box-shadow: 0 0 0 4px var(--accent), 3px 3px 0 4px var(--accent-deep); }
+.tab.is-active span { color: var(--accent); }
+</style>
+</head>
+<body data-style="pixel" data-default-set="game-icons" data-fonts="Silkscreen (headings) · VT323 (body + numbers) — both free, OFL">
+<div id="app"></div>
+<script src="icons.js"></script>
+<script src="sample.js"></script>
+</body>
+</html>
