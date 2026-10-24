@@ -69,6 +69,16 @@
 &lt;/button&gt;</pre>
   </div></section>
 
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Meter, attribute, streak</h2></header><div class="imp-panel__body">
+    <div class="imp-meter"><span class="imp-meter__label">Today</span><div class="imp-xpbar imp-xpbar--sm" style="--p:40%"><div class="imp-xpbar__fill"></div></div><span class="imp-meter__val"><svg class="imp-icon"><use href="assets/icons/icons.svg#xp"></use></svg>+86</span></div>
+    <div class="imp-attr"><svg class="imp-icon imp-attr__icon"><use href="assets/icons/icons.svg#mind"></use></svg>
+      <div class="imp-attr__top"><span class="imp-attr__name">Mind</span><span class="imp-attr__lv">LV 4</span></div>
+      <div class="imp-meter"><div class="imp-xpbar imp-xpbar--sm" style="--p:55%"><div class="imp-xpbar__fill"></div></div><span class="imp-attr__xp">28/51</span></div></div>
+    <p><span class="imp-streak"><svg class="imp-icon"><use href="assets/icons/icons.svg#flame"></use></svg>12 days</span> &nbsp; <span class="imp-streak is-pending"><svg class="imp-icon"><use href="assets/icons/icons.svg#flame"></use></svg>3 weeks</span></p>
+    <button class="imp-btn imp-btn--secondary imp-btn--sm" id="burstDemo">Show level-up overlay</button>
+    <pre>meter(label, pct, value) · attrRow(category) · streakTag(n, current, unit) · burst({ icon, title, big, sub })   ← js/ui.js</pre>
+  </div></section>
+
   <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Buttons</h2></header><div class="imp-panel__body">
     <div class="imp-btn-row">
       <button class="imp-btn imp-btn--primary">Primary</button>
@@ -108,6 +118,10 @@ sizes: --sm --block</pre>
   <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#wallet"></use></svg><span>Money</span></a>
   <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#profile"></use></svg><span>Profile</span></a>
 </nav>
+<script type="module">
+  import { burst } from './js/ui.js';
+  document.getElementById('burstDemo').onclick = () => burst({ icon: 'trophy', title: 'Level up!', big: 'LV 10', sub: 'New rank: Adept' });
+</script>
 <script>
   fetch('assets/icons/icons.svg').then((r) => r.text()).then((t) => {
     const ids = [...t.matchAll(/<symbol id="([^"]+)"/g)].map((m) => m[1]);

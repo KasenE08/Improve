@@ -5,7 +5,10 @@
 //   imp_categories  [{ id, name, icon }]
 //   imp_habits      [{ id, name, category, frequency: daily|weekly|monthly, target, xp, order, archived, auto }]
 //   imp_profile     { name }
-//   imp_log         { "YYYY-MM-DD": { habitId: { n: count, xp: xpPerCompletionAtTheTime } } }
+//   imp_log         { "YYYY-MM-DD": { habitId: { n: count, xp: xpPerCompletionAtTheTime, c: categoryAtTheTime } } }
+//   imp_bonus       { "YYYY-MM-DD": { bonusId: { type, xp, c?, habit?, n? } } }   (see rewards.js)
+//   imp_ranks       [{ min, name }]                                             (see levels.js)
+//   imp_last_backup ISO date of the last export
 //
 // Resets are automatic: progress is always counted from the log inside the
 // current period (today / Mon–Sun week / calendar month), so nothing is ever
@@ -15,17 +18,22 @@ import * as store from './store.js';
 import { dayKey, periodRange } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
-const SCHEMA = 1;
+export const SCHEMA = 2;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
+// Seeds a fresh install. Returns the schema version found before (0 = fresh),
+// so the app can run one-time upgrades. Existing data is never overwritten.
 export function init() {
-  if (store.get('schema') == null) {
+  const found = store.get('schema') ?? 0;
+  if (found === 0) {
     store.set('categories', DEFAULT_CATEGORIES);
     store.set('habits', DEFAULT_HABITS);
     store.set('profile', DEFAULT_PROFILE);
     store.set('log', {});
-    store.set('schema', SCHEMA);
+    store.set('bonus', {});
   }
+  if (found < SCHEMA) store.set('schema', SCHEMA);
+  return found;
 }
 
 // ---- Profile ----
@@ -85,6 +93,7 @@ export function step(habit, delta, date = new Date()) {
     const e = (day[habit.id] ||= { n: 0, xp: habit.xp });
     e.n += 1;
     e.xp = habit.xp;
+    e.c = habit.category;
     saveLog(log);
     return habit.xp;
   }
@@ -103,7 +112,14 @@ export function step(habit, delta, date = new Date()) {
   return -xp;
 }
 
-// XP earned on a given day
+// Index: counts[habitId][day] = n  (fast lookups for streaks and stats)
+export function countsIndex(log = getLog()) {
+  const idx = {};
+  for (const day in log) for (const id in log[day]) (idx[id] ||= {})[day] = log[day][id].n;
+  return idx;
+}
+
+// XP earned from habits on a given day (bonuses are separate, see rewards.js)
 export function xpOnDay(key = dayKey(), log = getLog()) {
   const day = log[key] || {};
   return Object.values(day).reduce((sum, e) => sum + e.n * e.xp, 0);

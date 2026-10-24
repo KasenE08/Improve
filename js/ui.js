@@ -52,6 +52,39 @@ export function floatXP(el, amount) {
   setTimeout(() => f.remove(), 900);
 }
 
+export const streakTag = (count, current, unit) =>
+  `<span class="imp-streak${current ? '' : ' is-pending'}" title="${count} ${unit} streak">${icon('flame')}${count} ${esc(unit)}</span>`;
+
+export const meter = (label, p, val) =>
+  `<div class="imp-meter"><span class="imp-meter__label">${esc(label)}</span>${xpbar(p, 'imp-xpbar--sm')}<span class="imp-meter__val">${val}</span></div>`;
+
+export const attrRow = (c) =>
+  `<div class="imp-attr">${icon(c.icon, 'imp-attr__icon')}
+    <div class="imp-attr__top"><span class="imp-attr__name">${esc(c.name)}</span><span class="imp-attr__lv">LV ${c.level}</span></div>
+    <div class="imp-meter">${xpbar(c.pct, 'imp-xpbar--sm')}<span class="imp-attr__xp">${Math.floor(c.into)}/${Math.ceil(c.need)}</span></div>
+  </div>`;
+
+// Big full-screen moments (level up, perfect day). Queued so they show one at a time.
+const burstQueue = [];
+export function burst({ icon: ic, title, big = '', sub = '' }) {
+  burstQueue.push({ ic, title, big, sub });
+  if (burstQueue.length === 1) showBurst();
+}
+function showBurst() {
+  const b = burstQueue[0];
+  if (!b) return;
+  const el = document.createElement('div');
+  el.className = 'imp-burst';
+  el.setAttribute('role', 'alertdialog');
+  el.innerHTML = `<div class="imp-burst__box">${icon(b.ic, 'imp-burst__icon')}<p class="imp-burst__title">${esc(b.title)}</p>
+    ${b.big ? `<p class="imp-burst__big">${esc(b.big)}</p>` : ''}${b.sub ? `<p class="imp-burst__sub">${esc(b.sub)}</p>` : ''}
+    <p class="imp-burst__hint">Tap to continue</p></div>`;
+  const close = () => { el.remove(); clearTimeout(t); burstQueue.shift(); showBurst(); };
+  const t = setTimeout(close, 3500);
+  el.addEventListener('click', close);
+  document.body.appendChild(el);
+}
+
 let toastTimer;
 export function toast(msg) {
   let t = document.querySelector('.imp-toast');
