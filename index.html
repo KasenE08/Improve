@@ -2,10 +2,30 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Improve</title>
-<meta http-equiv="refresh" content="0; url=design/">
-<style>body{margin:0;background:#05070c;color:#e8eef7;font:16px -apple-system,system-ui,sans-serif;display:grid;place-items:center;min-height:100vh}a{color:#22d3ee}</style>
+<meta name="description" content="Daily, weekly and monthly habits with XP.">
+<meta name="theme-color" content="#07070d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Improve">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/app-icons/icon-192.png">
+<link rel="apple-touch-icon" href="assets/app-icons/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/silkscreen-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="assets/fonts/vt323-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="css/app.css">
 </head>
-<body><p>Improve is in design review. <a href="design/">See the style samples</a>.</p></body>
+<body class="imp-root">
+  <div class="app">
+    <header class="hud" id="hud"></header>
+    <main id="screen"></main>
+  </div>
+  <nav class="imp-tabbar" id="tabbar" aria-label="Tabs"></nav>
+  <noscript><p style="padding:16px">Improve needs JavaScript turned on.</p></noscript>
+  <script type="module" src="js/app.js"></script>
+</body>
 </html>

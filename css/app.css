@@ -1,0 +1,34 @@
+/* App-specific layout. Generic pieces live in assets/css/components.css. */
+.app { max-width: 480px; margin: 0 auto; padding: 0 var(--imp-gutter) calc(var(--imp-tabbar-h) + 32px + env(safe-area-inset-bottom)); }
+.screen { display: grid; gap: var(--imp-gap); }
+
+/* HUD header */
+.hud { display: flex; gap: 16px; align-items: center; padding: calc(env(safe-area-inset-top) + 18px) 0 18px; }
+.hud__main { flex: 1; min-width: 0; }
+.hud__top, .hud__meta { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.hud__top { margin-bottom: 8px; }
+.hud__name { font: 700 var(--imp-fs-md) var(--imp-font-head); letter-spacing: .04em; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.hud__date { flex: none; font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-accent); }
+.hud__meta { margin-top: 6px; font-size: 19px; color: var(--imp-muted); }
+.hud__today { display: inline-flex; align-items: center; gap: 3px; color: var(--imp-accent); }
+.hud__today .imp-icon { width: 17px; height: 17px; }
+
+/* Today */
+.today-toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.today-hint { margin-top: -8px; }
+.today-stats { padding: 6px 0 2px; }
+.today-note { margin-top: 8px; font-size: 17px; color: var(--imp-muted); }
+
+/* Category editor */
+.cat-list { display: grid; gap: 12px; }
+.cat-item { display: grid; gap: 10px; }
+.cat-row { display: flex; gap: 10px; align-items: center; }
+.cat-icon { flex: none; width: 44px; height: 44px; display: grid; place-items: center; color: var(--imp-accent); background: var(--imp-sunken); box-shadow: 0 0 0 2px var(--imp-frame); }
+.cat-icon.is-on { box-shadow: 0 0 0 2px var(--imp-accent); }
+.cat-icon .imp-icon { width: 24px; height: 24px; }
+.cat-del::before { content: none; }
+
+/* Profile */
+.profile-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.profile-text { padding: 6px 0; line-height: 1.15; }
+.profile-text a { text-decoration: underline; }
