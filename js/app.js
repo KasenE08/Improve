@@ -7,6 +7,8 @@ import { esc, icon, lvl, xpbar, meter, pct } from './ui.js';
 import * as Today from './screens/today.js';
 import * as Food from './screens/food.js';
 import * as Money from './screens/money.js';
+import * as Journal from './screens/journal.js';
+import { recheckJournal } from './journal/autocheck.js';
 import { recheckMoney } from './money/autocheck.js';
 import * as Profile from './screens/profile.js';
 import { recheckPlanner } from './planner-auto.js';
@@ -18,6 +20,7 @@ const TABS = [
   ['food', 'Food', 'food'],
   ['planner', 'Planner', 'planner'],
   ['money', 'Money', 'wallet'],
+  ['journal', 'Journal', 'quill'],
   ['profile', 'Profile', 'profile'],
 ];
 
@@ -31,6 +34,7 @@ const foundSchema = H.init();
 if (foundSchema === 1) R.awardPastPerfectDays();
 Food.recheckToday();
 recheckMoney();
+recheckJournal();
 R.sync();
 
 function currentTab() {
@@ -90,18 +94,21 @@ function refresh() {
   const tab = currentTab();
   renderHud();
   renderTabs(tab);
+  Journal.flush(); // save anything still being typed before the screen changes
   if (tab === 'planner') { screen.dataset.tab = tab; showPlanner(); return; }
   unmountPlanner();
   screen.dataset.tab = tab;
   if (tab === 'today') Today.render(screen, refresh);
   else if (tab === 'food') Food.render(screen, refresh);
   else if (tab === 'money') Money.render(screen, refresh);
+  else if (tab === 'journal') Journal.render(screen, refresh, renderHud);
   else if (tab === 'profile') Profile.render(screen);
 }
 
 Today.bind(screen);
 Food.bind(screen);
 Money.bind(screen);
+Journal.bind(screen);
 Profile.bind(screen, refresh);
 hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
 
@@ -113,9 +120,9 @@ window.addEventListener('hashchange', () => {
 });
 
 // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-const checkDay = () => { Food.recheckToday(); recheckPlanner(); recheckMoney(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
+const checkDay = () => { Food.recheckToday(); recheckPlanner(); recheckMoney(); recheckJournal(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
 setInterval(checkDay, 30000);
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) Journal.flush(); else checkDay(); });
 window.addEventListener('focus', checkDay);
 window.addEventListener('pageshow', checkDay);
 

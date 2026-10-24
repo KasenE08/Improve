@@ -125,3 +125,25 @@ export const sheet = {
     document.documentElement.style.overflow = '';
   },
 };
+
+// Pixel-style confirm pop-up. Resolves true (OK) or false (Cancel / tap outside).
+// confirmBox({ title, text, ok: 'Edit', cancel: 'Cancel', icon: 'edit' })
+export function confirmBox({ title, text = '', ok = 'OK', cancel = 'Cancel', icon: ic = 'info' }) {
+  return new Promise((resolve) => {
+    const el = document.createElement('div');
+    el.className = 'imp-dialog';
+    el.setAttribute('role', 'alertdialog');
+    el.innerHTML = `<div class="imp-dialog__box">${icon(ic, 'imp-dialog__icon')}
+      <p class="imp-dialog__title">${esc(title)}</p>${text ? `<p class="imp-dialog__text">${esc(text)}</p>` : ''}
+      <div class="imp-dialog__btns"><button class="imp-btn imp-btn--secondary" data-v="0">${esc(cancel)}</button>
+      <button class="imp-btn imp-btn--primary" data-v="1">${esc(ok)}</button></div></div>`;
+    const done = (v) => { el.remove(); resolve(v); };
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-v]');
+      if (b) done(b.dataset.v === '1');
+      else if (e.target === el) done(false);
+    });
+    document.body.appendChild(el);
+    el.querySelector('[data-v="1"]').focus();
+  });
+}

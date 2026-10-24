@@ -34,6 +34,10 @@ Open the link in Safari → Share → **Add to Home Screen**.
 - Customizable pay schedule (weekly, every 2 weeks, twice a month, monthly, irregular) and saving as a fixed amount or % per paycheck.
 - "Save % of paycheck" and "Budget review" tick automatically; "Log spending" stays a manual tap.
 
+## Journal
+- Journal tab: one note that starts a new dated section every day. Past days are editable after an "are you sure" pop-up.
+- "Journal" ticks automatically at 25 words today (changeable with the gear icon).
+
 ## Files
 - `index.html`, `js/` app · `css/app.css` app layout
 - `assets/css/tokens.css` + `assets/css/components.css` shared design system (see `DESIGN.md`, `styleguide.html`)
@@ -41,6 +45,6 @@ Open the link in Safari → Share → **Add to Home Screen**.
 - `sw.js` offline cache · `manifest.webmanifest` install info
 - `design/` the original style samples from Part A
 - Planner source: `planner/` (TypeScript + Preact, `npm run check`, `npm run build` → `js/planner/`)
-- Tests: `node tests/logic.test.mjs`, `node tests/phase2.test.mjs`, `node tests/food-auto.test.mjs`, `node --test tests/food-logic.test.mjs`, `node tests/planner-auto.test.mjs`, `node tests/money.test.mjs`
+- Tests: `node tests/logic.test.mjs`, `node tests/phase2.test.mjs`, `node tests/food-auto.test.mjs`, `node --test tests/food-logic.test.mjs`, `node tests/planner-auto.test.mjs`, `node tests/money.test.mjs`, `node tests/journal.test.mjs`
 
 Credits: see `CREDITS.md`.

@@ -37,6 +37,7 @@ Live examples with copy-paste markup: `styleguide.html`.
 | Category level | `imp-attr`, `__icon`, `__top`, `__name`, `__lv`, `__xp` |
 | Streak tag | `imp-streak` (+ `is-pending`) |
 | Big moment overlay | `imp-burst`, `__box`, `__icon`, `__title`, `__big`, `__sub` (use `burst()` from `js/ui.js`) |
+| Confirm pop-up | `imp-dialog`, `__box`, `__icon`, `__title`, `__text`, `__btns` (use `await confirmBox({ title, text, ok })` from `js/ui.js`) |
 | Misc | `imp-icon`, `imp-title`, `imp-label`, `imp-accent`, `imp-muted`, `imp-frame`, `imp-toast`, `imp-float`, `imp-blink` |
 
 ## Icons
@@ -49,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `3` |
+| `imp_schema` | `4` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
@@ -60,10 +61,11 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
 | `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
 | `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving, amount, cat, note, date }], reviews: { 'YYYY-MM': { doneAt } } }`. Amounts in cents |
+| `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`). "Log spending" stays a manual tap.
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap.
 
 ## Leveling (Phase 2)
 
@@ -100,6 +102,14 @@ Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. 
 - Saving: fixed amount per paycheck (default $40) or % of each paycheck.
 - Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); weeks with no payday tick on their own; not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished.
 - Schema 3 upgrade sets those autos on existing "Save % of paycheck" / "Budget review" habits and makes "Log spending" manual.
+
+## Journal tab
+
+- One long note split into a section per day (midnight to midnight), newest at the bottom; opens at today. `js/screens/journal.js`, `js/journal/store.js`, `css/journal.css`.
+- Today is always editable. Past days are editable after a confirm pop-up (`confirmBox`), then go back to read-only when you leave them.
+- Auto-check (`js/journal/autocheck.js`): "Journal" ticks when today's section has at least `minWords` words (default 25, gear icon on the tab). Only today counts; editing past days never changes XP.
+- Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
+- Schema 4 upgrade makes the existing "Journal" habit auto.
 
 ## Deploying
 

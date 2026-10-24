@@ -288,3 +288,18 @@
 .imp-xpbar--protein .imp-xpbar__fill { background: repeating-linear-gradient(90deg, var(--imp-protein) 0 8px, transparent 8px 11px); }
 .imp-xpbar--over { box-shadow: 0 0 0 var(--imp-px) var(--imp-danger-deep); }
 .imp-xpbar--over .imp-xpbar__fill { background: repeating-linear-gradient(90deg, var(--imp-danger) 0 8px, transparent 8px 11px); }
+
+/* ---- Confirm pop-up --------------------------------------------------------
+   Built by confirmBox() in js/ui.js. */
+.imp-dialog { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 24px; background: rgba(0, 0, 0, .75); }
+.imp-dialog__box { width: 100%; max-width: 340px; display: grid; gap: 10px; justify-items: center; text-align: center; padding: 20px 18px 18px; background: var(--imp-surface);
+  box-shadow: 0 -3px 0 var(--imp-frame), 0 3px 0 var(--imp-frame), -3px 0 0 var(--imp-frame), 3px 0 0 var(--imp-frame), 0 10px 0 3px #000;
+  animation: imp-pop .2s steps(3); }
+.imp-dialog__icon { width: 40px; height: 40px; color: var(--imp-warn); }
+.imp-dialog__title { font: 700 var(--imp-fs-sm) var(--imp-font-head); text-transform: uppercase; color: var(--imp-text); line-height: 1.4; }
+.imp-dialog__text { font-size: 19px; color: var(--imp-muted); }
+.imp-dialog__btns { display: flex; gap: 12px; margin-top: 6px; width: 100%; }
+.imp-dialog__btns .imp-btn { flex: 1; }
+
+/* Six tabs fit at phone width */
+.imp-tabbar .imp-tab { min-width: 0; font-size: 9px; letter-spacing: 0; }
