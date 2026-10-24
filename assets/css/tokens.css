@@ -4,7 +4,9 @@
    ========================================================================== */
 
 @font-face { font-family: Silkscreen; font-weight: 400; font-display: swap; src: url(../fonts/silkscreen-latin-400-normal.woff2) format('woff2'); }
-@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-700-normal.woff2) format('woff2'); }
+/* Bold Silkscreen draws some digits badly (the 4 and 9), so bold text uses the regular-weight digits. */
+@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-700-normal.woff2) format('woff2'); unicode-range: U+0000-002F, U+003A-FFFF; }
+@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-400-normal.woff2) format('woff2'); unicode-range: U+0030-0039; }
 @font-face { font-family: VT323; font-weight: 400; font-display: swap; src: url(../fonts/vt323-latin-400-normal.woff2) format('woff2'); }
 
 :root {
