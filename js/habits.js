@@ -9,6 +9,7 @@
 //   imp_bonus       { "YYYY-MM-DD": { bonusId: { type, xp, c?, habit?, n? } } }   (see rewards.js)
 //   imp_ranks       [{ min, name }]                                             (see levels.js)
 //   imp_last_backup ISO date of the last export
+//   imp_journal     { settings: { minWords }, days: { "YYYY-MM-DD": text } }   (see journal/store.js)
 //
 // Resets are automatic: progress is always counted from the log inside the
 // current period (today / Mon–Sun week / calendar month), so nothing is ever
@@ -18,7 +19,7 @@ import * as store from './store.js';
 import { dayKey, periodRange } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
-export const SCHEMA = 3;
+export const SCHEMA = 4;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -37,6 +38,10 @@ export function init() {
   if (found > 0 && found < 3) {
     const MONEY_AUTO = { 'save-paycheck': 'money:save', 'budget-review': 'money:review', 'log-spending': null };
     store.set('habits', store.get('habits', []).map((h) => (h.id in MONEY_AUTO ? { ...h, auto: MONEY_AUTO[h.id] } : h)));
+  }
+  // Schema 4 (Journal tab): "Journal" ticks from the words written today.
+  if (found > 0 && found < 4) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'journal' ? { ...h, auto: 'journal:words' } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
