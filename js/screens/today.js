@@ -3,6 +3,9 @@ import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
 import { daysLeft } from '../dates.js';
+import { AUTO, isFoodAuto, recheck } from '../food/autocheck.js';
+import { appDateFor } from '../food/logic.js';
+const recheckFood = () => recheck(appDateFor(new Date()));
 import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
@@ -65,7 +68,7 @@ function emptyList() {
 function habitRow(h, n, st) {
   const multi = h.target > 1;
   const done = n >= h.target;
-  const fire = st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : '';
+  const fire = [isFoodAuto(h) ? `<span class="today-auto">${icon('food')}Auto</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
@@ -82,7 +85,9 @@ const HOLD_MS = 450;
 let holdTimer = null, held = false, startXY = null;
 
 export function bind(root) {
+  const mine = () => root.dataset.tab === 'today';
   root.addEventListener('pointerdown', (e) => {
+    if (!mine()) return;
     const r = e.target.closest('.imp-row[data-id]');
     if (!r || editMode) return;
     held = false;
@@ -99,6 +104,7 @@ export function bind(root) {
   root.addEventListener('contextmenu', (e) => { if (e.target.closest('.imp-row')) e.preventDefault(); });
 
   root.addEventListener('click', (e) => {
+    if (!mine()) return;
     const act = e.target.closest('[data-act]')?.dataset.act;
     if (act === 'edit') { editMode = true; return ctx.refresh(); }
     if (act === 'done-edit') { editMode = false; return ctx.refresh(); }
@@ -116,6 +122,7 @@ export function bind(root) {
 function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
+  if (isFoodAuto(h)) return toast('Auto from Food tab');
   const before = Stats.compute();
   let change;
   if (delta > 0 && h.target === 1 && H.progress(h) >= 1) change = H.step(h, -1); // tap on a checked single habit unchecks it
@@ -152,7 +159,11 @@ function openHabitForm(h) {
   const isNew = !h;
   const cats = H.getCategories();
   const cur = h || { name: '', category: cats[0]?.id, frequency: 'daily', target: 1, xp: 10 };
-  const autoNote = cur.auto ? `<p class="imp-label">Will auto-check from the ${AUTO_TAB[cur.auto.split(':')[0]] || 'other'} tab in a later phase. Manual for now.</p>` : '';
+  const autoNote = cur.auto && !AUTO[cur.auto] ? `<p class="imp-label">Will auto-check from the ${AUTO_TAB[cur.auto.split(':')[0]] || 'other'} tab in a later phase. Manual for now.</p>` : '';
+  const autoField = `<label class="imp-field"><span class="imp-label">Auto-check</span><select class="imp-select" id="f-auto">
+        <option value="">Off (tap to check)</option>
+        ${Object.entries(AUTO).map(([k, v]) => `<option value="${k}"${cur.auto === k ? ' selected' : ''}>${v}</option>`).join('')}
+        ${cur.auto && !AUTO[cur.auto] ? `<option value="${esc(cur.auto)}" selected>Later phase (${esc(cur.auto)})</option>` : ''}</select></label>`;
   sheet.open({
     title: isNew ? 'New habit' : 'Edit habit',
     body: `
@@ -165,6 +176,7 @@ function openHabitForm(h) {
         <label class="imp-field"><span class="imp-label">Times per period</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="1" max="31" value="${cur.target}"></label>
         <label class="imp-field"><span class="imp-label">XP each</span><input class="imp-input" id="f-xp" type="number" inputmode="numeric" min="0" max="999" value="${cur.xp}"></label>
       </div>
+      ${autoField}
       ${autoNote}
       <button class="imp-btn imp-btn--primary imp-btn--block" id="f-save">Save</button>
       ${isNew ? '' : '<button class="imp-btn imp-btn--danger imp-btn--block" id="f-del">' + icon('trash') + 'Delete habit</button>'}`,
@@ -181,7 +193,9 @@ function openHabitForm(h) {
         if (!name) { toast('Name needed'); return b.querySelector('#f-name').focus(); }
         const target = clampInt(b.querySelector('#f-target').value, 1, 31, 1);
         const xp = clampInt(b.querySelector('#f-xp').value, 0, 999, 10);
-        H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp });
+        const auto = b.querySelector('#f-auto').value || null;
+        H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto });
+        recheckFood();
         R.sync();
         sheet.close();
         ctx.refresh();

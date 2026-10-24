@@ -28,6 +28,10 @@
   --imp-text: #e2fbff;
   --imp-muted: #6b86a0;
 
+  /* Food: calories use the accent, protein is orange */
+  --imp-protein: #ff9f1c;
+  --imp-protein-deep: #5c3500;
+
   /* Status */
   --imp-danger: #ff4f6d;
   --imp-danger-deep: #5c1422;

@@ -57,6 +57,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_bonus` | `{ "YYYY-MM-DD": { "perfect" \| "streak:<habitId>": { type, xp, … } } }`, bonus XP on the day it was earned |
 | `imp_ranks` | `[{ min, name }]`, editable on Profile |
 | `imp_last_backup` | ISO date of the last export |
+| `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
 `auto` marks habits that later phases will check off automatically (`food:calories`, `food:protein`, `planner:work`, `money:log`).
@@ -69,6 +70,14 @@ Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. 
 - **Ranks:** Initiate 1, Apprentice 5, Adept 10, Veteran 20, Elite 30, Master 40, Legend 50, Mythic 75, Ascended 100 (editable).
 - **Bonuses** (`js/rewards.js`): Perfect Day +50 (all dailies done). Streak milestones +25 at 7, +100 at 30, +300 at 100 and every 100 after. Undoing a check-in removes a bonus it unlocked; missed periods reset streaks but never remove XP.
 - Levels are never stored: they're calculated from `imp_log` + `imp_bonus`, so curve changes apply instantly.
+
+## Food tab (Phase 3)
+
+- Ported from `KasenE08/calorie-tracker` (read-only copy). Logic in `js/food/logic.js` is the original file plus the hit rules; tests in `tests/food-logic.test.mjs`.
+- Food day runs 4:01 AM → 4:00 AM (late night counts toward the previous date). Meals: Breakfast 4:01–11:00, Lunch 11:01–4:00 PM, Dinner 4:01–9:00 PM, Late Night 9:01 PM–4:00 AM.
+- Auto-checks (`js/food/autocheck.js`): habits with `auto: "food:calories"` tick when calories are within ±`calRange`% of `calGoal`; `auto: "food:protein"` ticks at `proteinMin` g or more. These habits can't be tapped on Today.
+- Colors: calories use the accent, protein `--imp-protein` (orange), over goal `--imp-danger`. Bar variants: `imp-xpbar--protein`, `imp-xpbar--over`.
+- Import from the old app: its backup file (works on iPhone) or a direct read of `calorie-tracker.v1` when both apps share storage. The old data is never modified.
 
 ## Deploying
 

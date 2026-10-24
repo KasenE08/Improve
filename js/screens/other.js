@@ -1,8 +1,7 @@
-// Food, Planner, Money: "coming soon" screens.
+// Planner, Money: "coming soon" screens.
 import { esc, icon, panel, empty } from '../ui.js';
 
 const SOON = {
-  food: { icon: 'food', title: 'Food', text: 'Calorie + protein tracking moves in here in a later phase. It will auto-check "Hit calories" and "Hit protein".' },
   planner: { icon: 'planner', title: 'Planner', text: 'Your schedule planner moves in here in a later phase. It will auto-check "Work done on schedule".' },
   money: { icon: 'wallet', title: 'Money', text: 'Spending log + budget come in a later phase. It will auto-check "Log spending".' },
 };

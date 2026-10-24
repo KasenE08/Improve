@@ -112,6 +112,22 @@ export function step(habit, delta, date = new Date()) {
   return -xp;
 }
 
+// Set a habit done / not done on a date (used by auto-checks from other tabs).
+// Returns true if anything changed.
+export function setDone(habit, day, done) {
+  const log = getLog();
+  const cur = log[day]?.[habit.id]?.n || 0;
+  const want = done ? Math.max(1, habit.frequency === 'daily' ? habit.target : 1) : 0;
+  if (cur === want) return false;
+  if (want) (log[day] ||= {})[habit.id] = { n: want, xp: habit.xp, c: habit.category };
+  else {
+    delete log[day][habit.id];
+    if (!Object.keys(log[day]).length) delete log[day];
+  }
+  saveLog(log);
+  return true;
+}
+
 // Index: counts[habitId][day] = n  (fast lookups for streaks and stats)
 export function countsIndex(log = getLog()) {
   const idx = {};
