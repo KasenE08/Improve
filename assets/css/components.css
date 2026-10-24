@@ -73,7 +73,7 @@
   box-shadow: 4px 4px 0 var(--imp-accent-deep), inset -4px -4px 0 rgba(0, 0, 0, .18), inset 4px 4px 0 rgba(255, 255, 255, .35);
 }
 .imp-lvl__label { font: 700 var(--imp-fs-xs) var(--imp-font-head); }
-.imp-lvl__num { font: 700 26px/1 var(--imp-font-head); }
+.imp-lvl__num { font: 700 30px/1 var(--imp-font-head); }
 
 /* ---- XP bar ----------------------------------------------------------------
    <div class="imp-xpbar" style="--p:62%"><div class="imp-xpbar__fill"></div></div> */
