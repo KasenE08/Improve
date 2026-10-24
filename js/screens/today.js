@@ -3,9 +3,11 @@ import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
 import { daysLeft } from '../dates.js';
-import { AUTO, isFoodAuto, recheck } from '../food/autocheck.js';
+import { recheck } from '../food/autocheck.js';
+import { AUTO, isAuto, autoTab } from '../auto.js';
+import { recheckPlanner } from '../planner-auto.js';
 import { appDateFor } from '../food/logic.js';
-const recheckFood = () => recheck(appDateFor(new Date()));
+const recheckFood = () => { recheck(appDateFor(new Date())); recheckPlanner(); };
 import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
@@ -68,7 +70,7 @@ function emptyList() {
 function habitRow(h, n, st) {
   const multi = h.target > 1;
   const done = n >= h.target;
-  const fire = [isFoodAuto(h) ? `<span class="today-auto">${icon('food')}Auto</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
+  const fire = [isAuto(h) ? `<span class="today-auto">${icon(h.auto.startsWith('planner') ? 'planner' : 'food')}Auto</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
@@ -122,7 +124,7 @@ export function bind(root) {
 function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
-  if (isFoodAuto(h)) return toast('Auto from Food tab');
+  if (isAuto(h)) return toast(`Auto from ${autoTab(h)} tab`);
   const before = Stats.compute();
   let change;
   if (delta > 0 && h.target === 1 && H.progress(h) >= 1) change = H.step(h, -1); // tap on a checked single habit unchecks it

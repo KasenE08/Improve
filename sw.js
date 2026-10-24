@@ -1,6 +1,6 @@
 // Improve service worker. Scope is this folder only (/Improve/), set by its location.
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'v3';
+const VERSION = 'v4';
 const PREFIX = 'imp-cache-';            // only caches with this prefix are ever touched
 const CACHE = PREFIX + VERSION;
 
@@ -37,6 +37,10 @@ const FILES = [
   'js/food/store.js',
   'js/food/import.js',
   'js/food/autocheck.js',
+  'js/auto.js',
+  'js/planner-auto.js',
+  'js/planner/planner.js',
+  'js/planner/planner.css',
 ];
 
 self.addEventListener('install', (event) => {
@@ -83,4 +87,26 @@ self.addEventListener('fetch', (event) => {
       return res;
     }))
   );
+});
+
+// ---- Planner notifications (Web Push from the user's own free notification server) ----
+self.addEventListener('push', (e) => {
+  let n = {};
+  try { n = e.data ? e.data.json() : {}; } catch (_) {}
+  e.waitUntil(self.registration.showNotification(n.title || 'Improve', {
+    body: n.body || '', tag: n.tag, icon: 'assets/app-icons/icon-192.png', data: { taskId: n.taskId },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const taskId = e.notification.data && e.notification.data.taskId;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    const open = list[0];
+    if (open) {
+      if (taskId) open.postMessage({ type: 'open-task', taskId });
+      return open.focus();
+    }
+    return self.clients.openWindow(taskId ? './#planner?task=' + encodeURIComponent(taskId) : './');
+  }));
 });

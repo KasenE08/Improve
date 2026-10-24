@@ -11,7 +11,7 @@ Live examples with copy-paste markup: `styleguide.html`.
 <body class="imp-root"> … </body>
 ```
 
-- All classes start with `imp-` so they won't collide with the calorie tracker or planner code.
+- All classes start with `imp-` so they won't collide with the calorie tracker or planner code. (Improve's `.screen` is the one shared name; the planner theme resets it.)
 - Restyle by changing variables in `assets/css/tokens.css`. Components only read those variables.
 - Resets use `:where()` (zero specificity), so a component class always wins.
 - JS helpers that build the same markup live in `js/ui.js` (`panel()`, `xpbar()`, `statRow()`, `check()`, `chip()`, `pips()`, `lvl()`, `empty()`, `sheet.open()`, `toast()`, `icon()`, `meter()`, `attrRow()`, `streakTag()`, `burst()`).
@@ -57,10 +57,12 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_bonus` | `{ "YYYY-MM-DD": { "perfect" \| "streak:<habitId>": { type, xp, … } } }`, bonus XP on the day it was earned |
 | `imp_ranks` | `[{ min, name }]`, editable on Profile |
 | `imp_last_backup` | ISO date of the last export |
+| `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
+| `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that later phases will check off automatically (`food:calories`, `food:protein`, `planner:work`, `money:log`).
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`; `money:log` comes later).
 
 ## Leveling (Phase 2)
 
@@ -79,6 +81,16 @@ Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. 
 - Colors: calories use the accent, protein `--imp-protein` (orange), over goal `--imp-danger`. Bar variants: `imp-xpbar--protein`, `imp-xpbar--over`.
 - Import from the old app: its backup file (works on iPhone) or a direct read of `calorie-tracker.v1` when both apps share storage. The old data is never modified.
 
+## Planner tab (Phase 4)
+
+- Ported from `KasenE08/Schedule-App-Planner` (read-only copy) into `planner/`: TypeScript + Preact, unchanged scheduler and screens, 119 tests (`cd planner && npm run check`, two timezones).
+- `planner/vite.config.ts` builds one module + one stylesheet into `js/planner/` (git-ignored; built by the deploy workflow). A small PostCSS plugin scopes every rule under `.planner-root`, so the planner's CSS can't touch other tabs.
+- Theme: `planner/src/app/styles.css` now reads Improve's tokens (dark surfaces, square corners, VT323 text scaled up); details in `planner/src/app/improve-theme.css`. Category colors brightened for dark mode.
+- `js/app.js` loads the bundle in the background at launch (`start()`: replans on a new day, keeps notifications synced) and `mount()`s it when the Planner tab opens. Its old bottom bar is a top sub-nav (Schedule / Tasks / Settings / Stats / +).
+- Notifications: Improve's `sw.js` handles `push` and `notificationclick` (opens `#planner?task=ID`). The app uses the user's existing free Cloudflare server from Schedule-App-Planner.
+- Auto-check (`js/planner-auto.js`): "Work done on schedule" ticks when every task that was on today's plan is Done. Moving a task off today doesn't count; deleted tasks drop off; a day with nothing planned counts once the planner has tasks or fixed times.
+- Copy from the old app: Planner → Settings → Backup & copy (backup file, or same-browser storage). Read-only.
+
 ## Deploying
 
-Pushes to `main` deploy through `.github/workflows/pages.yml`. When app files change, bump `VERSION` in `sw.js` (and add any new file to its `FILES` list) so installed phones update.
+Pushes to `main` deploy through `.github/workflows/pages.yml` (it type-checks, tests and builds the Planner, runs the other tests, then publishes everything except `planner/` and `tests/`). When app files change, bump `VERSION` in `sw.js` (and add any new file to its `FILES` list) so installed phones update.

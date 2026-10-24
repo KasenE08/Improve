@@ -1,0 +1,334 @@
+import type { BlockReminder, Interval, Ms, ScheduleInput, ScheduleResult, ScheduledItem, Task, Warning } from './types';
+import { addDays, at, ceilTo, dateKey, MIN } from './time';
+import { freeTime, occurrencesOn } from './availability';
+import { comparePriority, isSchoolwork } from './priority';
+
+interface Prev {
+  end: Ms;
+  short: boolean;
+  /** True once this short task has already been paired with the one before it. */
+  paired: boolean;
+}
+
+interface State {
+  prev: Prev | null;
+  floor: Ms;
+  /** Parts of split tasks placed so far: group → part → end time. */
+  parts: Map<string, Map<number, Ms>>;
+  /** Ids placed so far. */
+  placed: Set<string>;
+}
+
+interface Run {
+  items: ScheduledItem[];
+  warnings: Warning[];
+}
+
+/** Earliest grid-aligned start ≥ from where `dur` fits fully inside one free interval. */
+function earliestFit(free: Interval[], from: Ms, dur: Ms, gridMin: number): Ms | null {
+  for (const iv of free) {
+    if (iv.end <= from) continue;
+    const s = ceilTo(Math.max(iv.start, from), gridMin);
+    if (s + dur <= iv.end) return s;
+  }
+  return null;
+}
+
+/** Sorted union of intervals, joining ones that touch (so a task can run 11:30pm–12:30am). */
+function merge(a: Interval[], b: Interval[]): Interval[] {
+  const all = [...a, ...b].sort((x, y) => x.start - y.start);
+  const out: Interval[] = [];
+  for (const iv of all) {
+    const last = out[out.length - 1];
+    if (last && iv.start <= last.end) last.end = Math.max(last.end, iv.end);
+    else out.push({ ...iv });
+  }
+  return out;
+}
+
+function cut(iv: Interval, busy: Interval): Interval[] {
+  if (busy.end <= iv.start || busy.start >= iv.end) return [iv];
+  return [
+    ...(busy.start > iv.start ? [{ start: iv.start, end: busy.start }] : []),
+    ...(busy.end < iv.end ? [{ start: busy.end, end: iv.end }] : []),
+  ];
+}
+
+const lateIds = (r: Run) => new Set(r.items.filter((i) => i.late).map((i) => i.taskId));
+
+/** Fewer late tasks wins; with the same count, being less late in total wins. */
+function better(a: Run, b: Run, tasks: Task[]): boolean {
+  const la = lateIds(a).size;
+  const lb = lateIds(b).size;
+  if (la !== lb) return la < lb;
+  const due = new Map(tasks.map((t) => [t.id, t.due]));
+  const lateness = (r: Run) => r.items.reduce((sum, i) => sum + (i.late ? i.end - (due.get(i.taskId) ?? i.end) : 0), 0);
+  return lateness(a) < lateness(b);
+}
+
+/**
+ * Places every unfinished task into free time, in priority order (due date, then category).
+ * A lower-priority task may fill a gap first only if doing so never delays the top task.
+ * Missing work goes as soon as possible unless that would make a dated task late.
+ * Parts of a split task go in order, one per day, unless that would make them late.
+ * With a night extension, only tasks that would otherwise be late may use it.
+ */
+export function schedule(input: ScheduleInput): ScheduleResult {
+  const plan = (allowNight: Set<string>) => run(input, allowNight);
+  let result = plan(new Set());
+  if (input.nightExtension) {
+    // Unlock tonight's late hours for tasks that would be late; reshuffling can make others late,
+    // so widen the set a few times and keep the plan with the fewest late tasks.
+    let allow = new Set<string>();
+    for (let round = 0; round < 4; round++) {
+      const late = lateIds(result);
+      const next = new Set([...allow, ...late]);
+      if (next.size === allow.size) break;
+      allow = next;
+      const extended = plan(allow);
+      if (better(extended, result, input.tasks)) result = extended;
+      else break;
+    }
+  }
+  return { ...result, blockReminders: blockReminders(input) };
+}
+
+function run(input: ScheduleInput, allowNight: Set<string>): Run {
+  const { now, settings: s } = input;
+  const free = freeTime(input, dateKey(now), s.horizonDays);
+  const night = input.nightExtension ? [input.nightExtension] : [];
+  const isShort = (t: Task) => t.estimateMin <= s.shortTaskMaxMin;
+
+  const fixed: ScheduledItem[] = [];
+  let state: State = { prev: null, floor: input.exactStart ?? now, parts: new Map(), placed: new Set() };
+
+  // A task already started holds its slot; it is the previous task for break purposes.
+  for (const t of input.tasks.filter((t) => t.status === 'inProgress' && t.startedAt !== undefined)) {
+    const end = Math.max(t.startedAt! + t.estimateMin * MIN, now + s.slotRoundMin * MIN);
+    fixed.push({ taskId: t.id, start: t.startedAt!, end, late: t.due !== null && end > t.due });
+    if (!state.prev || end > state.prev.end) state = { ...state, prev: { end, short: isShort(t), paired: false } };
+    const busy = { start: t.startedAt!, end };
+    free.all = free.all.flatMap((iv) => cut(iv, busy));
+    free.schoolwork = free.schoolwork.flatMap((iv) => cut(iv, busy));
+  }
+  const nightFree = {
+    all: merge(free.all, night),
+    schoolwork: merge(free.schoolwork, night),
+  };
+  const freeFor = (t: Task) => {
+    const scope = isSchoolwork(t) ? 'schoolwork' : 'all';
+    return allowNight.has(t.id) ? nightFree[scope] : free[scope];
+  };
+
+  // Hand moves: a pin to a past day no longer applies.
+  const today = dateKey(now);
+  const pinOf = (t: Task) => (t.pinDay && t.pinDay >= today ? t.pinDay : undefined);
+  const spread = s.spreadWork !== false;
+  /** Spreading: the chosen day per task (filled in below, once the priority order is known). */
+  let target = new Map<string, string>();
+
+  /**
+   * Spreading: picks a day for each dated task, in priority order: the day with the least work so far
+   * (ties: the earlier day) that still has room to finish it before it's due. Missing work stays as soon as
+   * possible and pinned tasks stay on their day; both still count toward that day's work.
+   */
+  function targetDays(): Map<string, string> {
+    const load = new Map<string, number>();
+    const addLoad = (k: string, min: number) => load.set(k, (load.get(k) ?? 0) + min + s.breakMin);
+    for (const f of fixed) addLoad(dateKey(f.start), (f.end - f.start) / MIN);
+    const days = Array.from({ length: s.horizonDays }, (_, i) => addDays(today, i));
+    /** Free minutes on day k for t before `until`, and the longest single stretch. */
+    const room = (t: Task, k: string, until: Ms) => {
+      const lo = Math.max(at(k, 0), now);
+      const hi = Math.min(at(addDays(k, 1), 0), until);
+      let total = 0;
+      let longest = 0;
+      for (const iv of free[isSchoolwork(t) ? 'schoolwork' : 'all']) {
+        const len = Math.min(iv.end, hi) - Math.max(iv.start, lo);
+        if (len > 0) {
+          total += len;
+          longest = Math.max(longest, len);
+        }
+      }
+      return { total: total / MIN, longest: longest / MIN };
+    };
+    const out = new Map<string, string>();
+    const partDay = new Map<string, string>();
+    for (const t of input.tasks.filter((x) => x.status === 'todo').sort(byHand)) {
+      const pin = pinOf(t);
+      if (pin) {
+        addLoad(pin, t.estimateMin);
+        if (t.group) partDay.set(t.group, pin);
+        continue;
+      }
+      const until = t.due ?? Infinity;
+      const prev = t.group ? partDay.get(t.group) : undefined;
+      const first = prev ? addDays(prev, 1) : today;
+      const ok = days.filter((k) => {
+        if (k < first || at(k, 0) >= until) return false;
+        const r = room(t, k, until);
+        return r.longest >= t.estimateMin && r.total - (load.get(k) ?? 0) >= t.estimateMin;
+      });
+      if (!ok.length) continue;
+      const k = t.due === null ? ok[0] : ok.reduce((best, d) => ((load.get(d) ?? 0) < (load.get(best) ?? 0) ? d : best));
+      if (t.due !== null) out.set(t.id, k);
+      addLoad(k, t.estimateMin);
+      if (t.group) partDay.set(t.group, k);
+    }
+    return out;
+  }
+
+  /** A part may be placed only after every earlier part is done, started or placed. */
+  const finishedPart = (group: string, part: number) =>
+    input.tasks.some((x) => x.group === group && x.part === part && x.status !== 'todo');
+  const pinnedBefore = (t: Task) =>
+    pinOf(t) !== undefined && t.pinOrder !== undefined
+      ? input.tasks.filter((x) => x.status === 'todo' && x.id !== t.id && pinOf(x) === pinOf(t) && x.pinOrder !== undefined && x.pinOrder < t.pinOrder!)
+      : [];
+  const ready = (t: Task, st: State) => {
+    // Hand-ordered tasks on a day go in the order they were arranged.
+    if (pinnedBefore(t).some((x) => !st.placed.has(x.id))) return false;
+    if (!t.group || !t.part) return true;
+    for (let p = 1; p < t.part; p++) if (!finishedPart(t.group, p) && !st.parts.get(t.group)?.has(p)) return false;
+    return true;
+  };
+
+  const gap = (p: Prev | null, t: Task) => {
+    if (!p || t.noBreakBefore) return 0;
+    return p.short && !p.paired && isShort(t) ? s.shortPairBreakMin : s.breakMin;
+  };
+  const baseFrom = (t: Task, st: State) => (st.prev ? Math.max(st.floor, st.prev.end + gap(st.prev, t) * MIN) : st.floor);
+  const startFor = (t: Task, st: State): Ms | null => {
+    if (!ready(t, st)) return null;
+    const pin = pinOf(t);
+    const base = pin ? Math.max(baseFrom(t, st), at(pin, 0), t.pinAfter ?? 0) : baseFrom(t, st);
+    const dur = t.estimateMin * MIN;
+    // Spreading: try its chosen day first; if that would make it late, the earliest slot as usual.
+    const day = pin ? undefined : target.get(t.id);
+    if (day) {
+      const s0 = placeFrom(t, st, Math.max(base, at(day, 0)));
+      if (s0 !== null && (t.due === null || s0 + dur <= t.due)) return s0;
+    }
+    return placeFrom(t, st, base);
+  };
+  const placeFrom = (t: Task, st: State, from: Ms): Ms | null => {
+    const dur = t.estimateMin * MIN;
+    // Falling behind: the first task may start exactly at the given minute; everything else snaps to the grid.
+    const fit = (f: Ms) => {
+      const x = input.exactStart;
+      if (x !== undefined && f <= x && earliestFit(freeFor(t), x, dur, 1) === x) return x;
+      return earliestFit(freeFor(t), f, dur, s.slotRoundMin);
+    };
+    const placed = t.group ? st.parts.get(t.group) : undefined;
+    if (!placed?.size) return fit(from);
+    // Spread parts: next part goes on a later day than the last placed one...
+    const lastEnd = Math.max(...placed.values());
+    // The next day starts at midnight, or after tonight's late window (12am–2am still counts as tonight).
+    let nextDay = at(addDays(dateKey(lastEnd), 1), 0);
+    for (const n of night) if (nextDay >= n.start && nextDay < n.end) nextDay = n.end;
+    const spread = fit(Math.max(from, nextDay));
+    if (spread !== null && (t.due === null || spread + dur <= t.due)) return spread;
+    // ...unless that makes it late; then the same day is allowed.
+    const sameDay = fit(from);
+    return sameDay ?? spread;
+  };
+  const after = (t: Task, start: Ms, st: State): State => {
+    const end = start + t.estimateMin * MIN;
+    const paired = !!st.prev && isShort(t) && gap(st.prev, t) === s.shortPairBreakMin;
+    let parts = st.parts;
+    if (t.group && t.part) {
+      parts = new Map(parts);
+      parts.set(t.group, new Map(parts.get(t.group) ?? []).set(t.part, end));
+    }
+    return { prev: { end, short: isShort(t), paired }, floor: end, parts, placed: new Set(st.placed).add(t.id) };
+  };
+
+  /** Missing work may go first only if no dated task becomes late because of it. */
+  const pickTop = (queue: Task[], st: State): number => {
+    const first = queue.findIndex((t) => ready(t, st));
+    if (first === -1 || queue[first].due !== null) return Math.max(first, 0);
+    const firstDated = queue.findIndex((t) => t.due !== null && ready(t, st));
+    if (firstDated === -1) return first;
+    const start = startFor(queue[first], st);
+    if (start === null) return first;
+    const dated = queue.filter((t) => t.due !== null);
+    const before = lateIds(greedy(dated, st, false));
+    const withMissing = lateIds(greedy(dated, after(queue[first], start, st), false));
+    return [...withMissing].some((id) => !before.has(id)) ? firstDated : first;
+  };
+
+  function greedy(tasks: Task[], st: State, checkMissing: boolean): Run {
+    const items: ScheduledItem[] = [];
+    const warnings: Warning[] = [];
+    const queue = [...tasks];
+    while (queue.length) {
+      const topIdx = checkMissing ? pickTop(queue, st) : Math.max(0, queue.findIndex((t) => ready(t, st)));
+      const top = queue[topIdx];
+      const topStart = startFor(top, st);
+      if (topStart === null) {
+        warnings.push({ kind: 'unscheduled', taskId: top.id });
+        queue.splice(topIdx, 1);
+        continue;
+      }
+      let chosen = topIdx;
+      let chosenStart = topStart;
+      for (let i = 0; i < queue.length; i++) {
+        if (i === topIdx) continue;
+        const cs = startFor(queue[i], st);
+        if (cs === null) continue;
+        const next = after(queue[i], cs, st);
+        if (next.floor + gap(next.prev, top) * MIN <= topStart && ready(top, next)) {
+          // Packing: the first by priority that fits. Spreading: the earliest of those, so days fill in time order.
+          if (!spread) {
+            chosen = i;
+            chosenStart = cs;
+            break;
+          }
+          if (chosen === topIdx || cs < chosenStart) {
+            chosen = i;
+            chosenStart = cs;
+          }
+        }
+      }
+      const t = queue[chosen];
+      const end = chosenStart + t.estimateMin * MIN;
+      const late = t.due !== null && end > t.due;
+      const inNight = night.some((n) => end > n.start && chosenStart < n.end);
+      items.push({ taskId: t.id, start: chosenStart, end, late, ...(inNight ? { night: true } : {}) });
+      if (late) warnings.push({ kind: 'late', taskId: t.id, due: t.due!, end });
+      st = after(t, chosenStart, st);
+      queue.splice(chosen, 1);
+    }
+    return { items, warnings };
+  }
+
+  // Hand-moved tasks get first claim on their day: by day, then hand order, then normal priority.
+  const byHand = (a: Task, b: Task) => {
+    const pa = pinOf(a);
+    const pb = pinOf(b);
+    if (pa && pb) return pa.localeCompare(pb) || (a.pinOrder ?? Infinity) - (b.pinOrder ?? Infinity) || comparePriority(a, b);
+    if (pa) return -1;
+    if (pb) return 1;
+    return comparePriority(a, b);
+  };
+  if (spread) target = targetDays();
+  const todo = input.tasks.filter((t) => t.status === 'todo').sort(byHand);
+  const r = greedy(todo, state, true);
+  return { items: [...fixed, ...r.items], warnings: r.warnings };
+}
+
+/** Step reminders (e.g. laundry washer/dryer) for upcoming block occurrences. */
+export function blockReminders(input: ScheduleInput): BlockReminder[] {
+  const out: BlockReminder[] = [];
+  const today = dateKey(input.now);
+  for (let i = 0; i < input.settings.horizonDays; i++) {
+    const key = addDays(today, i);
+    for (const o of occurrencesOn(key, input.blocks, input.locations, input.arrivals)) {
+      for (const step of o.block.steps ?? []) {
+        const t = at(key, o.block.startMin + step.offsetMin);
+        if (t >= input.now) out.push({ blockId: o.block.id, title: step.title, at: t });
+      }
+    }
+  }
+  return out.sort((a, b) => a.at - b.at);
+}

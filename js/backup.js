@@ -16,9 +16,11 @@ function appKeys() {
 export function buildBackup() {
   const data = {};
   for (const k of appKeys()) {
-    if (k === 'imp_last_backup') continue;
+    if (k === 'imp_last_backup' || k.startsWith('imp_planner-unreadable')) continue;
     data[k] = store.get(k);
   }
+  // Notification keys belong to this phone only (same rule as the old planner app)
+  if (data.imp_planner) data.imp_planner = { ...data.imp_planner, push: null };
   return { app: 'improve', format: 1, exportedAt: new Date().toISOString(), data };
 }
 
@@ -61,8 +63,11 @@ export function parseBackup(text) {
 
 // Replaces all Improve data with the backup. Other apps' data is untouched.
 export function restoreBackup(backup) {
+  const push = store.get('planner', null)?.push ?? null; // keep this phone's notification setup
   for (const k of appKeys()) if (k !== 'imp_last_backup') localStorage.removeItem(k);
   for (const [k, v] of Object.entries(backup.data)) store.set(k, v);
+  const planner = store.get('planner', null);
+  if (planner) store.set('planner', { ...planner, push });
 }
 
 export const lastBackup = () => store.get('last_backup', null);
