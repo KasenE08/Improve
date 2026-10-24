@@ -1,0 +1,248 @@
+/* ==========================================================================
+   Improve components. Reusable on any screen: include tokens.css first.
+   Every class starts with "imp-" so it can't collide with copied app code.
+   Markup examples: see DESIGN.md and styleguide.html.
+   ========================================================================== */
+
+/* ---- Base ---------------------------------------------------------------- */
+:where(.imp-root), :where(.imp-root) *, :where(.imp-root) *::before, :where(.imp-root) *::after { box-sizing: border-box; }
+.imp-root {
+  margin: 0; min-height: 100vh; min-height: 100dvh;
+  background: var(--imp-bg); color: var(--imp-text);
+  font: 400 var(--imp-fs-body)/1.05 var(--imp-font-body);
+  background-image: radial-gradient(rgba(41, 240, 255, .07) 1px, transparent 1px);
+  background-size: 12px 12px;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation; /* no double-tap zoom */
+}
+/* CRT scanlines (purely decorative) */
+.imp-root::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, .2) 0 1px, transparent 1px 3px);
+}
+/* Resets use :where() so they have zero specificity and never beat a component class */
+:where(.imp-root) :where(button) { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; text-align: inherit; }
+:where(.imp-root) :where(a) { color: inherit; text-decoration: none; }
+:where(.imp-root) :where(h1, h2, h3, p) { margin: 0; font-size: inherit; font-weight: inherit; }
+
+/* Pixel notched frame, reusable on anything */
+.imp-frame {
+  box-shadow:
+    0 calc(-1 * var(--imp-px)) 0 0 var(--imp-frame), 0 var(--imp-px) 0 0 var(--imp-frame),
+    calc(-1 * var(--imp-px)) 0 0 0 var(--imp-frame), var(--imp-px) 0 0 0 var(--imp-frame);
+}
+
+/* ---- Icon ----------------------------------------------------------------
+   <svg class="imp-icon"><use href="assets/icons/icons.svg#body"></use></svg> */
+.imp-icon { display: inline-block; width: 1em; height: 1em; flex: none; vertical-align: -0.125em; fill: currentColor; }
+
+/* ---- Text helpers --------------------------------------------------------- */
+.imp-label { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; letter-spacing: .02em; color: var(--imp-muted); }
+.imp-title { font: 700 var(--imp-fs-md) var(--imp-font-head); letter-spacing: .04em; }
+.imp-accent { color: var(--imp-accent); }
+.imp-muted { color: var(--imp-muted); }
+
+/* ---- Panel ----------------------------------------------------------------
+   <section class="imp-panel">
+     <header class="imp-panel__head"><h2 class="imp-panel__title">Daily</h2><span class="imp-panel__meta">3/7</span></header>
+     <div class="imp-panel__body">…</div>
+   </section> */
+.imp-panel {
+  background: var(--imp-surface);
+  margin: var(--imp-px);
+  box-shadow:
+    0 calc(-1 * var(--imp-px)) 0 0 var(--imp-frame), 0 var(--imp-px) 0 0 var(--imp-frame),
+    calc(-1 * var(--imp-px)) 0 0 0 var(--imp-frame), var(--imp-px) 0 0 0 var(--imp-frame),
+    0 calc(var(--imp-px) * 3) 0 0 #000;
+}
+.imp-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px var(--imp-pad); background: var(--imp-surface-2); }
+.imp-panel__title { font: 700 var(--imp-fs-sm) var(--imp-font-head); color: var(--imp-accent); text-transform: uppercase; letter-spacing: .04em; }
+.imp-panel__title::before { content: "\25B8\00a0"; }
+.imp-panel__meta { display: inline-flex; align-items: center; gap: 6px; font-size: 20px; color: var(--imp-muted); }
+.imp-panel__body { padding: 6px var(--imp-pad) 10px; }
+.imp-panel__sub { display: flex; align-items: center; gap: 6px; padding: 10px 0 2px; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-accent); }
+.imp-panel__sub .imp-icon { width: 14px; height: 14px; }
+.imp-panel__sub::after { content: ""; flex: 1; height: var(--imp-px); background: repeating-linear-gradient(90deg, var(--imp-divider) 0 3px, transparent 3px 6px); }
+
+/* ---- Level badge -----------------------------------------------------------
+   <div class="imp-lvl"><span class="imp-lvl__label">LV</span><span class="imp-lvl__num">1</span></div> */
+.imp-lvl {
+  flex: none; width: 62px; height: 62px; display: grid; place-items: center; align-content: center;
+  background: var(--imp-accent); color: var(--imp-on-accent);
+  box-shadow: 4px 4px 0 var(--imp-accent-deep), inset -4px -4px 0 rgba(0, 0, 0, .18), inset 4px 4px 0 rgba(255, 255, 255, .35);
+}
+.imp-lvl__label { font: 700 var(--imp-fs-xs) var(--imp-font-head); }
+.imp-lvl__num { font: 700 26px/1 var(--imp-font-head); }
+
+/* ---- XP bar ----------------------------------------------------------------
+   <div class="imp-xpbar" style="--p:62%"><div class="imp-xpbar__fill"></div></div> */
+.imp-xpbar { --p: 0%; position: relative; height: 16px; background: var(--imp-sunken); box-shadow: 0 0 0 var(--imp-px) var(--imp-frame); overflow: hidden; }
+.imp-xpbar__fill {
+  position: absolute; top: 3px; bottom: 3px; left: 3px; width: max(0px, calc(var(--p) - 6px));
+  background: repeating-linear-gradient(90deg, var(--imp-accent) 0 8px, transparent 8px 11px);
+  transition: width .3s var(--imp-steps);
+}
+.imp-xpbar--sm { height: 12px; }
+
+/* ---- Stat row + stat bar ----------------------------------------------------
+   <div class="imp-stat">
+     <svg class="imp-icon imp-stat__icon"><use href="…#body"/></svg>
+     <span class="imp-stat__name">Body</span>
+     <div class="imp-statbar" style="--p:72%"><div class="imp-statbar__fill"></div></div>
+     <span class="imp-stat__val">72</span>
+   </div> */
+.imp-stat { display: grid; grid-template-columns: 22px 64px 1fr 40px; align-items: center; gap: 10px; padding: 5px 0; }
+.imp-stat__icon { width: 20px; height: 20px; color: var(--imp-accent); }
+.imp-stat__name { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.imp-stat__val { text-align: right; color: var(--imp-accent); }
+.imp-statbar { --p: 0%; position: relative; height: 12px; background: var(--imp-sunken); box-shadow: 0 0 0 2px var(--imp-frame); overflow: hidden; }
+.imp-statbar__fill { position: absolute; inset: 0 auto 0 0; width: var(--p); background: repeating-linear-gradient(90deg, var(--imp-accent) 0 9px, transparent 9px 12px); transition: width .3s var(--imp-steps); }
+
+/* ---- Checkbox --------------------------------------------------------------
+   <span class="imp-check is-on"><svg class="imp-icon"><use href="…#check"/></svg></span> */
+.imp-check {
+  flex: none; width: 24px; height: 24px; margin: var(--imp-px); display: grid; place-items: center;
+  background: var(--imp-sunken); color: var(--imp-on-accent); box-shadow: 0 0 0 var(--imp-px) var(--imp-accent-dim);
+}
+.imp-check > * { grid-area: 1 / 1; }
+.imp-check .imp-icon { width: 16px; height: 16px; visibility: hidden; }
+.imp-check.is-on { background: var(--imp-accent); box-shadow: 0 0 0 var(--imp-px) var(--imp-accent), 3px 3px 0 var(--imp-px) var(--imp-accent-deep); }
+.imp-check.is-on .imp-icon { visibility: visible; }
+/* Partial progress (e.g. 2/5): show the count instead of a tick */
+.imp-check__count { font-size: 18px; color: var(--imp-accent); }
+.imp-check.is-on .imp-check__count { display: none; }
+
+/* ---- XP chip ---------------------------------------------------------------
+   <span class="imp-chip">+20<small>XP</small></span> */
+.imp-chip { flex: none; white-space: nowrap; font-size: 21px; color: var(--imp-accent); }
+.imp-chip::before { content: "["; color: var(--imp-muted); }
+.imp-chip::after { content: "]"; color: var(--imp-muted); }
+.imp-chip small { font-size: 15px; margin-left: 1px; }
+.imp-chip.is-on { background: var(--imp-accent); color: var(--imp-on-accent); }
+.imp-chip.is-on::before, .imp-chip.is-on::after { color: var(--imp-accent-deep); }
+
+/* ---- Progress pips (multi-count habits) ------------------------------------
+   <span class="imp-pips"><span class="imp-pip is-on"></span><span class="imp-pip"></span></span> */
+.imp-pips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.imp-pip { width: 14px; height: 8px; background: var(--imp-divider); }
+.imp-pip.is-on { background: var(--imp-accent); }
+
+/* ---- List row (checklist item) ---------------------------------------------
+   <button class="imp-row is-done">
+     <span class="imp-check is-on">…</span>
+     <span class="imp-row__main"><span class="imp-row__title">Journal</span><span class="imp-row__sub">…</span></span>
+     <span class="imp-chip is-on">+10<small>XP</small></span>
+   </button> */
+.imp-row {
+  position: relative; width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 0; min-height: 52px;
+  border-bottom: var(--imp-px) dotted var(--imp-divider);
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation;
+}
+.imp-row:last-child { border-bottom: 0; }
+.imp-row:active { background: rgba(41, 240, 255, .07); }
+.imp-row__main { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
+.imp-row__title { font-size: var(--imp-fs-body-lg); overflow-wrap: anywhere; }
+.imp-row.is-done .imp-row__title { color: var(--imp-muted); }
+.imp-row__sub { display: flex; align-items: center; gap: 5px; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.imp-row__sub .imp-icon { width: 13px; height: 13px; color: var(--imp-accent); }
+.imp-row__end { flex: none; color: var(--imp-muted); }
+
+/* Floating "+20 XP" feedback. JS appends <span class="imp-float">+20 XP</span> to a row. */
+.imp-float {
+  position: absolute; right: 8px; top: 2px; pointer-events: none;
+  font: 700 var(--imp-fs-sm) var(--imp-font-head); color: var(--imp-accent);
+  animation: imp-float .9s steps(6) forwards;
+}
+.imp-float.is-neg { color: var(--imp-muted); }
+@keyframes imp-float { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-28px); } }
+
+/* ---- Buttons ---------------------------------------------------------------
+   <button class="imp-btn imp-btn--primary">+ New</button>
+   Variants: --primary --secondary --ghost --danger. Sizes: --sm --block */
+.imp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font: 700 var(--imp-fs-sm) var(--imp-font-head); text-transform: uppercase; letter-spacing: .02em;
+  padding: 11px 14px; min-height: 42px; text-align: center; transition: transform .05s;
+}
+.imp-btn .imp-icon { width: 16px; height: 16px; }
+.imp-btn:active { transform: translateY(3px); box-shadow: none !important; }
+.imp-btn:disabled { opacity: .4; pointer-events: none; }
+.imp-btn--primary { background: var(--imp-accent); color: var(--imp-on-accent); box-shadow: 0 4px 0 var(--imp-accent-deep); }
+.imp-btn--secondary { margin: var(--imp-px); color: var(--imp-accent); background: var(--imp-sunken);
+  box-shadow: 0 -3px 0 var(--imp-accent-dim), 0 3px 0 var(--imp-accent-dim), -3px 0 0 var(--imp-accent-dim), 3px 0 0 var(--imp-accent-dim); }
+.imp-btn--ghost { color: var(--imp-muted); }
+.imp-btn--ghost::before { content: ">\00a0"; }
+.imp-btn--danger { background: var(--imp-danger); color: var(--imp-on-accent); box-shadow: 0 4px 0 var(--imp-danger-deep); }
+.imp-btn--sm { padding: 7px 10px; min-height: 34px; font-size: var(--imp-fs-xs); }
+.imp-btn--block { display: flex; width: 100%; }
+.imp-btn-row { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+
+/* ---- Form fields -----------------------------------------------------------
+   <label class="imp-field"><span class="imp-label">Name</span><input class="imp-input"></label> */
+.imp-field { display: grid; gap: 6px; }
+.imp-input, .imp-select {
+  width: 100%; margin: 0; padding: 8px 10px; min-height: 44px; border: 0; border-radius: 0;
+  font: 400 22px var(--imp-font-body); color: var(--imp-text); background: var(--imp-sunken);
+  box-shadow: 0 0 0 var(--imp-px) var(--imp-frame); -webkit-appearance: none; appearance: none;
+}
+.imp-input:focus, .imp-select:focus { outline: none; box-shadow: 0 0 0 var(--imp-px) var(--imp-accent); }
+.imp-select { background-image: linear-gradient(45deg, transparent 50%, var(--imp-accent) 50%), linear-gradient(135deg, var(--imp-accent) 50%, transparent 50%);
+  background-position: calc(100% - 18px) 50%, calc(100% - 12px) 50%; background-size: 6px 6px; background-repeat: no-repeat; padding-right: 32px; }
+.imp-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Segmented choice (radio group) */
+.imp-seg { display: flex; gap: 0; box-shadow: 0 0 0 var(--imp-px) var(--imp-frame); margin: var(--imp-px); }
+.imp-seg button { flex: 1; padding: 10px 4px; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); background: var(--imp-sunken); text-align: center; }
+.imp-seg button.is-on { background: var(--imp-accent); color: var(--imp-on-accent); }
+
+/* Icon picker grid */
+.imp-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; }
+.imp-icon-grid button { display: grid; place-items: center; height: 44px; background: var(--imp-sunken); color: var(--imp-accent); box-shadow: 0 0 0 2px var(--imp-frame); }
+.imp-icon-grid button.is-on { background: var(--imp-accent); color: var(--imp-on-accent); }
+.imp-icon-grid .imp-icon { width: 24px; height: 24px; }
+
+/* ---- Bottom sheet (modal) ---------------------------------------------------
+   <div class="imp-sheet is-open"><div class="imp-sheet__backdrop"></div>
+     <div class="imp-sheet__panel imp-panel"><header class="imp-panel__head">…</header><div class="imp-sheet__body">…</div></div></div> */
+.imp-sheet { position: fixed; inset: 0; z-index: 50; display: none; }
+.imp-sheet.is-open { display: block; }
+.imp-sheet__backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .7); }
+.imp-sheet__panel {
+  position: absolute; left: var(--imp-px); right: var(--imp-px); bottom: 0; margin: 0 auto; max-width: 480px;
+  max-height: 88vh; max-height: 88dvh; display: flex; flex-direction: column;
+  animation: imp-sheet-in .18s steps(3);
+}
+.imp-sheet__body { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px var(--imp-pad) calc(18px + env(safe-area-inset-bottom)); display: grid; gap: 16px; }
+@keyframes imp-sheet-in { from { transform: translateY(40%); } to { transform: none; } }
+
+/* ---- Tab bar ---------------------------------------------------------------
+   <nav class="imp-tabbar"><a class="imp-tab is-active" href="#today"><svg class="imp-icon">…</svg><span>Today</span></a>…</nav> */
+.imp-tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; display: flex; justify-content: space-around;
+  padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom));
+  background: #0a0d18; border-top: var(--imp-px) solid var(--imp-frame); box-shadow: 0 -6px 0 #000;
+}
+.imp-tab { flex: 1; max-width: 96px; display: grid; justify-items: center; gap: 6px; padding: 4px 0;
+  font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.imp-tab .imp-icon { width: 24px; height: 24px; }
+.imp-tab.is-active { color: var(--imp-accent); }
+.imp-tab.is-active .imp-icon { color: var(--imp-on-accent); background: var(--imp-accent); box-shadow: 0 0 0 4px var(--imp-accent), 3px 3px 0 4px var(--imp-accent-deep); }
+
+/* ---- Empty / coming-soon state ---------------------------------------------
+   <div class="imp-empty"><svg class="imp-icon imp-empty__icon">…</svg><p class="imp-title">Food</p><p>Coming soon</p></div> */
+.imp-empty { display: grid; justify-items: center; gap: 12px; padding: 36px 16px; text-align: center; }
+.imp-empty__icon { width: 64px; height: 64px; color: var(--imp-accent); }
+.imp-empty__text { color: var(--imp-muted); max-width: 28ch; }
+.imp-blink { animation: imp-blink 1s steps(1) infinite; }
+@keyframes imp-blink { 50% { opacity: 0; } }
+
+/* ---- Toast -------------------------------------------------------------- */
+.imp-toast[hidden] { display: none; }
+.imp-toast { position: fixed; left: 50%; bottom: calc(var(--imp-tabbar-h) + 24px + env(safe-area-inset-bottom)); z-index: 60;
+  transform: translateX(-50%); padding: 8px 12px; background: var(--imp-accent); color: var(--imp-on-accent);
+  font: 700 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; box-shadow: 4px 4px 0 var(--imp-accent-deep); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) {
+  .imp-root *, .imp-root *::before, .imp-root *::after { animation: none !important; transition: none !important; }
+}

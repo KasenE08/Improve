@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Improve · Style Guide</title>
+<meta name="theme-color" content="#07070d">
+<link rel="stylesheet" href="assets/css/tokens.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<style>
+  .sg { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 20px) 16px 120px; display: grid; gap: 20px; }
+  .sg > * { min-width: 0; }
+  .sg pre { white-space: pre-wrap; word-break: break-all; margin: 10px 0 0; padding: 10px; overflow-x: auto; background: #000; color: var(--imp-muted); font: 14px/1.3 ui-monospace, monospace; box-shadow: 0 0 0 2px var(--imp-divider); }
+  .sg .imp-panel__body > * + * { margin-top: 10px; }
+  .sg-swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .sg-swatches div { height: 44px; box-shadow: 0 0 0 2px var(--imp-divider); }
+  .sg-swatches span { display: block; font: 10px var(--imp-font-head); color: var(--imp-muted); margin-top: 4px; }
+</style>
+</head>
+<body class="imp-root">
+<main class="sg">
+  <div><p class="imp-title">Style guide</p><p class="imp-muted">Every component, with copy-paste markup. Include <span class="imp-accent">tokens.css</span> then <span class="imp-accent">components.css</span> and put <span class="imp-accent">class="imp-root"</span> on &lt;body&gt;.</p></div>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Colors</h2></header><div class="imp-panel__body">
+    <div class="sg-swatches">
+      <div style="background:var(--imp-accent)"></div><div style="background:var(--imp-accent-dim)"></div><div style="background:var(--imp-accent-deep)"></div><div style="background:var(--imp-surface)"></div>
+    </div>
+    <div class="sg-swatches"><span>accent</span><span>accent-dim</span><span>accent-deep</span><span>surface</span></div>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Panel</h2><span class="imp-panel__meta">3/7</span></header><div class="imp-panel__body">
+    <div class="imp-panel__sub"><svg class="imp-icon"><use href="assets/icons/icons.svg#body"></use></svg>Sub-heading</div>
+    <p>Panel body text in VT323.</p>
+    <pre>&lt;section class="imp-panel"&gt;
+  &lt;header class="imp-panel__head"&gt;
+    &lt;h2 class="imp-panel__title"&gt;Daily&lt;/h2&gt;
+    &lt;span class="imp-panel__meta"&gt;3/7&lt;/span&gt;
+  &lt;/header&gt;
+  &lt;div class="imp-panel__body"&gt;…&lt;/div&gt;
+&lt;/section&gt;</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Level + XP bar</h2></header><div class="imp-panel__body">
+    <div style="display:flex;gap:16px;align-items:center">
+      <div class="imp-lvl"><span class="imp-lvl__label">LV</span><span class="imp-lvl__num">7</span></div>
+      <div style="flex:1"><div class="imp-xpbar" style="--p:62%"><div class="imp-xpbar__fill"></div></div></div>
+    </div>
+    <pre>&lt;div class="imp-lvl"&gt;&lt;span class="imp-lvl__label"&gt;LV&lt;/span&gt;&lt;span class="imp-lvl__num"&gt;7&lt;/span&gt;&lt;/div&gt;
+&lt;div class="imp-xpbar" style="--p:62%"&gt;&lt;div class="imp-xpbar__fill"&gt;&lt;/div&gt;&lt;/div&gt;</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Stat bar</h2></header><div class="imp-panel__body">
+    <div class="imp-stat"><svg class="imp-icon imp-stat__icon"><use href="assets/icons/icons.svg#diet"></use></svg><span class="imp-stat__name">Protein</span><div class="imp-statbar" style="--p:72%"><div class="imp-statbar__fill"></div></div><span class="imp-stat__val">72%</span></div>
+    <pre>&lt;div class="imp-stat"&gt;
+  &lt;svg class="imp-icon imp-stat__icon"&gt;&lt;use href="assets/icons/icons.svg#diet"/&gt;&lt;/svg&gt;
+  &lt;span class="imp-stat__name"&gt;Protein&lt;/span&gt;
+  &lt;div class="imp-statbar" style="--p:72%"&gt;&lt;div class="imp-statbar__fill"&gt;&lt;/div&gt;&lt;/div&gt;
+  &lt;span class="imp-stat__val"&gt;72%&lt;/span&gt;
+&lt;/div&gt;</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Checklist row</h2></header><div class="imp-panel__body">
+    <button class="imp-row is-done"><span class="imp-check is-on"><svg class="imp-icon"><use href="assets/icons/icons.svg#check"></use></svg></span><span class="imp-row__main"><span class="imp-row__title">Done item</span></span><span class="imp-chip is-on">+20<small>XP</small></span></button>
+    <button class="imp-row"><span class="imp-check"><svg class="imp-icon"><use href="assets/icons/icons.svg#check"></use></svg><span class="imp-check__count">2</span></span><span class="imp-row__main"><span class="imp-row__title">Multi-count item</span><span class="imp-row__sub">2/5 this week</span><span class="imp-pips"><span class="imp-pip is-on"></span><span class="imp-pip is-on"></span><span class="imp-pip"></span><span class="imp-pip"></span><span class="imp-pip"></span></span></span><span class="imp-chip">+20<small>XP</small></span></button>
+    <pre>&lt;button class="imp-row is-done"&gt;
+  &lt;span class="imp-check is-on"&gt;&lt;svg class="imp-icon"&gt;&lt;use href="assets/icons/icons.svg#check"/&gt;&lt;/svg&gt;&lt;/span&gt;
+  &lt;span class="imp-row__main"&gt;&lt;span class="imp-row__title"&gt;Done item&lt;/span&gt;&lt;/span&gt;
+  &lt;span class="imp-chip is-on"&gt;+20&lt;small&gt;XP&lt;/small&gt;&lt;/span&gt;
+&lt;/button&gt;</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Buttons</h2></header><div class="imp-panel__body">
+    <div class="imp-btn-row">
+      <button class="imp-btn imp-btn--primary">Primary</button>
+      <button class="imp-btn imp-btn--secondary">Secondary</button>
+      <button class="imp-btn imp-btn--ghost">Ghost</button>
+    </div>
+    <div class="imp-btn-row">
+      <button class="imp-btn imp-btn--danger imp-btn--sm"><svg class="imp-icon"><use href="assets/icons/icons.svg#trash"></use></svg>Danger sm</button>
+      <button class="imp-btn imp-btn--primary imp-btn--sm"><svg class="imp-icon"><use href="assets/icons/icons.svg#plus"></use></svg>Add</button>
+    </div>
+    <pre>&lt;button class="imp-btn imp-btn--primary"&gt;Primary&lt;/button&gt;
+variants: --primary --secondary --ghost --danger
+sizes: --sm --block</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Form</h2></header><div class="imp-panel__body">
+    <label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" value="Text input"></label>
+    <label class="imp-field"><span class="imp-label">Pick</span><select class="imp-select"><option>Select</option></select></label>
+    <div class="imp-seg"><button class="is-on">One</button><button>Two</button><button>Three</button></div>
+    <pre>&lt;label class="imp-field"&gt;&lt;span class="imp-label"&gt;Name&lt;/span&gt;&lt;input class="imp-input"&gt;&lt;/label&gt;
+&lt;div class="imp-seg"&gt;&lt;button class="is-on"&gt;One&lt;/button&gt;…&lt;/div&gt;</pre>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Empty state</h2></header><div class="imp-panel__body">
+    <div class="imp-empty"><svg class="imp-icon imp-empty__icon"><use href="assets/icons/icons.svg#hourglass"></use></svg><p class="imp-title">Coming soon</p><p class="imp-empty__text">Short explanation.</p></div>
+  </div></section>
+
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Icons</h2></header><div class="imp-panel__body">
+    <div class="imp-icon-grid" id="icons"></div>
+    <pre>&lt;svg class="imp-icon"&gt;&lt;use href="assets/icons/icons.svg#body"/&gt;&lt;/svg&gt;</pre>
+  </div></section>
+</main>
+<nav class="imp-tabbar">
+  <a class="imp-tab is-active" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#today"></use></svg><span>Today</span></a>
+  <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#food"></use></svg><span>Food</span></a>
+  <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#planner"></use></svg><span>Planner</span></a>
+  <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#wallet"></use></svg><span>Money</span></a>
+  <a class="imp-tab" href="#"><svg class="imp-icon"><use href="assets/icons/icons.svg#profile"></use></svg><span>Profile</span></a>
+</nav>
+<script>
+  fetch('assets/icons/icons.svg').then((r) => r.text()).then((t) => {
+    const ids = [...t.matchAll(/<symbol id="([^"]+)"/g)].map((m) => m[1]);
+    document.getElementById('icons').innerHTML = ids.map((id) =>
+      `<button title="${id}"><svg class="imp-icon"><use href="assets/icons/icons.svg#${id}"></use></svg></button>`).join('');
+  });
+</script>
+</body>
+</html>

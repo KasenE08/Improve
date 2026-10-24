@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Improve design tokens: Pixel HUD theme.
+   Change values here to restyle every screen. Components only use these vars.
+   ========================================================================== */
+
+@font-face { font-family: Silkscreen; font-weight: 400; font-display: swap; src: url(../fonts/silkscreen-latin-400-normal.woff2) format('woff2'); }
+@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-700-normal.woff2) format('woff2'); }
+@font-face { font-family: VT323; font-weight: 400; font-display: swap; src: url(../fonts/vt323-latin-400-normal.woff2) format('woff2'); }
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --imp-bg: #07070d;
+  --imp-surface: #0c1020;        /* panel body */
+  --imp-surface-2: #10213a;      /* panel header strip */
+  --imp-sunken: #000;            /* inside bars, inputs, checkboxes */
+  --imp-frame: #1c4a66;          /* pixel borders */
+  --imp-divider: #1a2a40;
+
+  /* Accent (cyan / electric blue) */
+  --imp-accent: #29f0ff;
+  --imp-accent-dim: #0f6f80;
+  --imp-accent-deep: #08414d;    /* pixel drop-shadows */
+  --imp-on-accent: #07070d;      /* text on accent fills */
+
+  /* Text */
+  --imp-text: #e2fbff;
+  --imp-muted: #6b86a0;
+
+  /* Status */
+  --imp-danger: #ff4f6d;
+  --imp-danger-deep: #5c1422;
+  --imp-warn: #ffd23f;
+
+  /* Type */
+  --imp-font-head: Silkscreen, ui-monospace, monospace;  /* labels, titles, buttons */
+  --imp-font-body: VT323, ui-monospace, monospace;       /* body text + numbers */
+  --imp-fs-xs: 10px;   /* head font: tiny labels */
+  --imp-fs-sm: 12px;   /* head font: buttons, panel titles */
+  --imp-fs-md: 18px;   /* head font: big titles */
+  --imp-fs-body: 21px; /* body font base */
+  --imp-fs-body-lg: 23px;
+
+  /* Shape + spacing */
+  --imp-px: 3px;       /* "pixel" unit for borders and offsets */
+  --imp-gap: 16px;
+  --imp-pad: 14px;
+  --imp-gutter: 16px;  /* page side padding */
+  --imp-tabbar-h: 64px;
+
+  /* Motion */
+  --imp-steps: steps(4);
+}
