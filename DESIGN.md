@@ -49,7 +49,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `2` |
+| `imp_schema` | `3` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
@@ -59,10 +59,11 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_last_backup` | ISO date of the last export |
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
 | `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
+| `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving, amount, cat, note, date }], reviews: { 'YYYY-MM': { doneAt } } }`. Amounts in cents |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`; `money:log` comes later).
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`). "Log spending" stays a manual tap.
 
 ## Leveling (Phase 2)
 
@@ -90,6 +91,15 @@ Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. 
 - Notifications: Improve's `sw.js` handles `push` and `notificationclick` (opens `#planner?task=ID`). The app uses the user's existing free Cloudflare server from Schedule-App-Planner.
 - Auto-check (`js/planner-auto.js`): "Work done on schedule" ticks when every task that was on today's plan is Done. Moving a task off today doesn't count; deleted tasks drop off; a day with nothing planned counts once the planner has tasks or fixed times.
 - Copy from the old app: Planner → Settings → Backup & copy (backup file, or same-browser storage). Read-only.
+
+## Money tab (Phase 5)
+
+- Built from scratch: `js/money/logic.js` (pure: paydays, save check, month summary; tests in `tests/money.test.mjs`), `js/money/store.js`, `js/screens/money.js`, `css/money.css`. Sub-tabs: Overview / History / Budget / Settings.
+- Per-category monthly budgets (blank = no limit), red when over. Entries: expense (with category), paycheck, saving. Amounts stored in cents.
+- Pay schedule: every week / every 2 weeks (from a recent payday) / twice a month (two days) / monthly (a day) / irregular. Days past a short month's end clamp to its last day.
+- Saving: fixed amount per paycheck (default $40) or % of each paycheck.
+- Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); weeks with no payday tick on their own; not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished.
+- Schema 3 upgrade sets those autos on existing "Save % of paycheck" / "Budget review" habits and makes "Log spending" manual.
 
 ## Deploying
 

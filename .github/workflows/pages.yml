@@ -38,6 +38,7 @@ jobs:
           node tests/food-auto.test.mjs
           node --test tests/food-logic.test.mjs
           node tests/planner-auto.test.mjs
+          node tests/money.test.mjs
       - name: Collect the site (without Planner sources)
         run: |
           mkdir _site

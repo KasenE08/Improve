@@ -1,0 +1,109 @@
+// Run: node tests/money.test.mjs  (paydays, save check, budgets, Money auto-checks)
+const mem = {};
+globalThis.localStorage = {
+  getItem: (k) => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: (k) => delete mem[k],
+  key: (i) => Object.keys(mem)[i], get length() { return Object.keys(mem).length; },
+};
+const J = (p) => new URL('../js/' + p, import.meta.url).href;
+const L = await import(J('money/logic.js'));
+const H = await import(J('habits.js'));
+let fails = 0;
+const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++; console.log('FAIL', m, '\n  got ', JSON.stringify(a), '\n  want', JSON.stringify(b)); } else console.log('ok', m); };
+
+// ---- amounts ----
+eq(L.toCents('40'), 4000, '"40" → 4000 cents');
+eq(L.toCents('$1,234.56'), 123456, '"$1,234.56" → cents');
+eq(L.toCents('0.1') + L.toCents('0.2'), 30, 'no float drift');
+eq(Number.isNaN(L.toCents('abc')), true, 'junk → NaN');
+eq(L.fmtMoney(4000), '$40', '$40');
+eq(L.fmtMoney(123456), '$1,234.56', '$1,234.56');
+eq(L.fmtMoney(-550), '−$5.50', 'negative');
+
+// ---- paydays ----
+const bi = { freq: 'biweekly', anchor: '2026-10-23' }; // Fri
+eq(L.paydaysBetween(bi, '2026-10-01', '2026-11-30'), ['2026-10-09', '2026-10-23', '2026-11-06', '2026-11-20'], 'every 2 weeks, before and after the anchor');
+eq(L.paydaysBetween({ freq: 'weekly', anchor: '2026-10-23' }, '2026-10-19', '2026-11-01'), ['2026-10-23', '2026-10-30'], 'weekly');
+eq(L.paydaysBetween({ freq: 'semimonthly', days: [15, 31] }, '2026-02-01', '2026-03-31'), ['2026-02-15', '2026-02-28', '2026-03-15', '2026-03-31'], 'twice a month, 31st clamps to Feb 28');
+eq(L.paydaysBetween({ freq: 'monthly', day: 31 }, '2026-11-01', '2027-01-31'), ['2026-11-30', '2026-12-31', '2027-01-31'], 'monthly on the 31st clamps');
+eq(L.paydaysBetween({ freq: 'semimonthly', days: [1, 15] }, '2026-12-10', '2027-01-05'), ['2026-12-15', '2027-01-01'], 'twice a month across the new year');
+eq(L.paydaysBetween({ freq: 'irregular' }, '2026-10-01', '2026-12-31'), [], 'irregular: none expected');
+eq(L.paydaysBetween({ freq: 'biweekly', anchor: null }, '2026-10-01', '2026-12-31'), [], 'no anchor yet: none');
+eq(L.nextPayday(bi, '2026-10-24'), '2026-11-06', 'next payday');
+
+// ---- save check (fixed $40 every 2 weeks, anchor Fri Oct 23) ----
+const st = (entries, save = { mode: 'amount', amount: 4000, percent: 20 }, setup = true) => ({
+  settings: { pay: bi, save, setup }, entries, categories: [], reviews: {},
+});
+const payWeek = new Date(2026, 9, 21); // Wed in the week of Oct 19–25 (payday Fri 23)
+const offWeek = new Date(2026, 9, 28); // week of Oct 26–Nov 1 (no payday)
+eq(L.saveStatus(st([]), offWeek).offWeek && L.saveStatus(st([]), offWeek).hit, true, 'off week counts as done');
+eq(L.saveStatus(st([]), payWeek).hit, false, 'payday week, nothing saved');
+eq(L.saveStatus(st([{ kind: 'saving', amount: 3000, date: '2026-10-23' }]), payWeek).hit, false, '$30 saved < $40');
+eq(L.saveStatus(st([{ kind: 'saving', amount: 4000, date: '2026-10-23' }]), payWeek).hit, true, '$40 saved: done');
+eq(L.saveStatus(st([{ kind: 'saving', amount: 4000, date: '2026-10-16' }]), payWeek).hit, false, 'saving from last week does not count');
+eq(L.saveStatus(st([], undefined, false), payWeek).judge, false, 'not set up: not judged');
+// percent mode
+const pct = { mode: 'percent', amount: 0, percent: 20 };
+eq(L.saveStatus(st([{ kind: 'saving', amount: 9999, date: '2026-10-23' }], pct), payWeek).pending, true, 'percent: paycheck not logged yet → pending');
+const pay = { kind: 'income', amount: 50000, date: '2026-10-23' };
+eq(L.saveStatus(st([pay, { kind: 'saving', amount: 9999, date: '2026-10-23' }], pct), payWeek).hit, false, '20% of $500 = $100: $99.99 not enough');
+eq(L.saveStatus(st([pay, { kind: 'saving', amount: 10000, date: '2026-10-24' }], pct), payWeek).hit, true, '20% of $500: $100 saved');
+// irregular: a logged paycheck creates the obligation
+const irr = { settings: { pay: { freq: 'irregular' }, save: { mode: 'amount', amount: 4000 }, setup: true }, entries: [{ kind: 'income', amount: 30000, date: '2026-10-28' }] };
+eq(L.saveStatus(irr, offWeek).hit, false, 'irregular: paycheck logged, not saved yet');
+eq(L.saveTarget({ mode: 'percent', percent: 15 }, 33333), 5000, '15% of $333.33 rounds to $50');
+
+// ---- month summary ----
+const m = L.monthSummary({ categories: [{ id: 'food', budget: 20000 }, { id: 'fun', budget: 5000 }], entries: [
+  { kind: 'expense', cat: 'food', amount: 1250, date: '2026-10-02' },
+  { kind: 'expense', cat: 'food', amount: 750, date: '2026-10-30' },
+  { kind: 'expense', cat: 'fun', amount: 6000, date: '2026-10-15' },
+  { kind: 'expense', cat: 'fun', amount: 999, date: '2026-11-01' },
+  { kind: 'income', amount: 50000, date: '2026-10-23' },
+  { kind: 'saving', amount: 4000, date: '2026-10-23' },
+] }, '2026-10');
+eq(m, { spent: 8000, income: 50000, saved: 4000, byCat: { food: 2000, fun: 6000 }, budget: 25000 }, 'October summary (November excluded)');
+eq(L.shiftMonth('2026-12', 1), '2027-01', 'next month across the year');
+eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
+
+// ---- auto-checks through storage ----
+H.init();
+const habits = Object.fromEntries(H.getHabits().map((h) => [h.id, h.auto]));
+eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [null, 'money:save', 'money:review'], 'fresh install: save + review auto, log spending manual');
+const M = await import(J('money/store.js'));
+const A = await import(J('money/autocheck.js'));
+const done = (id, key) => !!H.getLog()[key]?.[id];
+A.recheckMoney(payWeek);
+eq(done('save-paycheck', '2026-10-21'), false, 'not set up: save habit untouched');
+M.saveSettings({ pay: bi, setup: true });
+A.recheckMoney(offWeek);
+eq(done('save-paycheck', '2026-10-28'), true, 'off week ticks on its own');
+A.recheckMoney(payWeek);
+eq(done('save-paycheck', '2026-10-21'), false, 'payday week: not yet');
+M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
+A.recheckMoney(payWeek);
+eq(done('save-paycheck', '2026-10-21'), true, 'saved $40: ticked');
+A.recheckMoney(new Date(2026, 9, 24));
+eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 2, 'rechecking later in the week adds no second check-in');
+const id = M.getState().entries[0].id;
+M.deleteEntry(id);
+A.recheckMoney(new Date(2026, 9, 24));
+eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the week');
+M.setReview('2026-10', true);
+A.recheckMoney(new Date(2026, 9, 24));
+eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), true, 'review finished: monthly habit ticked');
+M.setReview('2026-10', false);
+A.recheckMoney(new Date(2026, 9, 24));
+eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), false, 'review undone: unticked');
+eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys');
+
+// ---- upgrade from schema 2 keeps habits, sets the Money autos ----
+for (const k of Object.keys(mem)) delete mem[k];
+mem.imp_schema = '2';
+mem.imp_habits = JSON.stringify([{ id: 'log-spending', auto: 'money:log', xp: 5 }, { id: 'save-paycheck', auto: null, xp: 25, name: 'My save' }, { id: 'budget-review', auto: null }, { id: 'journal', auto: null }]);
+H.init();
+eq(JSON.parse(mem.imp_habits).map((h) => [h.id, h.auto]), [['log-spending', null], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['journal', null]], 'upgrade sets autos, keeps the rest');
+eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
+
+console.log(fails ? `${fails} FAILED` : 'all passed');
+process.exitCode = fails ? 1 : 0;

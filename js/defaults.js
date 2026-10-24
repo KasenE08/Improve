@@ -42,9 +42,9 @@ const rows = [
   ['kept-word', 'Kept my word', 'mind', 'daily', 1, 10],
   ['weekly-review', 'Weekly review (wins, misses, staying calm)', 'mind', 'weekly', 1, 25],
 
-  ['log-spending', 'Log spending', 'money', 'daily', 1, 5, 'money:log'],
-  ['save-paycheck', 'Save set % of paycheck', 'money', 'weekly', 1, 25],
-  ['budget-review', 'Budget review', 'money', 'monthly', 1, 50],
+  ['log-spending', 'Log spending', 'money', 'daily', 1, 5],
+  ['save-paycheck', 'Save set % of paycheck', 'money', 'weekly', 1, 25, 'money:save'],
+  ['budget-review', 'Budget review', 'money', 'monthly', 1, 50, 'money:review'],
 
   ['dressed', 'Dressed intentionally', 'style', 'daily', 1, 5],
   ['clean-shoes', 'Clean shoes', 'style', 'weekly', 1, 25],

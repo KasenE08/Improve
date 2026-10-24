@@ -3,6 +3,8 @@ export const AUTO = {
   'food:calories': 'Food: hit calories',
   'food:protein': 'Food: hit protein',
   'planner:work': "Planner: all of today's tasks done",
+  'money:save': 'Money: saved from this week\'s paycheck',
+  'money:review': 'Money: monthly budget review done',
 };
 export const isAuto = (h) => !!h && typeof h.auto === 'string' && h.auto in AUTO;
-export const autoTab = (h) => ({ food: 'Food', planner: 'Planner' }[String(h?.auto).split(':')[0]] || 'another tab');
+export const autoTab = (h) => ({ food: 'Food', planner: 'Planner', money: 'Money' }[String(h?.auto).split(':')[0]] || 'another tab');

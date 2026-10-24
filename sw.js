@@ -1,6 +1,6 @@
 // Improve service worker. Scope is this folder only (/Improve/), set by its location.
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'v4';
+const VERSION = 'v5';
 const PREFIX = 'imp-cache-';            // only caches with this prefix are ever touched
 const CACHE = PREFIX + VERSION;
 
@@ -10,6 +10,7 @@ const FILES = [
   'manifest.webmanifest',
   'css/app.css',
   'css/food.css',
+  'css/money.css',
   'assets/css/tokens.css',
   'assets/css/components.css',
   'assets/icons/icons.svg',
@@ -26,7 +27,6 @@ const FILES = [
   'js/habits.js',
   'js/ui.js',
   'js/screens/today.js',
-  'js/screens/other.js',
   'js/screens/profile.js',
   'js/levels.js',
   'js/rewards.js',
@@ -39,6 +39,10 @@ const FILES = [
   'js/food/autocheck.js',
   'js/auto.js',
   'js/planner-auto.js',
+  'js/screens/money.js',
+  'js/money/logic.js',
+  'js/money/store.js',
+  'js/money/autocheck.js',
   'js/planner/planner.js',
   'js/planner/planner.css',
 ];
