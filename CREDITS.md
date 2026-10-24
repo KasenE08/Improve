@@ -9,6 +9,7 @@ Everything used is free. Licenses:
 
 ## Code
 - Food tab logic and screens are adapted from KasenE08/calorie-tracker (same author).
+- Planner tab is adapted from KasenE08/Schedule-App-Planner (same author). It bundles Preact (MIT License, © Jason Miller).
 
 ## Design samples only (`/design/`)
 - Lucide icons: ISC License, © Lucide Contributors.

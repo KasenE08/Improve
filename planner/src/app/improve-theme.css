@@ -1,0 +1,81 @@
+/* Pixel HUD details for the Planner tab (scoped under .planner-root at build time). */
+
+/* Fits inside Improve's page and tab bar */
+.screen { display: block; padding: 0; max-width: none; margin: 0; min-width: 0; }
+.screen::before { content: none; }
+.week { top: 0; margin: 0 -16px 14px; background: var(--imp-bg); border-bottom: 2px solid var(--imp-divider); }
+.drag-hint { bottom: calc(env(safe-area-inset-bottom) + 92px); }
+
+/* Headings + controls use the pixel heading font */
+h1 { font: 700 20px/1.2 var(--imp-font-head); letter-spacing: .03em; text-transform: uppercase; }
+h2 { font: 700 13px/1.3 var(--imp-font-head); letter-spacing: .03em; text-transform: uppercase; }
+h3 { font: 400 10px var(--imp-font-head); letter-spacing: .04em; color: var(--imp-accent); }
+.btn, .chip, .filter, .segmented button, .cat-chip, .field-label, .link, .day span, .month-grid .wd, .info-label, .badge {
+  font-family: var(--imp-font-head); text-transform: uppercase; letter-spacing: .02em;
+}
+.btn { font-size: 11px; font-weight: 700; border-width: 2px; }
+.btn.small { font-size: 10px; }
+.btn.wide { font-size: 12px; }
+.btn.primary { box-shadow: 0 4px 0 var(--imp-accent-deep); }
+.btn:active { transform: translateY(3px); box-shadow: none; }
+.btn.danger { border-color: var(--imp-danger); }
+.chip, .filter, .cat-chip, .segmented button { font-size: 10px; }
+.field-label, .info-label { font-size: 10px; }
+.link { font-size: 11px; text-decoration: none; color: var(--imp-accent); }
+.link.danger { color: var(--imp-danger); }
+.badge { font-size: 9px; }
+
+/* Panels: square frames with a hard pixel shadow */
+.card, .entry, .list-item, .hub, .month, .info-list, .stat, .profile-card, .dialog {
+  border-width: 2px; border-color: var(--imp-frame); box-shadow: 0 4px 0 #000;
+}
+.entry.block { box-shadow: none; border-color: #16283e; }
+.entry.task { box-shadow: inset 5px 0 0 var(--cat), 0 4px 0 #000; }
+.entry.task.inProgress { box-shadow: inset 5px 0 0 var(--cat), 0 0 0 2px var(--cat); }
+.entry .title, .task-row-body .title, .hub-row .title, .settings-row .title { font-size: 22px; font-weight: 400; }
+.chip-icon { background: color-mix(in srgb, var(--cat) 18%, var(--imp-sunken)); }
+
+/* Inputs */
+input, select, textarea { background: var(--imp-sunken); border: 2px solid var(--imp-frame); font-size: 21px; }
+input:focus, select:focus, textarea:focus { background: var(--imp-sunken); border-color: var(--imp-accent); }
+input[type='checkbox'] { border: 2px solid var(--imp-frame); background: var(--imp-sunken); }
+input[type='checkbox']::after { top: 4px; left: 4px; width: 18px; height: 18px; background: var(--imp-muted); }
+input[type='checkbox']:checked { background: var(--imp-accent-deep); border-color: var(--imp-accent); }
+input[type='checkbox']:checked::after { background: var(--imp-accent); }
+
+/* Week + month day pickers */
+.day strong { font-size: 22px; font-weight: 400; }
+.day.on strong { background: var(--imp-accent); color: var(--imp-on-accent); box-shadow: 3px 3px 0 var(--imp-accent-deep); }
+.day.today span { color: var(--imp-accent); }
+.mday.on strong { box-shadow: 3px 3px 0 var(--imp-accent-deep); }
+.mday.today strong { box-shadow: inset 0 0 0 2px var(--imp-accent); }
+
+/* Segmented control, filters, chips */
+.segmented { background: var(--imp-sunken); border: 2px solid var(--imp-frame); padding: 0; gap: 0; }
+.segmented button.on { background: var(--imp-accent); color: var(--imp-on-accent); }
+.chip.on, .filter.on { background: var(--imp-accent); color: var(--imp-on-accent); border-color: var(--imp-accent); }
+.check { border-width: 3px; }
+
+/* Sheets */
+.sheet { border: 0; border-top: 3px solid var(--imp-frame); background: var(--imp-surface); }
+.sheet-head { background: var(--imp-surface-2); padding-top: 10px; }
+.sheet-head h2 { color: var(--imp-accent); }
+.sheet-grabber { display: none; }
+
+/* Sub-navigation that replaces the old bottom bar */
+.pl-subnav { display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px; }
+.pl-subnav .segmented { flex: 1; margin: 0; }
+.pl-subnav .segmented button { min-height: 40px; }
+.pl-add { flex: 0 0 auto; width: 46px; display: grid; place-items: center; background: var(--imp-accent); color: var(--imp-on-accent); border: 0; box-shadow: 0 4px 0 var(--imp-accent-deep); }
+.pl-add:active { transform: translateY(3px); box-shadow: none; }
+
+/* Above Improve's tab bar (z 40) and sheet (z 50) */
+.sheet-backdrop { z-index: 55; }
+.dialog-backdrop { z-index: 75; }
+.drag-ghost, .drag-hint { z-index: 65; }
+
+/* Polish */
+.segmented button, .btn, .chip, .filter, .day, .mday { text-align: center; }
+.pl-subnav .segmented button { font-size: 9px; padding: 0 2px; letter-spacing: 0; }
+.detail-head h2 { font-size: 16px; line-height: 1.35; }
+.warn-row { font-family: var(--imp-font-body); font-size: 19px; text-transform: none; letter-spacing: 0; color: var(--imp-text); }

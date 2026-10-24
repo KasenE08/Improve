@@ -1,0 +1,3 @@
+# Planner tab: dependencies and build output (built by the deploy workflow)
+planner/node_modules/
+js/planner/

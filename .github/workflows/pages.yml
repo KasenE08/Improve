@@ -1,4 +1,5 @@
-# Deploys the repo root as a static site to GitHub Pages on every push to main.
+# Deploys Improve to GitHub Pages on every push to main.
+# The Planner tab is TypeScript/Preact: it is type-checked, tested and built into js/planner/ first.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -19,9 +20,32 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: planner/package-lock.json
+      - name: Test and build the Planner tab
+        working-directory: planner
+        run: |
+          npm ci
+          npm run check
+          npm run build
+      - name: Test the rest of the app
+        run: |
+          node tests/logic.test.mjs
+          node tests/phase2.test.mjs
+          node tests/food-auto.test.mjs
+          node --test tests/food-logic.test.mjs
+          node tests/planner-auto.test.mjs
+      - name: Collect the site (without Planner sources)
+        run: |
+          mkdir _site
+          tar --exclude=./_site --exclude=./.git --exclude=./.github --exclude=./planner --exclude=./tests -cf - . | tar -xf - -C _site
+          test -f _site/js/planner/planner.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
