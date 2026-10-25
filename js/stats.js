@@ -2,7 +2,7 @@
 import * as H from './habits.js';
 import * as R from './rewards.js';
 import { levelFromXP, getRanks, rankFor, nextRank } from './levels.js';
-import { dayKey } from './dates.js';
+import { dayKey, appNow } from './dates.js';
 
 const WEEKLY_FACTOR = { daily: 7, weekly: 1, monthly: 12 / 52 };
 
@@ -62,7 +62,7 @@ export function compute() {
 }
 
 // Daily meter: XP earned today vs. the most you could earn today
-export function today(date = new Date()) {
+export function today(date = appNow()) {
   const key = dayKey(date);
   const log = H.getLog();
   const byId = new Map(H.getAllHabits().map((h) => [h.id, h]));

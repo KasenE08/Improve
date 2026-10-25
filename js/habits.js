@@ -16,7 +16,7 @@
 // wiped and the full by-date history stays available for streaks and stats.
 
 import * as store from './store.js';
-import { dayKey, periodRange } from './dates.js';
+import { dayKey, periodRange, appNow } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
 export const SCHEMA = 4;
@@ -83,7 +83,7 @@ export const getLog = () => store.get('log', {});
 const saveLog = (log) => store.set('log', log);
 
 // Completions of a habit in the period containing `date`
-export function progress(habit, date = new Date(), log = getLog()) {
+export function progress(habit, date = appNow(), log = getLog()) {
   const [start, end] = periodRange(habit.frequency, date);
   let n = 0;
   for (const day in log) {
@@ -93,7 +93,7 @@ export function progress(habit, date = new Date(), log = getLog()) {
 }
 
 // Add (+1) or remove (-1) one completion. Returns the XP change (0 if nothing changed).
-export function step(habit, delta, date = new Date()) {
+export function step(habit, delta, date = appNow()) {
   const log = getLog();
   const today = dayKey(date);
   const done = progress(habit, date, log);

@@ -2,7 +2,7 @@
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
-import { daysLeft } from '../dates.js';
+import { daysLeft, appNow } from '../dates.js';
 import { recheck } from '../food/autocheck.js';
 import { AUTO, isAuto, autoTab } from '../auto.js';
 import { recheckPlanner } from '../planner-auto.js';
@@ -25,7 +25,7 @@ export function render(root, refresh) {
   const habits = H.getHabits();
   const cats = H.getCategories();
   const log = H.getLog();
-  const now = new Date();
+  const now = appNow();
   const prog = new Map(habits.map((h) => [h.id, H.progress(h, now, log)]));
   const counts = H.countsIndex(log);
   const streaks = new Map(habits.map((h) => [h.id, R.streak(h, now, counts)]));

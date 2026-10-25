@@ -7,9 +7,9 @@
 import * as store from './store.js';
 import * as H from './habits.js';
 import * as R from './rewards.js';
-import { dayKey } from './dates.js';
+import { dayKey, appNow } from './dates.js';
 
-export function plannerHit(data, date = new Date()) {
+export function plannerHit(data, date = appNow()) {
   const today = dayKey(date);
   const tasks = new Map((data.tasks || []).map((t) => [t.id, t]));
   let day = store.get('planner_day', null);
@@ -23,7 +23,7 @@ export function plannerHit(data, date = new Date()) {
 }
 
 // Returns bonuses newly earned (for celebrations).
-export function recheckPlanner(date = new Date()) {
+export function recheckPlanner(date = appNow()) {
   const data = store.get('planner', null);
   // Not set up yet (no tasks and no fixed times): nothing to judge, no free XP
   if (!data || (!data.tasks?.length && !data.blocks?.length)) return [];

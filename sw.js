@@ -1,6 +1,6 @@
 // Improve service worker. Scope is this folder only (/Improve/), set by its location.
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'v7';
+const VERSION = 'v8';
 const PREFIX = 'imp-cache-';            // only caches with this prefix are ever touched
 const CACHE = PREFIX + VERSION;
 
