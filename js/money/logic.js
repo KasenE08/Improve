@@ -1,5 +1,5 @@
 // Money tab: pure logic (no DOM, no storage). Amounts are whole cents.
-import { dayKey, fromDayKey, addDays, periodRange } from '../dates.js';
+import { dayKey, fromDayKey, addDays, periodRange, appNow } from '../dates.js';
 
 export const FREQS = {
   weekly: 'Every week',
@@ -85,7 +85,7 @@ export const sum = (list) => list.reduce((s, e) => s + e.amount, 0);
 //   judge: false until paydays are set up
 //   offWeek: no payday expected and no paycheck logged → counts as done (nothing to save)
 //   hit: saved this week ≥ what this week's paycheck(s) call for
-export function saveStatus(state, date = new Date()) {
+export function saveStatus(state, date = appNow()) {
   const { settings, entries } = state;
   const [start, end] = periodRange('weekly', date);
   const expected = paydaysBetween(settings.pay, start, end);
@@ -121,4 +121,4 @@ export function monthSummary(state, mk) {
   };
 }
 
-export const reviewDone = (state, date = new Date()) => !!state.reviews?.[monthKey(dayKey(date))];
+export const reviewDone = (state, date = appNow()) => !!state.reviews?.[monthKey(dayKey(date))];

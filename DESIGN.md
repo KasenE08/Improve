@@ -64,7 +64,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
-Periods: daily = local day, weekly = Monday–Sunday, monthly = calendar month. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
+Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM, weekly on Monday 4:01 AM, monthly on the 1st at 4:01 AM. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
 `auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap.
 
 ## Leveling (Phase 2)

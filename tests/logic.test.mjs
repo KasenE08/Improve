@@ -27,3 +27,18 @@ H.step(lift, -1, mon); eq(H.progress(lift, sun), 5, 'undo Monday cannot touch la
 H.step(lift, -1, sun); eq(H.progress(lift, sun), 4, 'undo on Sun removes one');
 eq(JSON.parse(mem.imp_log)['2026-10-25'].lift.n, 1, 'undo took Sunday entry first');
 eq(Object.keys(mem).every(k => k.startsWith('imp_')), true, 'all keys imp_');
+
+// ---- 4 AM day end (late-night check-ins count for the day you're finishing) ----
+eq(D.dayKey(D.appNow(new Date(2026, 9, 25, 23, 59))), '2026-10-25', 'Sun 11:59 PM is Sunday');
+eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 0, 30))), '2026-10-25', 'Mon 12:30 AM still counts as Sunday');
+eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 4, 0))), '2026-10-25', 'Mon 4:00 AM still Sunday');
+eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 4, 1))), '2026-10-26', 'Mon 4:01 AM is Monday');
+eq(D.periodRange('weekly', D.appNow(new Date(2026, 9, 26, 1, 0))), ['2026-10-19', '2026-10-25'], 'Mon 1 AM: still last week');
+eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 2, 0))), ['2026-10-01', '2026-10-31'], 'Nov 1, 2 AM: still October');
+eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 4, 1))), ['2026-11-01', '2026-11-30'], 'Nov 1, 4:01 AM: November');
+{
+  const lift = H.getHabits().find((h) => h.id === 'lift');
+  const before = H.progress(lift, new Date(2026, 9, 25, 12));
+  H.step(lift, 1, D.appNow(new Date(2026, 9, 26, 1, 0)));
+  eq(H.progress(lift, new Date(2026, 9, 25, 12)), Math.min(before + 1, lift.target), 'tick at Mon 1 AM lands in last week');
+}

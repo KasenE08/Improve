@@ -11,7 +11,7 @@
 
 import * as store from './store.js';
 import * as H from './habits.js';
-import { dayKey, addDays, weekStart, periodRange } from './dates.js';
+import { dayKey, addDays, weekStart, periodRange, appNow } from './dates.js';
 
 export const PERFECT_DAY_XP = 50;
 export const MILESTONES = [[7, 25], [30, 100], [100, 300]]; // [streak length, XP]
@@ -47,7 +47,7 @@ function doneIn(h, d, counts) {
 }
 
 // → { count, current: is this period already done }
-export function streak(h, date = new Date(), counts = H.countsIndex()) {
+export function streak(h, date = appNow(), counts = H.countsIndex()) {
   const current = doneIn(h, date, counts) >= h.target;
   let count = current ? 1 : 0;
   let d = prevPeriod(h.frequency, date);
@@ -59,7 +59,7 @@ export function streak(h, date = new Date(), counts = H.countsIndex()) {
 }
 
 // Re-check today's bonuses. Returns the bonuses newly added (for notifications).
-export function sync(date = new Date()) {
+export function sync(date = appNow()) {
   const today = dayKey(date);
   const counts = H.countsIndex();
   const habits = H.getHabits();
@@ -94,7 +94,7 @@ export function sync(date = new Date()) {
 }
 
 // One-time upgrade from Phase 1: award Perfect Days already earned in the history
-export function awardPastPerfectDays(date = new Date()) {
+export function awardPastPerfectDays(date = appNow()) {
   const today = dayKey(date);
   const dailies = H.getHabits().filter((h) => h.frequency === 'daily');
   if (!dailies.length) return;
@@ -108,7 +108,7 @@ export function awardPastPerfectDays(date = new Date()) {
 }
 
 // Current streaks for every active habit, longest first
-export function allStreaks(date = new Date()) {
+export function allStreaks(date = appNow()) {
   const counts = H.countsIndex();
   return H.getHabits()
     .map((h) => ({ h, ...streak(h, date, counts) }))
