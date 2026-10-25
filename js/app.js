@@ -14,6 +14,7 @@ import * as Profile from './screens/profile.js';
 import { recheckPlanner } from './planner-auto.js';
 import { panel, empty } from './ui.js';
 import { celebrate } from './screens/today.js';
+import { isLocked, showCountdown, wipeTestData } from './launch.js';
 
 const TABS = [
   ['today', 'Today', 'today'],
@@ -29,122 +30,129 @@ const screen = document.getElementById('screen');
 const tabbar = document.getElementById('tabbar');
 let shownDay = dayKey();
 
-// First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
-const foundSchema = H.init();
-if (foundSchema === 1) R.awardPastPerfectDays();
-Food.recheckToday();
-recheckMoney();
-recheckJournal();
-R.sync();
+// Locked behind a countdown until launch day; on launch day, test data is wiped once.
+if (isLocked()) showCountdown();
+else boot();
 
-function currentTab() {
-  const t = location.hash.replace('#', '').split('?')[0];
-  return TABS.some(([id]) => id === t) ? t : 'today';
-}
+function boot() {
+  wipeTestData();
+  // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
+  const foundSchema = H.init();
+  if (foundSchema === 1) R.awardPastPerfectDays();
+  Food.recheckToday();
+  recheckMoney();
+  recheckJournal();
+  R.sync();
 
-// ---- Planner tab (built bundle, loaded on demand) ----
-let planner = null;        // the loaded module
-let plannerMounted = false;
-let plannerLoad = null;
-function loadPlanner() {
-  plannerLoad ||= import('./planner/planner.js').then((m) => {
-    planner = m;
-    // Every saved planner change: re-check "Work done on schedule" and update the HUD.
-    m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
-    recheckPlanner();
+  function currentTab() {
+    const t = location.hash.replace('#', '').split('?')[0];
+    return TABS.some(([id]) => id === t) ? t : 'today';
+  }
+
+  // ---- Planner tab (built bundle, loaded on demand) ----
+  let planner = null;        // the loaded module
+  let plannerMounted = false;
+  let plannerLoad = null;
+  function loadPlanner() {
+    plannerLoad ||= import('./planner/planner.js').then((m) => {
+      planner = m;
+      // Every saved planner change: re-check "Work done on schedule" and update the HUD.
+      m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
+      recheckPlanner();
+      renderHud();
+      return m;
+    }).catch((e) => { console.warn('Planner failed to load', e); plannerLoad = null; throw e; });
+    return plannerLoad;
+  }
+  function unmountPlanner() {
+    if (plannerMounted && planner) planner.unmount(screen);
+    plannerMounted = false;
+  }
+  function showPlanner() {
+    if (plannerMounted) return;
+    if (planner) { screen.innerHTML = ''; planner.mount(screen); plannerMounted = true; return; }
+    screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'hourglass', title: 'Loading', text: 'One moment…' }) })}</div>`;
+    loadPlanner().then(() => { if (currentTab() === 'planner') showPlanner(); })
+      .catch(() => { screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'info', title: 'Couldn’t load', text: 'Check your connection and reopen the app.' }) })}</div>`; });
+  }
+
+  function renderHud() {
+    const st = Stats.compute();
+    const t = Stats.today();
+    const name = H.getProfile().name;
+    const o = st.overall;
+
+    hud.innerHTML = `${lvl(o.level)}
+      <div class="hud__main">
+        <div class="hud__top"><button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button><span class="hud__rank">${esc(st.rank.name)}</span></div>
+        ${xpbar(o.pct)}
+        <div class="hud__meta"><span>${o.into} / ${o.need} XP</span><span class="hud__date">${prettyDate()}</span></div>
+        ${meter('Today', pct(t.earned, t.max), `${icon('xp')}+${t.earned}`)}
+      </div>`;
+  }
+
+  function renderTabs(active) {
+    tabbar.innerHTML = TABS.map(([id, label, ic]) =>
+      `<a class="imp-tab${id === active ? ' is-active' : ''}" href="#${id}"${id === active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`).join('');
+  }
+
+  function refresh() {
+    shownDay = dayKey();
+    const tab = currentTab();
     renderHud();
-    return m;
-  }).catch((e) => { console.warn('Planner failed to load', e); plannerLoad = null; throw e; });
-  return plannerLoad;
-}
-function unmountPlanner() {
-  if (plannerMounted && planner) planner.unmount(screen);
-  plannerMounted = false;
-}
-function showPlanner() {
-  if (plannerMounted) return;
-  if (planner) { screen.innerHTML = ''; planner.mount(screen); plannerMounted = true; return; }
-  screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'hourglass', title: 'Loading', text: 'One moment…' }) })}</div>`;
-  loadPlanner().then(() => { if (currentTab() === 'planner') showPlanner(); })
-    .catch(() => { screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'info', title: 'Couldn’t load', text: 'Check your connection and reopen the app.' }) })}</div>`; });
-}
+    renderTabs(tab);
+    Journal.flush(); // save anything still being typed before the screen changes
+    if (tab === 'planner') { screen.dataset.tab = tab; showPlanner(); return; }
+    unmountPlanner();
+    screen.dataset.tab = tab;
+    if (tab === 'today') Today.render(screen, refresh);
+    else if (tab === 'food') Food.render(screen, refresh);
+    else if (tab === 'money') Money.render(screen, refresh);
+    else if (tab === 'journal') Journal.render(screen, refresh, renderHud);
+    else if (tab === 'profile') Profile.render(screen);
+  }
 
-function renderHud() {
-  const st = Stats.compute();
-  const t = Stats.today();
-  const name = H.getProfile().name;
-  const o = st.overall;
+  Today.bind(screen);
+  Food.bind(screen);
+  Money.bind(screen);
+  Journal.bind(screen);
+  Profile.bind(screen, refresh);
+  hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
 
-  hud.innerHTML = `${lvl(o.level)}
-    <div class="hud__main">
-      <div class="hud__top"><button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button><span class="hud__rank">${esc(st.rank.name)}</span></div>
-      ${xpbar(o.pct)}
-      <div class="hud__meta"><span>${o.into} / ${o.need} XP</span><span class="hud__date">${prettyDate()}</span></div>
-      ${meter('Today', pct(t.earned, t.max), `${icon('xp')}+${t.earned}`)}
-    </div>`;
-}
+  window.addEventListener('hashchange', () => {
+    const id = takeTaskFromHash();
+    refresh();
+    window.scrollTo(0, 0);
+    if (id) loadPlanner().then((m) => m.openTask(id, plannerMounted)).catch(() => {});
+  });
 
-function renderTabs(active) {
-  tabbar.innerHTML = TABS.map(([id, label, ic]) =>
-    `<a class="imp-tab${id === active ? ' is-active' : ''}" href="#${id}"${id === active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`).join('');
-}
+  // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
+  const checkDay = () => { Food.recheckToday(); recheckPlanner(); recheckMoney(); recheckJournal(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
+  setInterval(checkDay, 30000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) Journal.flush(); else checkDay(); });
+  window.addEventListener('focus', checkDay);
+  window.addEventListener('pageshow', checkDay);
 
-function refresh() {
-  shownDay = dayKey();
-  const tab = currentTab();
-  renderHud();
-  renderTabs(tab);
-  Journal.flush(); // save anything still being typed before the screen changes
-  if (tab === 'planner') { screen.dataset.tab = tab; showPlanner(); return; }
-  unmountPlanner();
-  screen.dataset.tab = tab;
-  if (tab === 'today') Today.render(screen, refresh);
-  else if (tab === 'food') Food.render(screen, refresh);
-  else if (tab === 'money') Money.render(screen, refresh);
-  else if (tab === 'journal') Journal.render(screen, refresh, renderHud);
-  else if (tab === 'profile') Profile.render(screen);
-}
+  // Opened from a notification tap: #planner?task=ID
+  function takeTaskFromHash() {
+    const m = location.hash.match(/^#planner\?task=(.+)$/);
+    if (!m) return null;
+    history.replaceState(null, '', '#planner');
+    return decodeURIComponent(m[1]);
+  }
+  const tappedTask = takeTaskFromHash();
 
-Today.bind(screen);
-Food.bind(screen);
-Money.bind(screen);
-Journal.bind(screen);
-Profile.bind(screen, refresh);
-hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
-
-window.addEventListener('hashchange', () => {
-  const id = takeTaskFromHash();
   refresh();
-  window.scrollTo(0, 0);
-  if (id) loadPlanner().then((m) => m.openTask(id, plannerMounted)).catch(() => {});
-});
 
-// New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-const checkDay = () => { Food.recheckToday(); recheckPlanner(); recheckMoney(); recheckJournal(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
-setInterval(checkDay, 30000);
-document.addEventListener('visibilitychange', () => { if (document.hidden) Journal.flush(); else checkDay(); });
-window.addEventListener('focus', checkDay);
-window.addEventListener('pageshow', checkDay);
-
-// Opened from a notification tap: #planner?task=ID
-function takeTaskFromHash() {
-  const m = location.hash.match(/^#planner\?task=(.+)$/);
-  if (!m) return null;
-  history.replaceState(null, '', '#planner');
-  return decodeURIComponent(m[1]);
+  // Load the planner in the background: replans on a new day and keeps notifications in sync.
+  const plannerReady = loadPlanner().catch(() => null);
+  if (tappedTask) plannerReady.then((m) => m && m.openTask(tappedTask, plannerMounted));
+  navigator.serviceWorker?.addEventListener('message', (e) => {
+    if (e.data?.type !== 'open-task') return;
+    if (currentTab() !== 'planner') location.hash = 'planner';
+    plannerReady.then((m) => m && m.openTask(e.data.taskId, plannerMounted));
+  });
 }
-const tappedTask = takeTaskFromHash();
-
-refresh();
-
-// Load the planner in the background: replans on a new day and keeps notifications in sync.
-const plannerReady = loadPlanner().catch(() => null);
-if (tappedTask) plannerReady.then((m) => m && m.openTask(tappedTask, plannerMounted));
-navigator.serviceWorker?.addEventListener('message', (e) => {
-  if (e.data?.type !== 'open-task') return;
-  if (currentTab() !== 'planner') location.hash = 'planner';
-  plannerReady.then((m) => m && m.openTask(e.data.taskId, plannerMounted));
-});
 
 // ---- Offline support ----
 if ('serviceWorker' in navigator) {

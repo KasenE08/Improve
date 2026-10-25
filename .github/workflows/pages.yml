@@ -40,6 +40,7 @@ jobs:
           node tests/planner-auto.test.mjs
           node tests/money.test.mjs
           node tests/journal.test.mjs
+          node tests/launch.test.mjs
       - name: Collect the site (without Planner sources)
         run: |
           mkdir _site
