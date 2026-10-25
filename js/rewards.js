@@ -11,7 +11,7 @@
 
 import * as store from './store.js';
 import * as H from './habits.js';
-import { dayKey, addDays, weekStart, periodRange, appNow } from './dates.js';
+import { dayKey, addDays, weekStart, periodRange, appNow, fromDayKey } from './dates.js';
 
 export const PERFECT_DAY_XP = 50;
 export const MILESTONES = [[7, 25], [30, 100], [100, 300]]; // [streak length, XP]
@@ -30,10 +30,10 @@ export function bonusXPOnDay(key = dayKey(), bonus = getBonus()) {
   return Object.values(bonus[key] || {}).reduce((s, b) => s + b.xp, 0);
 }
 
+// A day in the period before the one containing d
 function prevPeriod(freq, d) {
-  if (freq === 'weekly') return addDays(weekStart(d), -1);
-  if (freq === 'monthly') return new Date(d.getFullYear(), d.getMonth(), 0);
-  return addDays(d, -1);
+  if (freq === 'daily') return addDays(d, -1);
+  return addDays(fromDayKey(periodRange(freq, d)[0]), -1);
 }
 
 function doneIn(h, d, counts) {

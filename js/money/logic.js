@@ -121,4 +121,13 @@ export function monthSummary(state, mk) {
   };
 }
 
-export const reviewDone = (state, date = appNow()) => !!state.reviews?.[monthKey(dayKey(date))];
+// "Budget review" habit: a review finished at any point during the habit's month
+// (first Monday → day before next month's first Monday). Budgets themselves stay on calendar months.
+export function reviewDone(state, date = appNow()) {
+  const [start, end] = periodRange('monthly', date);
+  return Object.values(state.reviews || {}).some((r) => {
+    if (!r?.doneAt) return false;
+    const k = dayKey(appNow(new Date(r.doneAt)));
+    return k >= start && k <= end;
+  });
+}
