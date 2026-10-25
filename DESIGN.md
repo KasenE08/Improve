@@ -64,7 +64,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
-Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM, weekly on Monday 4:01 AM, monthly on the 1st at 4:01 AM. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
+Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM and weekly on Monday 4:01 AM. Habit months start on the month's first Monday and run to the day before the next month's first Monday (4 or 5 whole weeks), so monthly resets on a Monday at 4:01 AM too. Money budgets stay on calendar months. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
 `auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap.
 
 ## Leveling (Phase 2)
@@ -113,7 +113,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 
 ## Launch day
 
-- `js/launch.js`: until `START` (2026-11-01, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept.
+- `js/launch.js`: until `START` (Monday 2026-11-02, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept.
 
 ## Deploying
 

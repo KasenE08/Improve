@@ -91,6 +91,14 @@ eq(holder, '2027-01-20', 'weekly milestone stored on completion day');
 R.sync(addDays(lastWeekDay, 2));
 eq(!!R.getBonus()['2027-01-20']['streak:family'], true, 'later sync same week keeps it');
 
+// ---- Monthly streak counts first-Monday months ----
+{
+  const cut = H.getHabits().find((h) => h.id === 'haircut');
+  for (const d of [new Date(2027, 2, 10, 12), new Date(2027, 3, 12, 12), new Date(2027, 4, 4, 12)]) H.step(cut, 1, d); // Mar 1–Apr 4, Apr 5–May 2, May 3–Jun 6
+  eq(R.streak(cut, new Date(2027, 4, 20, 12)).count, 3, '3-month streak across Monday-months');
+  eq(R.streak(cut, new Date(2027, 5, 10, 12)), { count: 3, current: false }, 'next month (Jun 7–) not done yet: streak alive');
+}
+
 // ---- Category meters are scaled ----
 const st = S.compute();
 const pot = S.weeklyPotential();

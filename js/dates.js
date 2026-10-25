@@ -27,6 +27,12 @@ export function addDays(d, n) {
   return x;
 }
 
+// First Monday of a calendar month (m is 0-based)
+export function firstMonday(y, m) {
+  const first = new Date(y, m, 1);
+  return addDays(first, (8 - first.getDay()) % 7);
+}
+
 // Monday of the week containing d
 export function weekStart(d = appNow()) {
   const dow = (d.getDay() + 6) % 7; // Mon=0 … Sun=6
@@ -40,8 +46,11 @@ export function periodRange(freq, d = appNow()) {
     return [dayKey(s), dayKey(addDays(s, 6))];
   }
   if (freq === 'monthly') {
-    const s = new Date(d.getFullYear(), d.getMonth(), 1);
-    const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    // Habit months start on the month's first Monday and run until the next month's first Monday
+    let y = d.getFullYear(), m = d.getMonth();
+    if (dayKey(d) < dayKey(firstMonday(y, m))) { m -= 1; if (m < 0) { m = 11; y -= 1; } }
+    const s = firstMonday(y, m);
+    const e = addDays(firstMonday(m === 11 ? y + 1 : y, (m + 1) % 12), -1);
     return [dayKey(s), dayKey(e)];
   }
   const k = dayKey(d);

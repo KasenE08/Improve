@@ -9,7 +9,7 @@ Open the link in Safari → Share → **Add to Home Screen**.
 
 ## What's here (Phase 1)
 - **Today** tab: Daily / This Week / This Month habits grouped by category, XP per habit, today's XP in the header.
-  Tap = done (+1), hold = undo (−1). Days end at 4 AM: daily resets at 4:01 AM, weekly on Monday 4:01 AM, monthly on the 1st at 4:01 AM.
+  Tap = done (+1), hold = undo (−1). Days end at 4 AM: daily resets at 4:01 AM, weekly on Monday 4:01 AM, monthly on the first Monday of each month at 4:01 AM.
 - Edit habits, categories and your name in the app.
 - Data stays on the phone (localStorage keys all start with `imp_`). Service worker only covers this folder.
 
