@@ -16,10 +16,10 @@
 // wiped and the full by-date history stays available for streaks and stats.
 
 import * as store from './store.js';
-import { dayKey, periodRange, appNow } from './dates.js';
+import { dayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
-export const SCHEMA = 4;
+export const SCHEMA = 5;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -42,6 +42,10 @@ export function init() {
   // Schema 4 (Journal tab): "Journal" ticks from the words written today.
   if (found > 0 && found < 4) {
     store.set('habits', store.get('habits', []).map((h) => (h.id === 'journal' ? { ...h, auto: 'journal:words' } : h)));
+  }
+  // Schema 5: auto habits can wait until a time of day; "Work done on schedule" waits until 3 PM.
+  if (found > 0 && found < 5) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'work-on-schedule' && h.autoAfter === undefined ? { ...h, autoAfter: 15 * 60 } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
@@ -123,9 +127,22 @@ export function step(habit, delta, date = appNow()) {
   return -xp;
 }
 
+// Auto habits can wait until a time of day (habit.autoAfter, minutes after midnight).
+// Past days are always allowed; today only once that time has come. Between midnight and
+// 4 AM it's still "today" (the app day ends at 4 AM), so that counts as after any afternoon time.
+export function autoTimeReached(habit, day, now = new Date()) {
+  if (habit.autoAfter == null) return true;
+  const today = dayKey(appNow(now));
+  if (day < today) return true;
+  if (day > today) return false;
+  const late = (m) => (m < DAY_START_MIN ? m + 1440 : m);
+  return late(now.getHours() * 60 + now.getMinutes()) >= late(habit.autoAfter);
+}
+
 // Set a habit done / not done on a date (used by auto-checks from other tabs).
 // Returns true if anything changed.
-export function setDone(habit, day, done) {
+export function setDone(habit, day, done, now = new Date()) {
+  if (done && !autoTimeReached(habit, day, now)) done = false;
   const log = getLog();
   const cur = log[day]?.[habit.id]?.n || 0;
   const want = done ? Math.max(1, habit.frequency === 'daily' ? habit.target : 1) : 0;
@@ -142,8 +159,9 @@ export function setDone(habit, day, done) {
 // Weekly / monthly version for auto-checks: done = exactly one completion somewhere in the
 // period containing `date` (added on that date if missing); not done = none in the period.
 // Returns true if anything changed.
-export function setPeriodDone(habit, date, done) {
-  if (habit.frequency === 'daily') return setDone(habit, dayKey(date), done);
+export function setPeriodDone(habit, date, done, now = new Date()) {
+  if (habit.frequency === 'daily') return setDone(habit, dayKey(date), done, now);
+  if (done && !autoTimeReached(habit, dayKey(date), now)) done = false;
   const log = getLog();
   const [start, end] = periodRange(habit.frequency, date);
   const days = Object.keys(log).filter((d) => d >= start && d <= end && log[d][habit.id]);

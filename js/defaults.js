@@ -55,8 +55,12 @@ const rows = [
   ['try-new', 'Try something new', 'people', 'monthly', 1, 50],
 ];
 
+// Auto habits that wait until a time of day before ticking (minutes after midnight)
+const AUTO_AFTER = { 'work-on-schedule': 15 * 60 };
+
 export const DEFAULT_HABITS = rows.map(([id, name, category, frequency, target, xp, auto], order) => ({
   id, name, category, frequency, target, xp, order, archived: false, auto: auto || null,
+  ...(id in AUTO_AFTER ? { autoAfter: AUTO_AFTER[id] } : {}),
 }));
 
 export const DEFAULT_PROFILE = { name: 'KASEN' };
