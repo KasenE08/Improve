@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `5` |
+| `imp_schema` | `6` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
@@ -110,6 +110,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Auto-check (`js/journal/autocheck.js`): "Journal" ticks when today's section has at least `minWords` words (default 25, gear icon on the tab). Only today counts; editing past days never changes XP.
 - Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
 - Schema 4 upgrade makes the existing "Journal" habit auto.
+- Schema 6 upgrade adds the daily "Be proactive" right after "Kept my word", with the same category and XP.
 
 ## Launch day
 

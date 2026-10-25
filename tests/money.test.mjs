@@ -111,7 +111,7 @@ for (const k of Object.keys(mem)) delete mem[k];
 mem.imp_schema = '2';
 mem.imp_habits = JSON.stringify([{ id: 'log-spending', auto: 'money:log', xp: 5 }, { id: 'save-paycheck', auto: null, xp: 25, name: 'My save' }, { id: 'budget-review', auto: null }, { id: 'kept-word', auto: null }]);
 H.init();
-eq(JSON.parse(mem.imp_habits).map((h) => [h.id, h.auto]), [['log-spending', null], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['kept-word', null]], 'upgrade sets autos, keeps the rest');
+eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto]), [['log-spending', null], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['kept-word', null]], 'upgrade sets autos, keeps the rest');
 eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
 
 console.log(fails ? `${fails} FAILED` : 'all passed');

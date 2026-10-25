@@ -91,4 +91,4 @@ for (const k of Object.keys(mem)) delete mem[k];
 mem.imp_schema = '4';
 mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', auto: 'planner:work', name: 'Work (mine)' }, { id: 'journal', auto: 'journal:words' }]);
 H.init();
-eq(JSON.parse(mem.imp_habits).map((h) => [h.id, h.autoAfter ?? null, h.name ?? null]), [['work-on-schedule', 900, 'Work (mine)'], ['journal', null, null]], 'upgrade: 3 PM on Work done on schedule only, edits kept');
+eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.autoAfter ?? null, h.name ?? null]), [['work-on-schedule', 900, 'Work (mine)'], ['journal', null, null]], 'upgrade: 3 PM on Work done on schedule only, edits kept');

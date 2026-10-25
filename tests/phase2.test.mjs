@@ -49,7 +49,7 @@ eq(found, 1, 'init reports old schema 1');
 eq(H.getProfile().name, 'TESTER', 'profile kept');
 R.awardPastPerfectDays(new Date(2026, 9, 24));
 eq(R.getBonus()['2026-10-20']?.perfect?.xp, 50, 'past perfect day awarded on upgrade');
-eq(S.compute().total, 215 + 50, 'total XP = 215 dailies + 50 bonus');
+eq(S.compute().total, 225 + 50, 'total XP = 225 dailies + 50 bonus');
 eq(S.compute().categories.find((c) => c.id === 'body').xp, 40, 'old entries count toward category via habit');
 
 // ---- Perfect Day: earned and undone ----
@@ -58,8 +58,8 @@ const hs = H.getHabits();
 for (const h of hs.filter((h) => h.frequency === 'daily')) H.step(h, 1, sat);
 let added = R.sync(sat);
 eq(added.some((b) => b.type === 'perfect'), true, 'perfect day added when all dailies done');
-eq(S.today(sat).earned, 215 + 50, 'daily meter includes bonus');
-eq(S.today(sat).max, 215 + 50, 'daily meter full on perfect day');
+eq(S.today(sat).earned, 225 + 50, 'daily meter includes bonus');
+eq(S.today(sat).max, 225 + 50, 'daily meter full on perfect day');
 H.step(hs.find((h) => h.id === 'journal'), -1, sat);
 R.sync(sat);
 eq(!!R.getBonus()['2026-10-24']?.perfect, false, 'undo removes perfect day');
@@ -102,7 +102,7 @@ eq(!!R.getBonus()['2027-01-20']['streak:family'], true, 'later sync same week ke
 // ---- Category meters are scaled ----
 const st = S.compute();
 const pot = S.weeklyPotential();
-eq(Math.round(pot.total), Math.round(215 * 7 + 275 + 300 * 12 / 52), 'weekly potential total');
+eq(Math.round(pot.total), Math.round(225 * 7 + 275 + 300 * 12 / 52), 'weekly potential total');
 const people = st.categories.find((c) => c.id === 'people');
 eq(people.scale < 0.05, true, 'People curve scaled down');
 eq(st.categories.every((c) => c.level >= 1), true, 'all categories have a level');

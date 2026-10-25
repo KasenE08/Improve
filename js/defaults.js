@@ -40,6 +40,7 @@ const rows = [
   ['no-phone-am', 'No phone first 30 min of morning', 'mind', 'daily', 1, 10],
   ['journal', 'Journal', 'mind', 'daily', 1, 10, 'journal:words'],
   ['kept-word', 'Kept my word', 'mind', 'daily', 1, 10],
+  ['proactive', 'Be proactive', 'mind', 'daily', 1, 10],
   ['weekly-review', 'Weekly review (wins, misses, staying calm)', 'mind', 'weekly', 1, 25],
 
   ['log-spending', 'Log spending', 'money', 'daily', 1, 5],
