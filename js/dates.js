@@ -54,6 +54,12 @@ export function daysLeft(freq, d = appNow()) {
   return Math.round((fromDayKey(end) - fromDayKey(dayKey(d))) / 86400000);
 }
 
+// First day of the next period (day/week/month) after the one containing d
+export function nextStart(freq, d = appNow()) {
+  const [, end] = periodRange(freq, d);
+  return addDays(fromDayKey(end), 1);
+}
+
 export function msUntilMidnight(d = new Date()) {
   return addDays(d, 1).getTime() - d.getTime();
 }
