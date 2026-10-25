@@ -4,7 +4,7 @@ import * as M from '../money/store.js';
 import { recheckMoney } from '../money/autocheck.js';
 import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
-import { dayKey, fromDayKey } from '../dates.js';
+import { dayKey, fromDayKey, periodRange } from '../dates.js';
 import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
 
 const SUBS = [['overview', 'Overview'], ['history', 'History'], ['budget', 'Budget'], ['settings', 'Settings']];
@@ -18,10 +18,19 @@ const today = () => dayKey();
 const shortDate = (k) => fromDayKey(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
 // Any data change: re-check the Money habits, then show XP / level moments.
-function changed(fn) {
+// `dates` are the entry dates touched, so a saving back-dated into an earlier week counts for that week.
+function changed(fn, dates = []) {
   const before = Stats.compute();
   fn();
-  const added = recheckMoney();
+  const weekStart = periodRange('weekly')[0];
+  let added = [];
+  for (const k of new Set(dates)) {
+    if (!k || k >= weekStart) continue;
+    const d = fromDayKey(k);
+    d.setHours(12);
+    added = added.concat(recheckMoney(d));
+  }
+  added = added.concat(recheckMoney());
   rerender();
   celebrate(before, Stats.compute(), added);
 }
@@ -35,6 +44,14 @@ export function render(root, refresh) {
   const subnav = `<div class="imp-seg food-subnav">${SUBS.map(([id, label]) => `<button data-m="sub" data-sub="${id}" class="${ui.sub === id ? 'is-on' : ''}">${label}</button>`).join('')}</div>`;
   const body = { overview, history, budget, settings }[ui.sub](s);
   root.innerHTML = `<div class="screen money">${subnav}${body}</div>`;
+  // Settings: put back anything typed before switching pay schedule or saving mode
+  if (ui.sub === 'settings' && ui.typed) {
+    for (const [id, v] of Object.entries(ui.typed)) { const el = root.querySelector('#' + id); if (el) el.value = v; }
+  }
+}
+function keepTyped() {
+  ui.typed = { ...(ui.typed || {}) };
+  for (const el of ctx.root.querySelectorAll('.money input[id]')) ui.typed[el.id] = el.value;
 }
 
 const money = (s, c) => L.fmtMoney(c, s.settings.currency);
@@ -105,7 +122,7 @@ function paydayPanel(s) {
 }
 
 function reviewPanel(s) {
-  const mk = today().slice(0, 7);
+  const mk = L.reviewMonth();
   const done = s.reviews?.[mk];
   return box(`${L.monthLabel(mk).split(' ')[0]} review`, `<div class="mon-stack">
     ${done ? `<p class="mon-status is-on">${icon('check')} Done ${new Date(done.doneAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>`
@@ -211,12 +228,12 @@ function openEntry(kind, e = null) {
           const date = b.querySelector('#e-date').value || today();
           const entry = { ...(e || {}), kind: k, amount, note: b.querySelector('#e-note').value.trim(), date, cat: k === 'expense' ? cat : undefined };
           sheet.close();
-          changed(() => M.upsertEntry(entry));
+          changed(() => M.upsertEntry(entry), [entry.date, e?.date]);
           toast(e ? 'Saved' : `${KIND[k]} added`);
         }
         if (t.id === 'e-del' && confirm('Delete this entry?')) {
           sheet.close();
-          changed(() => M.deleteEntry(e.id));
+          changed(() => M.deleteEntry(e.id), [e.date]);
           toast('Deleted');
         }
       };
@@ -227,7 +244,7 @@ function openEntry(kind, e = null) {
 
 function openReview() {
   const s = M.getState();
-  const mk = today().slice(0, 7);
+  const mk = L.reviewMonth();
   const sum = L.monthSummary(s, mk);
   const prev = L.monthSummary(s, L.shiftMonth(mk, -1));
   const done = s.reviews?.[mk];
@@ -280,7 +297,7 @@ export function bind(root) {
     if (!el) return;
     const s = M.getState();
     switch (el.dataset.m) {
-      case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.saveMode = null; rerender(); break;
+      case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.saveMode = null; ui.typed = null; rerender(); break;
       case 'month': ui.month = L.shiftMonth(ui.month, Number(el.dataset.dir)); rerender(); break;
       case 'add': openEntry(el.dataset.kind); break;
       case 'edit': openEntry(null, s.entries.find((e) => e.id === el.dataset.id)); break;
@@ -315,8 +332,8 @@ export function bind(root) {
         break;
       }
 
-      case 'freq': ui.payFreq = el.dataset.freq; rerender(); break;
-      case 'mode': ui.saveMode = el.dataset.mode; rerender(); break;
+      case 'freq': keepTyped(); ui.payFreq = el.dataset.freq; rerender(); break;
+      case 'mode': keepTyped(); ui.saveMode = el.dataset.mode; rerender(); break;
       case 'save-settings': saveSettings(s); break;
     }
   });
@@ -362,6 +379,7 @@ function saveSettings(s) {
   const currency = ctx.root.querySelector('#s-cur').value.trim() || '$';
   ui.payFreq = null;
   ui.saveMode = null;
+  ui.typed = null;
   changed(() => M.saveSettings({ pay, save, currency, setup: true }));
   toast('Settings saved');
 }

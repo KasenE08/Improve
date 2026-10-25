@@ -127,14 +127,13 @@ export function step(habit, delta, date = appNow()) {
   return -xp;
 }
 
-// Auto habits can wait until a time of day (habit.autoAfter, minutes after midnight).
-// Past days are always allowed; today only once that time has come. Between midnight and
+// Auto habits never tick a day that hasn't started yet, and can wait until a time of day
+// (habit.autoAfter, minutes after midnight). Past days are always allowed; today only once that time has come. Between midnight and
 // 4 AM it's still "today" (the app day ends at 4 AM), so that counts as after any afternoon time.
 export function autoTimeReached(habit, day, now = new Date()) {
-  if (habit.autoAfter == null) return true;
   const today = dayKey(appNow(now));
-  if (day < today) return true;
-  if (day > today) return false;
+  if (day > today) return false; // a future day (e.g. food logged ahead) waits until that day comes
+  if (habit.autoAfter == null || day < today) return true;
   const late = (m) => (m < DAY_START_MIN ? m + 1440 : m);
   return late(now.getHours() * 60 + now.getMinutes()) >= late(habit.autoAfter);
 }
