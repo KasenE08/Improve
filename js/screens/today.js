@@ -73,7 +73,7 @@ function emptyList() {
 function habitRow(h, n, st) {
   const multi = h.target > 1;
   const done = n >= h.target;
-  const fire = [isAuto(h) ? `<span class="today-auto">${icon(h.auto.startsWith('planner') ? 'planner' : 'food')}Auto</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
+  const fire = [isAuto(h) ? `<span class="today-auto">${icon(h.auto.startsWith('planner') ? 'planner' : 'food')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
@@ -168,7 +168,9 @@ function openHabitForm(h) {
   const autoField = `<label class="imp-field"><span class="imp-label">Auto-check</span><select class="imp-select" id="f-auto">
         <option value="">Off (tap to check)</option>
         ${Object.entries(AUTO).map(([k, v]) => `<option value="${k}"${cur.auto === k ? ' selected' : ''}>${v}</option>`).join('')}
-        ${cur.auto && !AUTO[cur.auto] ? `<option value="${esc(cur.auto)}" selected>Later phase (${esc(cur.auto)})</option>` : ''}</select></label>`;
+        ${cur.auto && !AUTO[cur.auto] ? `<option value="${esc(cur.auto)}" selected>Later phase (${esc(cur.auto)})</option>` : ''}</select></label>
+      <label class="imp-field" id="f-after-wrap"${cur.auto ? '' : ' hidden'}><span class="imp-label">Only tick after (optional)</span>
+        <input class="imp-input" id="f-after" type="time" value="${cur.autoAfter == null ? '' : minToTime(cur.autoAfter)}"></label>`;
   sheet.open({
     title: isNew ? 'New habit' : 'Edit habit',
     body: `
@@ -187,6 +189,8 @@ function openHabitForm(h) {
       ${isNew ? '' : '<button class="imp-btn imp-btn--danger imp-btn--block" id="f-del">' + icon('trash') + 'Delete habit</button>'}`,
     onMount(b) {
       let freq = cur.frequency;
+      // The time option only applies to auto-checked habits
+      b.querySelector('#f-auto').addEventListener('change', (e) => { b.querySelector('#f-after-wrap').hidden = !e.target.value; });
       b.querySelector('#f-freq').addEventListener('click', (e) => {
         const btn = e.target.closest('[data-f]');
         if (!btn) return;
@@ -199,7 +203,9 @@ function openHabitForm(h) {
         const target = clampInt(b.querySelector('#f-target').value, 1, 31, 1);
         const xp = clampInt(b.querySelector('#f-xp').value, 0, 999, 10);
         const auto = b.querySelector('#f-auto').value || null;
-        H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto });
+        const afterVal = b.querySelector('#f-after').value;
+        const autoAfter = auto && afterVal ? timeToMin(afterVal) : null;
+        H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter });
         recheckFood();
         R.sync();
         sheet.close();
@@ -216,6 +222,15 @@ function openHabitForm(h) {
       });
     },
   });
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+const minToTime = (m) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
+const timeToMin = (t) => { const [hh, mm] = t.split(':').map(Number); return hh * 60 + mm; };
+// "3 PM", "9:30 AM"
+export function fmtClock(m) {
+  const h = Math.floor(m / 60) % 24, mm = m % 60;
+  return `${h % 12 || 12}${mm ? ':' + pad2(mm) : ''} ${h < 12 ? 'AM' : 'PM'}`;
 }
 
 function clampInt(v, min, max, fallback) {

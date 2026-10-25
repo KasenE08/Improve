@@ -23,12 +23,13 @@ export function plannerHit(data, date = appNow()) {
 }
 
 // Returns bonuses newly earned (for celebrations).
-export function recheckPlanner(date = appNow()) {
+export function recheckPlanner(date = new Date()) {
   const data = store.get('planner', null);
   // Not set up yet (no tasks and no fixed times): nothing to judge, no free XP
   if (!data || (!data.tasks?.length && !data.blocks?.length)) return [];
-  const hit = plannerHit(data, date);
+  const hit = plannerHit(data, appNow(date));
   let changed = false;
-  for (const h of H.getHabits()) if (h.auto === 'planner:work') changed = H.setDone(h, dayKey(date), hit) || changed;
-  return changed ? R.sync(date) : [];
+  const day = dayKey(appNow(date));
+  for (const h of H.getHabits()) if (h.auto === 'planner:work') changed = H.setDone(h, day, hit, date) || changed;
+  return changed ? R.sync(appNow(date)) : [];
 }

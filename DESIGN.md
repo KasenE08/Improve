@@ -65,7 +65,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM and weekly on Monday 4:01 AM. Habit months start on the month's first Monday and run to the day before the next month's first Monday (4 or 5 whole weeks), so monthly resets on a Monday at 4:01 AM too. Money budgets stay on calendar months. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap.
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap. An auto habit can also wait until a time of day before ticking (`autoAfter`, minutes after midnight; "Only tick after" in the habit editor). "Work done on schedule" waits until 3 PM. Past days and the 12–4 AM tail of a day always count as after.
 
 ## Leveling (Phase 2)
 
