@@ -42,3 +42,6 @@ eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 4, 1))), ['2026-11-01
   H.step(lift, 1, D.appNow(new Date(2026, 9, 26, 1, 0)));
   eq(H.progress(lift, new Date(2026, 9, 25, 12)), Math.min(before + 1, lift.target), 'tick at Mon 1 AM lands in last week');
 }
+eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 25, 12))), '2026-10-26', 'next week starts Monday Oct 26');
+eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 26, 12))), '2026-11-02', 'from Monday: next is Nov 2');
+eq(D.dayKey(D.nextStart('monthly', new Date(2026, 11, 15, 12))), '2027-01-01', 'next month across the year');

@@ -59,3 +59,5 @@
 .rank-del { min-height: 44px; }
 .rank-del::before { content: none; }
 .imp-input:disabled { opacity: .5; }
+.today-reset { display: flex; align-items: center; gap: 6px; padding: 8px 0 2px; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.today-reset .imp-icon { width: 13px; height: 13px; color: var(--imp-accent); }
