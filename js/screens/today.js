@@ -45,8 +45,8 @@ export function render(root, refresh) {
     const list = habits.filter((h) => h.frequency === freq);
     if (!list.length) return '';
     const done = list.filter((h) => prog.get(h.id) >= h.target).length;
-    const dl = daysLeft(freq);
-    const left = freq === 'daily' ? '' : dl === 0 ? ' · Last day' : ` · ${dl}D left`;
+    const resetDay = nextStart(freq).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const left = freq === 'daily' ? '' : ` · ${daysLeft(freq)}D left (${resetDay})`;
     const groups = cats.map((c) => {
       const items = list.filter((h) => h.category === c.id);
       if (!items.length) return '';
@@ -55,9 +55,7 @@ export function render(root, refresh) {
     // Habits whose category was removed
     const orphans = list.filter((h) => !cats.some((c) => c.id === h.category));
     const orphanHtml = orphans.length ? `<div class="imp-panel__sub">${icon('scroll')}Other</div>` + orphans.map(row).join('') : '';
-    const next = nextStart(freq);
-    const reset = freq === 'daily' ? '' : `<p class="today-reset">${icon('hourglass')}New ${freq === 'weekly' ? 'week' : 'month'} starts ${next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · 4 AM</p>`;
-    return panel({ title: SECTION[freq], meta: `${done}/${list.length}${left}`, body: reset + groups + orphanHtml });
+    return panel({ title: SECTION[freq], meta: `${done}/${list.length}${left}`, body: groups + orphanHtml });
   }).join('');
 
   const st = Stats.compute();
