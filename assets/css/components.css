@@ -303,3 +303,5 @@
 
 /* Six tabs fit at phone width */
 .imp-tabbar .imp-tab { min-width: 0; font-size: 9px; letter-spacing: 0; }
+/* The hidden attribute always wins over component display rules */
+.imp-root [hidden] { display: none !important; }

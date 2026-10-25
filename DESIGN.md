@@ -111,6 +111,10 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
 - Schema 4 upgrade makes the existing "Journal" habit auto.
 
+## Launch day
+
+- `js/launch.js`: until `START` (2026-11-01, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept.
+
 ## Deploying
 
 Pushes to `main` deploy through `.github/workflows/pages.yml` (it type-checks, tests and builds the Planner, runs the other tests, then publishes everything except `planner/` and `tests/`). When app files change, bump `VERSION` in `sw.js` (and add any new file to its `FILES` list) so installed phones update.

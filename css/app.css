@@ -59,3 +59,17 @@
 .rank-del { min-height: 44px; }
 .rank-del::before { content: none; }
 .imp-input:disabled { opacity: .5; }
+
+/* Launch countdown (before the start date) */
+.launch { min-height: calc(100vh - 40px); min-height: calc(100dvh - 40px); display: grid; place-items: center; padding: calc(env(safe-area-inset-top) + 24px) 0 24px; }
+.launch__box { width: 100%; display: grid; justify-items: center; gap: 14px; text-align: center; padding: 28px 18px; background: var(--imp-surface);
+  box-shadow: 0 -3px 0 var(--imp-frame), 0 3px 0 var(--imp-frame), -3px 0 0 var(--imp-frame), 3px 0 0 var(--imp-frame), 0 10px 0 3px #000; }
+.launch__icon { width: 64px; height: 64px; color: var(--imp-accent); }
+.launch__title { font: 700 26px var(--imp-font-head); color: var(--imp-accent); letter-spacing: .06em; text-transform: uppercase; }
+.launch__sub { font: 400 var(--imp-fs-sm) var(--imp-font-head); text-transform: uppercase; line-height: 1.5; }
+.launch__count { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; margin: 6px 0; }
+.launch__count div { display: grid; gap: 4px; padding: 12px 4px; background: var(--imp-sunken); box-shadow: 0 0 0 2px var(--imp-divider); }
+.launch__count b { font: 400 48px/1 var(--imp-font-body); color: var(--imp-accent); }
+.launch__count span { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.launch__note { font-size: 19px; color: var(--imp-muted); max-width: 30ch; }
+.launch__ready { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-accent); }
