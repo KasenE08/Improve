@@ -19,7 +19,7 @@ import * as store from './store.js';
 import { dayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 
-export const SCHEMA = 5;
+export const SCHEMA = 6;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -46,6 +46,17 @@ export function init() {
   // Schema 5: auto habits can wait until a time of day; "Work done on schedule" waits until 3 PM.
   if (found > 0 && found < 5) {
     store.set('habits', store.get('habits', []).map((h) => (h.id === 'work-on-schedule' && h.autoAfter === undefined ? { ...h, autoAfter: 15 * 60 } : h)));
+  }
+  // Schema 6: new daily "Be proactive", right after "Kept my word" and worth the same.
+  if (found > 0 && found < 6) {
+    const all = store.get('habits', []);
+    if (!all.some((h) => h.id === 'proactive')) {
+      const kw = all.find((h) => h.id === 'kept-word');
+      const at = kw ? kw.order + 1 : all.reduce((m, h) => Math.max(m, h.order + 1), 0);
+      const shifted = all.map((h) => (h.order >= at ? { ...h, order: h.order + 1 } : h));
+      shifted.push({ id: 'proactive', name: 'Be proactive', category: kw?.category || 'mind', frequency: 'daily', target: 1, xp: kw?.xp ?? 10, order: at, archived: false, auto: null });
+      store.set('habits', shifted);
+    }
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

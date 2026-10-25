@@ -14,7 +14,7 @@ eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnig
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
 const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 33, '33 preloaded habits');
+eq(H.getHabits().length, 34, '34 preloaded habits');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');
@@ -47,3 +47,21 @@ eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 2, 4, 1))), ['2026-11-02
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 25, 12))), '2026-10-26', 'next week starts Monday Oct 26');
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 26, 12))), '2026-11-02', 'from Monday: next is Nov 2');
 eq(D.dayKey(D.nextStart('monthly', new Date(2026, 11, 15, 12))), '2027-01-04', 'next month starts Mon Jan 4');
+
+// ---- Upgrade to schema 6 adds "Be proactive" right after "Kept my word", same worth ----
+for (const k of Object.keys(mem)) delete mem[k];
+mem.imp_schema = '5';
+mem.imp_habits = JSON.stringify([
+  { id: 'journal', name: 'Journal', category: 'mind', frequency: 'daily', target: 1, xp: 10, order: 0 },
+  { id: 'kept-word', name: 'Kept my word', category: 'mind', frequency: 'daily', target: 1, xp: 15, order: 1 },
+  { id: 'fast-food', name: 'Fast food', category: 'diet', frequency: 'weekly', target: 2, xp: 25, order: 2 },
+]);
+mem.imp_log = '{"2026-11-03":{"kept-word":{"n":1,"xp":15}}}';
+H.init();
+const up = H.getHabits();
+eq(up.map((h) => h.id), ['journal', 'kept-word', 'proactive', 'fast-food'], 'upgrade: Be proactive sits right after Kept my word');
+const pro = up.find((h) => h.id === 'proactive');
+eq([pro.name, pro.category, pro.frequency, pro.target, pro.xp, pro.auto], ['Be proactive', 'mind', 'daily', 1, 15, null], 'upgrade: same category + XP as Kept my word (edited to 15)');
+eq(mem.imp_log, '{"2026-11-03":{"kept-word":{"n":1,"xp":15}}}', 'upgrade: history untouched');
+H.init();
+eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs once');
