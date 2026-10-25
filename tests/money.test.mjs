@@ -34,8 +34,8 @@ eq(L.nextPayday(bi, '2026-10-24'), '2026-11-06', 'next payday');
 const st = (entries, save = { mode: 'amount', amount: 4000, percent: 20 }, setup = true) => ({
   settings: { pay: bi, save, setup }, entries, categories: [], reviews: {},
 });
-const payWeek = new Date(2026, 9, 21); // Wed in the week of Oct 19–25 (payday Fri 23)
-const offWeek = new Date(2026, 9, 28); // week of Oct 26–Nov 1 (no payday)
+const payWeek = new Date(2026, 9, 21, 12); // Wed in the week of Oct 19–25 (payday Fri 23)
+const offWeek = new Date(2026, 9, 28, 12); // week of Oct 26–Nov 1 (no payday)
 eq(L.saveStatus(st([]), offWeek).offWeek && L.saveStatus(st([]), offWeek).hit, true, 'off week counts as done');
 eq(L.saveStatus(st([]), payWeek).hit, false, 'payday week, nothing saved');
 eq(L.saveStatus(st([{ kind: 'saving', amount: 3000, date: '2026-10-23' }]), payWeek).hit, false, '$30 saved < $40');
@@ -73,28 +73,37 @@ eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [
 const M = await import(J('money/store.js'));
 const A = await import(J('money/autocheck.js'));
 const done = (id, key) => !!H.getLog()[key]?.[id];
-A.recheckMoney(payWeek);
+A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), false, 'not set up: save habit untouched');
 M.saveSettings({ pay: bi, setup: true });
-A.recheckMoney(offWeek);
+A.recheckMoney(offWeek, offWeek);
 eq(done('save-paycheck', '2026-10-28'), true, 'off week ticks on its own');
-A.recheckMoney(payWeek);
+A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), false, 'payday week: not yet');
 M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
-A.recheckMoney(payWeek);
+A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), true, 'saved $40: ticked');
-A.recheckMoney(new Date(2026, 9, 24));
+{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 2, 'rechecking later in the week adds no second check-in');
 const id = M.getState().entries[0].id;
 M.deleteEntry(id);
-A.recheckMoney(new Date(2026, 9, 24));
+{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the week');
 M.setReview('2026-10', true);
-A.recheckMoney(new Date(2026, 9, 24));
+{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), true, 'review finished: monthly habit ticked');
 M.setReview('2026-10', false);
-A.recheckMoney(new Date(2026, 9, 24));
+{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), false, 'review undone: unticked');
+// A saving logged later but dated in an earlier payday week ticks that week
+{
+  const later = new Date(2026, 10, 2, 12); // the next Monday
+  A.recheckMoney(payWeek, later);
+  eq(done('save-paycheck', '2026-10-21'), false, 'payday week without saving stays unticked');
+  M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
+  A.recheckMoney(new Date(2026, 9, 23, 12), later);
+  eq(Object.keys(H.getLog()).some((k) => k >= '2026-10-19' && k <= '2026-10-25' && H.getLog()[k]['save-paycheck']), true, 'back-dated saving ticks its own week');
+}
 eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys');
 
 // ---- upgrade from schema 2 keeps habits, sets the Money autos ----
@@ -115,4 +124,8 @@ process.exitCode = fails ? 1 : 0;
   eq(L.reviewDone(st(new Date(2026, 11, 3, 20).toISOString()), new Date(2026, 11, 8, 12)), false, 'but not for December (Dec 7 – Jan 3)');
   eq(L.reviewDone(st(new Date(2026, 11, 7, 2).toISOString()), new Date(2026, 11, 6, 12)), true, 'Mon Dec 7 at 2 AM still counts for November');
   eq(L.monthRange('2026-11'), ['2026-11-01', '2026-11-30'], 'budget month stays Nov 1–30');
+  eq(L.reviewMonth(new Date(2026, 11, 1, 12)), '2026-11', 'Tue Dec 1: panel shows the November review');
+  eq(L.reviewMonth(new Date(2026, 11, 7, 12)), '2026-12', 'Mon Dec 7: December review');
+  eq(L.reviewMonth(new Date(2027, 0, 2, 12)), '2026-12', 'Sat Jan 2: still the December review');
+  eq(L.reviewMonth(new Date(2026, 10, 2, 12)), '2026-11', 'Mon Nov 2: November review');
 }

@@ -31,6 +31,13 @@ eq(done('calories'), true, 'wider range ±20% (max 3120): checked again');
 F.deleteEntry(e.id);
 A.recheck(day);
 eq([done('calories'), done('protein')], [false, false], 'delete entry: both unchecked');
+// Food logged ahead on a future day ticks nothing until that day comes
+{
+  const future = '2099-01-05';
+  F.quickAdd({ date: future, meal: 'lunch', label: 'Prep', cal: 2600, protein: 150 });
+  A.recheck(future);
+  eq(!!H.getLog()[future], false, 'future day: no ticks or XP yet');
+}
 eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys written');
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exitCode = fails ? 1 : 0;

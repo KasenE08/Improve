@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `4` |
+| `imp_schema` | `5` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
@@ -65,7 +65,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
 Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM and weekly on Monday 4:01 AM. Habit months start on the month's first Monday and run to the day before the next month's first Monday (4 or 5 whole weeks), so monthly resets on a Monday at 4:01 AM too. Money budgets stay on calendar months. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap. An auto habit can also wait until a time of day before ticking (`autoAfter`, minutes after midnight; "Only tick after" in the habit editor). "Work done on schedule" waits until 3 PM. Past days and the 12–4 AM tail of a day always count as after.
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap. Auto habits never tick a day that hasn't started yet (food logged ahead counts once that day comes). An auto habit can also wait until a time of day before ticking (`autoAfter`, minutes after midnight; "Only tick after" in the habit editor). "Work done on schedule" waits until 3 PM. Past days and the 12–4 AM tail of a day always count as after.
 
 ## Leveling (Phase 2)
 
@@ -100,12 +100,12 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Per-category monthly budgets (blank = no limit), red when over. Entries: expense (with category), paycheck, saving. Amounts stored in cents.
 - Pay schedule: every week / every 2 weeks (from a recent payday) / twice a month (two days) / monthly (a day) / irregular. Days past a short month's end clamp to its last day.
 - Saving: fixed amount per paycheck (default $40) or % of each paycheck.
-- Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); weeks with no payday tick on their own; not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished.
+- Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); weeks with no payday tick on their own; not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished. The review panel follows the habit month and is named after the month it starts in (Tue Dec 1 is still the November review; Dec 7 starts December's). A saving or paycheck back-dated into an earlier week re-checks that week too.
 - Schema 3 upgrade sets those autos on existing "Save % of paycheck" / "Budget review" habits and makes "Log spending" manual.
 
 ## Journal tab
 
-- One long note split into a section per day (midnight to midnight), newest at the bottom; opens at today. `js/screens/journal.js`, `js/journal/store.js`, `css/journal.css`.
+- One long note split into a section per day (4:01 AM to 4:00 AM, like the rest of the app), newest at the bottom; opens at today. `js/screens/journal.js`, `js/journal/store.js`, `css/journal.css`.
 - Today is always editable. Past days are editable after a confirm pop-up (`confirmBox`), then go back to read-only when you leave them.
 - Auto-check (`js/journal/autocheck.js`): "Journal" ticks when today's section has at least `minWords` words (default 25, gear icon on the tab). Only today counts; editing past days never changes XP.
 - Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
@@ -113,7 +113,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 
 ## Launch day
 
-- `js/launch.js`: until `START` (Monday 2026-11-02, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept.
+- `js/launch.js`: until `START` (Monday 2026-11-02, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept. The Food tab re-reads its data after the wipe.
 
 ## Deploying
 

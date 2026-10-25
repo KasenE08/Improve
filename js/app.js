@@ -15,6 +15,7 @@ import { recheckPlanner } from './planner-auto.js';
 import { panel, empty } from './ui.js';
 import { celebrate } from './screens/today.js';
 import { isLocked, showCountdown, wipeTestData } from './launch.js';
+import { reload as reloadFood } from './food/store.js';
 
 const TABS = [
   ['today', 'Today', 'today'],
@@ -35,7 +36,8 @@ if (isLocked()) showCountdown();
 else boot();
 
 function boot() {
-  wipeTestData();
+  // The Food tab keeps its data in memory, so re-read it after the wipe (or old entries come back on the next save)
+  if (wipeTestData()) reloadFood();
   // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
   const foundSchema = H.init();
   if (foundSchema === 1) R.awardPastPerfectDays();

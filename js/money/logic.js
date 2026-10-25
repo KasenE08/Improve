@@ -121,6 +121,10 @@ export function monthSummary(state, mk) {
   };
 }
 
+// The review the Today habit is waiting on: named after the month its habit month starts in.
+// e.g. Tue Dec 1 is still in the Nov 2 – Dec 6 habit month, so it's the November review.
+export const reviewMonth = (date = appNow()) => periodRange('monthly', date)[0].slice(0, 7);
+
 // "Budget review" habit: a review finished at any point during the habit's month
 // (first Monday → day before next month's first Monday). Budgets themselves stay on calendar months.
 export function reviewDone(state, date = appNow()) {
