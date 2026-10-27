@@ -72,37 +72,57 @@ export function nextPayday(pay, fromKey) {
   return paydaysBetween(pay, fromKey, dayKey(addDays(fromDayKey(fromKey), 400)))[0] || null;
 }
 
-// How much to save from one paycheck (cents)
-export function saveTarget(save, paycheckCents) {
-  if (save.mode === 'percent') return Math.round((paycheckCents || 0) * (save.percent || 0) / 100);
-  return save.amount || 0;
+// ---- Paycheck split ----
+// split = { rest: accountId, parts: [{ account, mode: 'percent' | 'amount', value }] }
+//   value is a percent (0–100) or cents. Parts are taken in order (never more than what's left);
+//   whatever remains goes to `rest` (your spending account, Checking by default).
+// → [{ account, amount }] adding up to the paycheck
+export function splitPaycheck(split, amount) {
+  const rest = split?.rest || 'checking';
+  const out = [];
+  let left = amount;
+  for (const p of split?.parts || []) {
+    if (!p.value || p.account === rest) continue;
+    const want = p.mode === 'percent' ? Math.round((amount * p.value) / 100) : p.value;
+    const a = Math.max(0, Math.min(want, left));
+    left -= a;
+    if (a) out.push({ account: p.account, amount: a });
+  }
+  if (left > 0 || !out.length) out.push({ account: rest, amount: left });
+  return out;
 }
+// Money a split puts anywhere other than the spending account (what the saving habit checks)
+export const setAside = (split, list) => list.filter((x) => x.account !== (split?.rest || 'checking')).reduce((s, x) => s + x.amount, 0);
 
 export const inRange = (entries, start, end) => entries.filter((e) => e.date >= start && e.date <= end);
 export const sum = (list) => list.reduce((s, e) => s + e.amount, 0);
 
 // The "Save from paycheck" check for the Mon–Sun week containing `date`.
 //   judge: false until paydays are set up
-//   offWeek: no payday expected and no paycheck logged → counts as done (nothing to save)
-//   hit: saved this week ≥ what this week's paycheck(s) call for
+//   offWeek: no payday expected and no paycheck logged (a week off)
+//   required: what this week's paycheck(s) split sets aside (everything not going to the spending account)
+//   saved: what was actually set aside: paycheck splits, plus moves out of the spending account
+//          (and older "To savings" entries)
+//   hit: every expected paycheck is logged and saved ≥ required
 export function saveStatus(state, date = appNow()) {
   const { settings, entries } = state;
+  const split = settings.split;
+  const rest = split?.rest || 'checking';
   const [start, end] = periodRange('weekly', date);
   const expected = paydaysBetween(settings.pay, start, end);
   const week = inRange(entries, start, end);
   const incomes = week.filter((e) => e.kind === 'income');
-  const saved = sum(week.filter((e) => e.kind === 'saving' && !beforeTracking(state, e)));
+  let saved = 0;
+  for (const e of week) {
+    if (e.kind === 'income' && e.splits) saved += setAside(split, e.splits);
+    else if (e.kind === 'saving' && !beforeTracking(state, e)) saved += e.amount;
+    else if (e.kind === 'transfer' && e.from === rest && e.to !== rest) saved += e.amount;
+  }
   const base = { judge: !!settings.setup, start, end, expected, incomes, saved };
   if (!expected.length && !incomes.length) return { ...base, offWeek: true, required: 0, pending: false, hit: true };
-  let required;
-  let pending = false;
-  if (settings.save.mode === 'percent') {
-    required = incomes.reduce((s, e) => s + saveTarget(settings.save, e.amount), 0);
-    pending = incomes.length < expected.length; // payday came but paycheck not logged yet
-  } else {
-    required = saveTarget(settings.save) * Math.max(expected.length, incomes.length);
-  }
-  const hit = !pending && required > 0 && saved >= required;
+  const required = incomes.reduce((s, e) => s + setAside(split, splitPaycheck(split, e.amount)), 0);
+  const pending = incomes.length < expected.length; // payday came but paycheck not logged yet
+  const hit = !pending && incomes.length > 0 && saved >= required;
   return { ...base, offWeek: false, required, pending, hit };
 }
 
@@ -150,7 +170,7 @@ export const DEFAULT_ACCOUNTS = [
 export function entryMoves(e) {
   switch (e.kind) {
     case 'expense': return [[e.account || 'checking', -e.amount]];
-    case 'income': return [[e.account || 'checking', e.amount]];
+    case 'income': return e.splits ? e.splits.map((x) => [x.account, x.amount]) : [[e.account || 'checking', e.amount]];
     case 'saving': return [[e.from || 'checking', -e.amount], [e.to || 'savings', e.amount]];
     case 'transfer': return [[e.from, -e.amount], [e.to, e.amount]];
     case 'adjust': return [[e.account, e.amount]];

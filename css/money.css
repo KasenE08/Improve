@@ -56,3 +56,14 @@
 .mon-chip .imp-icon { width: 16px; height: 16px; color: var(--imp-accent); }
 .mon-chip.is-on { background: var(--imp-accent); color: var(--imp-on-accent); }
 .mon-chip.is-on .imp-icon { color: var(--imp-on-accent); }
+
+/* Paycheck split rows (Settings + logging a paycheck) */
+.mon-split { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 6px 0; border-bottom: var(--imp-px) dotted var(--imp-divider); }
+.mon-split:has(.mon-split__mode) { grid-template-columns: 22px 1fr auto 84px; }
+.mon-split__icon { width: 20px; height: 20px; color: var(--imp-accent); }
+.mon-split__name { font-size: 20px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mon-split__name small { color: var(--imp-muted); font-size: 16px; }
+.mon-split__mode button { padding: 6px 10px; }
+.mon-split__val { width: 84px; text-align: right; }
+.mon-split.is-rest b { font-size: 20px; font-weight: 400; }
+.mon-acct-add { margin-top: 8px; }
