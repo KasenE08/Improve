@@ -1,4 +1,4 @@
-// "Work done on schedule": ticks when every assignment the planner put on today is Done.
+// "Finished today's work": ticks when every assignment the planner put on today is Done.
 // Reads the Planner tab's saved data (imp_planner) directly, so it works without opening the tab.
 //
 // Today's list only grows during the day (imp_planner_day), so moving a task off today

@@ -131,3 +131,18 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   H.init();
   eq(H.getHabits().filter((h) => h.id === 'skincare').length, 1, 'schema 8 runs once');
 }
+
+// ---- Upgrade to schema 9: rename "Work done on schedule" ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '8';
+  mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', name: 'Work done on schedule', category: 'mind', frequency: 'daily', target: 1, xp: 60, order: 0, auto: 'planner:work', autoAfter: 900 }]);
+  H.init();
+  const w = H.getHabits()[0];
+  eq([w.name, w.xp, w.auto, w.autoAfter], ["Finished today's work", 60, 'planner:work', 900], 'schema 9: renamed, everything else kept');
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '8';
+  mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', name: 'My work', category: 'mind', frequency: 'daily', target: 1, xp: 60, order: 0 }]);
+  H.init();
+  eq(H.getHabits()[0].name, 'My work', 'schema 9: a name you chose is kept');
+}

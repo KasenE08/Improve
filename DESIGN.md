@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `8` |
+| `imp_schema` | `9` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto, autoAfter?, kind?: "goal"\|"limit", limitSince? }]` |
@@ -95,7 +95,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Theme: `planner/src/app/styles.css` now reads Improve's tokens (dark surfaces, square corners, VT323 text scaled up); details in `planner/src/app/improve-theme.css`. Category colors brightened for dark mode.
 - `js/app.js` loads the bundle in the background at launch (`start()`: replans on a new day, keeps notifications synced) and `mount()`s it when the Planner tab opens. Its old bottom bar is a top sub-nav (Schedule / Tasks / Settings / Stats / +).
 - Notifications: Improve's `sw.js` handles `push` and `notificationclick` (opens `#planner?task=ID`). The app uses the user's existing free Cloudflare server from Schedule-App-Planner.
-- Auto-check (`js/planner-auto.js`): "Work done on schedule" ticks when every task that was on today's plan (or finished today) is Done. Moving a task off today doesn't count; deleted tasks drop off. A day with nothing planned is a **day off** (`imp_excused`): no tick and no XP, but it doesn't break the streak, block Perfect Day, or count in the Today header/meter. Needs the planner to have tasks or fixed times.
+- Auto-check (`js/planner-auto.js`): "Finished today's work" (id `work-on-schedule`, renamed in schema 9) ticks when every task that was on today's plan (or finished today) is Done. Moving a task off today doesn't count; deleted tasks drop off. A day with nothing planned is a **day off** (`imp_excused`): no tick and no XP, but it doesn't break the streak, block Perfect Day, or count in the Today header/meter. Needs the planner to have tasks or fixed times.
 - Copy from the old app: Planner → Settings → Backup & copy (backup file, or same-browser storage). Read-only.
 
 ## Money tab (Phase 5)
