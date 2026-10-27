@@ -76,7 +76,9 @@ export function freeTime(input: ScheduleInput, from: DateKey, days: number): Fre
           into.push({ start: o.arrive, end: o.arrive + r.minutes * MIN });
         } else if (!r.weekdays || r.weekdays.includes(weekday(key))) {
           const anchor = r.from === 'leave' ? o.leave : o.start;
-          const start = r.minutes >= WHOLE_MORNING ? at(key, 0) : anchor - r.minutes * MIN;
+          // "All morning" starts when the night before ends ("No work after", e.g. 2am), not at midnight
+          const nightEnd = at(addDays(key, -1), settings.dayEndMin);
+          const start = r.minutes >= WHOLE_MORNING ? Math.max(at(key, 0), Math.min(nightEnd, anchor)) : anchor - r.minutes * MIN;
           into.push({ start, end: anchor });
         }
       }

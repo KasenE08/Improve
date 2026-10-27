@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { freeTime, occurrencesOn } from '../src/core/availability';
 import { at } from '../src/core/time';
-import { BLOCKS, FRI, LOCATIONS, MON, SAT, SUN, T, fmt, input } from './fixtures';
+import { BLOCKS, FRI, LOCATIONS, MON, PACKED, SAT, SUN, T, TUE, fmt, input, task } from './fixtures';
+import { schedule } from '../src/core/scheduler';
 
 const show = (ivs: { start: number; end: number }[]) => ivs.map((i) => `${fmt(i.start)}–${fmt(i.end).slice(11)}`);
 
@@ -63,5 +64,36 @@ describe('availability', () => {
     // Nov 1 2026 is the US fall-back date; blocks stay at their local times in any timezone.
     expect(new Date(at('2026-11-01', 20 * 60)).getHours()).toBe(20);
     expect(new Date(at('2026-03-08', 20 * 60)).getHours()).toBe(20);
+  });
+
+  it('"No work after 2am" still works on school nights (the all-morning rule starts at the day end, not midnight)', () => {
+    const late = { ...PACKED, dayEndMin: 26 * 60 };
+    const free = freeTime(input(T(MON, '00:00'), [], { settings: late }), MON, 2);
+    expect(show(free.schoolwork).filter((x) => x.startsWith(MON)).at(-1)).toBe(`${MON} 21:30–02:00`);
+  });
+
+  it('a task that cannot make its due time goes right after the others tonight, not to tomorrow afternoon', () => {
+    const late = { ...PACKED, dayEndMin: 26 * 60 };
+    const due = T(MON, '23:59');
+    const tasks = [task({ id: 'a', estimateMin: 120, due }), task({ id: 'c', estimateMin: 40, due })];
+    const r = schedule(input(T(MON, '21:30'), tasks, { settings: late }));
+    const c = r.items.find((i) => i.taskId === 'c')!;
+    expect(c.start).toBeLessThan(T(TUE, '02:00')); // tonight after midnight, not Tuesday afternoon
+    expect(c.end).toBeLessThanOrEqual(T(TUE, '02:00'));
+    expect(r.warnings.some((w) => w.taskId === 'c')).toBe(true); // and honestly flagged as late (due 11:59pm)
+  });
+
+  it('with "No work after 2am", spreading treats 12am–2am as the night before (no non-urgent work at midnight)', () => {
+    const late = { ...PACKED, dayEndMin: 26 * 60, spreadWork: true };
+    // a heavy night due by 4am, plus work spread over the week: nothing that isn't urgent should land at 12–2am
+    const tasks = [
+      task({ id: 'a', estimateMin: 120, due: T(TUE, '04:00') }),
+      ...['p1', 'p2', 'p3', 'p4', 'p5'].map((id) => task({ id, estimateMin: 35, due: T(FRI, '23:59') })),
+    ];
+    const r = schedule(input(T(MON, '21:30'), tasks, { settings: late }));
+    for (const id of ['p1', 'p2', 'p3', 'p4', 'p5']) {
+      const h = new Date(r.items.find((i) => i.taskId === id)!.start).getHours();
+      expect(h >= 2, `${id} starts at ${h}:xx`).toBe(true);
+    }
   });
 });
