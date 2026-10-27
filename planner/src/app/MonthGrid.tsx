@@ -1,5 +1,5 @@
 import type { DateKey } from '../core/types';
-import { addDays, dateKey, daysInMonth, weekday } from '../core/time';
+import { addDays, dateKey, daysInMonth, planDay, weekday } from '../core/time';
 import type { AppData } from './model';
 import { category, fmtDay, WEEKDAYS } from './format';
 import { Icon } from './icons';
@@ -36,7 +36,7 @@ export function MonthGrid(p: {
   for (const i of p.data.plan?.items ?? []) {
     const t = tasks.get(i.taskId);
     if (!t || t.status === 'done') continue;
-    const k = dateKey(i.start);
+    const k = planDay(i.start);
     dots.set(k, [...(dots.get(k) ?? []), category(t).color]);
   }
   const month = p.month.slice(0, 7);

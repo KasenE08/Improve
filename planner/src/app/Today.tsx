@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import type { BlockTag, DateKey, Ms, Task } from '../core/types';
-import { addDays, at, dateKey } from '../core/time';
+import { addDays, at, DAY_START_MIN, planDay } from '../core/time';
 import { occurrencesOn } from '../core/availability';
 import type { AppData } from './model';
 import { actions } from './model';
@@ -21,8 +21,9 @@ type Entry =
   | { kind: 'now'; start: Ms };
 
 function entriesFor(d: AppData, key: DateKey, now: Ms): Entry[] {
-  const dayStart = at(key, 0);
-  const dayEnd = at(addDays(key, 1), 0);
+  // A day on screen runs 4:01 AM → 4:00 AM (late-night work shows under the night before)
+  const dayStart = at(key, DAY_START_MIN);
+  const dayEnd = at(addDays(key, 1), DAY_START_MIN);
   const inDay = (t: Ms) => t >= dayStart && t < dayEnd;
   const locs = new Map(d.locations.map((l) => [l.id, l]));
   const tasks = new Map(d.tasks.map((t) => [t.id, t]));
@@ -56,7 +57,7 @@ function entriesFor(d: AppData, key: DateKey, now: Ms): Entry[] {
 }
 
 export function Today({ data, now }: { data: AppData; now: Ms }) {
-  const today = dateKey(now);
+  const today = planDay(now);
   const [day, setDay] = useState<DateKey>(today);
   const [weekOffset, setWeekOffset] = useState(0);
   const [mode, setMode] = useState<'week' | 'month'>('week');
@@ -102,7 +103,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
     if ('day' in target) {
       next = actions.moveToDay(cur, id, target.day, n);
       const slot = next.plan?.items.find((i) => i.taskId === id);
-      if (slot && dateKey(slot.start) !== target.day) {
+      if (slot && planDay(slot.start) !== target.day) {
         notes.push(`No room on ${fmtDay(target.day)}, so it goes to ${fmtDue(slot.start)}.`);
       }
     } else {
@@ -111,13 +112,13 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
       if (!spot) return;
       next = actions.reorderDay(cur, day, spot.ids, n, { id, after: spot.after });
       const slot = next.plan?.items.find((i) => i.taskId === id);
-      if (slot && dateKey(slot.start) !== day) notes.push(`No room on ${fmtDay(day)}, so it goes to ${fmtDue(slot.start)}.`);
+      if (slot && planDay(slot.start) !== day) notes.push(`No room on ${fmtDay(day)}, so it goes to ${fmtDue(slot.start)}.`);
       else if (slot && spot.before && slot.start >= spot.before.start) {
         notes.push(`It doesn't fit before "${spot.before.title}", so it goes after it (${fmtTime(slot.start)}).`);
       }
     }
     // If anything ends up late, offer the smallest help that gets it done on time.
-    const fix = fixLateness(cur, next, id, n, 'day' in target ? target.day === dateKey(n) : day === dateKey(n));
+    const fix = fixLateness(cur, next, id, n, 'day' in target ? target.day === planDay(n) : day === planDay(n));
     if (fix) {
       const allOnTime = fix.tasks.every((t) => !fix.data.plan!.items.some((i) => i.taskId === t.id && i.late));
       const how = fix.skipBreak && fix.night
@@ -149,7 +150,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   );
 
   const countFor = (k: DateKey) =>
-    (data.plan?.items ?? []).filter((i) => dateKey(i.start) === k && tasks.get(i.taskId)?.status !== 'done').length;
+    (data.plan?.items ?? []).filter((i) => planDay(i.start) === k && tasks.get(i.taskId)?.status !== 'done').length;
 
   return (
     <div>

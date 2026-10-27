@@ -16,7 +16,8 @@ export function plannerHit(data, date = appNow()) {
   let day = store.get('planner_day', null);
   if (!day || day.date !== today) day = { date: today, ids: [] };
   for (const i of data.plan?.items || []) {
-    if (dayKey(new Date(i.start)) === today && !day.ids.includes(i.taskId)) day.ids.push(i.taskId);
+    // 4:01 AM day like the rest of the app: work planned 12–2am counts for the night before
+    if (dayKey(appNow(new Date(i.start))) === today && !day.ids.includes(i.taskId)) day.ids.push(i.taskId);
   }
   // Tasks finished today count as today's work too (e.g. done early, before they were planned)
   for (const t of data.tasks || []) {

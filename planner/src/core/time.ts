@@ -20,6 +20,15 @@ export function at(key: DateKey, min: number): Ms {
   return new Date(y, m, d, Math.floor(min / 60), min % 60).getTime();
 }
 
+/** Improve's day runs 4:01 AM → 4:00 AM, so late-night work belongs to the night before (same as the rest of the app). */
+export const DAY_START_MIN = 4 * 60 + 1;
+
+/** The planner day a moment belongs to: before 4:01 AM it's still the previous day. */
+export function planDay(t: Ms, startMin = DAY_START_MIN): DateKey {
+  const k = dateKey(t);
+  return t < at(k, startMin) ? addDays(k, -1) : k;
+}
+
 export function addDays(key: DateKey, n: number): DateKey {
   const [y, m, d] = parts(key);
   return dateKey(new Date(y, m, d + n));

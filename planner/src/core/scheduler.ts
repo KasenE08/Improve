@@ -1,5 +1,5 @@
 import type { BlockReminder, Interval, Ms, ScheduleInput, ScheduleResult, ScheduledItem, Task, Warning } from './types';
-import { addDays, at, ceilTo, dateKey, MIN } from './time';
+import { addDays, at, ceilTo, dateKey, DAY_START_MIN, MIN, planDay } from './time';
 import { freeTime, occurrencesOn } from './availability';
 import { comparePriority, isSchoolwork } from './priority';
 
@@ -120,14 +120,11 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
     return allowNight.has(t.id) ? nightFree[scope] : free[scope];
   };
 
-  // A planner "day" ends when you stop working ("No work after"): with 2am, 12am–2am still belongs to
-  // the night before. With midnight or earlier this is just the calendar day.
-  const dayShift = Math.max(0, s.dayEndMin - 1440);
+  // A planner "day" runs 4:01 AM → 4:00 AM like the rest of Improve, so 12am–2am late-night work belongs
+  // to the night before (earlier if your earliest start is before 4am).
+  const dayShift = Math.min(DAY_START_MIN, s.earliestStartMin);
   const dayStart = (k: string) => at(k, dayShift);
-  const dayOf = (ms: Ms) => {
-    const k = dateKey(ms);
-    return ms < dayStart(k) ? addDays(k, -1) : k;
-  };
+  const dayOf = (ms: Ms) => planDay(ms, dayShift);
 
   // Hand moves: a pin to a past day no longer applies.
   const today = dayOf(now);
