@@ -15,7 +15,7 @@ export const DEFAULT_CATEGORIES = [
 // XP = difficulty × importance (rated Oct 2026): base by difficulty × 1 / 1.5 / 2 for Nice / Important / Core.
 // "auto" marks habits that a later phase will check off from another tab.
 const rows = [
-  ['lift', 'Lift', 'body', 'weekly', 5, 60],
+  ['lift', 'Lift', 'body', 'weekly', 5, 40],
   ['sleep', '7–9 hrs sleep', 'body', 'daily', 1, 30],
   ['steps', '8–10k steps', 'body', 'daily', 1, 20],
   ['mobility', 'Mobility/stretching', 'body', 'daily', 1, 10],

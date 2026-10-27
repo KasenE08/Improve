@@ -102,7 +102,7 @@ eq(!!R.getBonus()['2027-01-20']['streak:family'], true, 'later sync same week ke
 // ---- Category meters are scaled ----
 const st = S.compute();
 const pot = S.weeklyPotential();
-eq(Math.round(pot.total), Math.round(470 * 7 + 525 + 320 * 12 / 52), 'weekly potential total');
+eq(Math.round(pot.total), Math.round(470 * 7 + 425 + 320 * 12 / 52), 'weekly potential total');
 const people = st.categories.find((c) => c.id === 'people');
 eq(people.scale < 0.05, true, 'People curve scaled down');
 eq(st.categories.every((c) => c.level >= 1), true, 'all categories have a level');

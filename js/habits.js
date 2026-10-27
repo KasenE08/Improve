@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 9;
+export const SCHEMA = 10;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -136,6 +136,10 @@ export function init() {
   // Schema 9: "Work done on schedule" renamed to "Finished today's work" (unless you renamed it yourself)
   if (found > 0 && found < 9) {
     store.set('habits', store.get('habits', []).map((h) => (h.id === 'work-on-schedule' && h.name === 'Work done on schedule' ? { ...h, name: "Finished today's work" } : h)));
+  }
+  // Schema 10: Lift 60 → 40 XP per session (200 a week). Sessions already logged keep what they earned.
+  if (found > 0 && found < 10) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'lift' && h.xp === 60 ? { ...h, xp: 40 } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

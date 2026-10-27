@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `9` |
+| `imp_schema` | `10` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto, autoAfter?, kind?: "goal"\|"limit", limitSince? }]` |
@@ -72,7 +72,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 ## Leveling (Phase 2)
 
 - **Three meters:** Today (XP today ÷ most possible today), Overall (player level), and one per category.
-- **Habit XP:** rated by difficulty × importance (Oct 2026). Difficulty sets a base (daily 5/10/20/30/40 for trivial→brutal; weekly 10/15/25/40/60; monthly 20/30/50/75/100) and importance multiplies it (Nice ×1, Important ×1.5, Core ×2), rounded to 5. Lift sessions use the daily base. Values live in `js/defaults.js`; schema 7 applied them to existing installs.
+- **Habit XP:** rated by difficulty × importance (Oct 2026). Difficulty sets a base (daily 5/10/20/30/40 for trivial→brutal; weekly 10/15/25/40/60; monthly 20/30/50/75/100) and importance multiplies it (Nice ×1, Important ×1.5, Core ×2), rounded to 5. Lift sessions use the daily base; Lift was then lowered to 40 per session (200 a week, schema 10). Values live in `js/defaults.js`; schema 7 applied them to existing installs.
 - **Overall curve:** XP from level L to L+1 = `300 + 60 × (L − 1)` (`js/levels.js`), doubled with the re-rating. LV 10 at 4,860 XP, LV 50 at 85,260.
 - **Category curves:** the same curve × the category's share of weekly XP you can earn (`js/stats.js`), so equal consistency means equal pace.
 - **Ranks:** Initiate 1, Apprentice 5, Adept 10, Veteran 20, Elite 30, Master 40, Legend 50, Mythic 75, Ascended 100 (editable).
