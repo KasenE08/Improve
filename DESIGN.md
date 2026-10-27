@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `6` |
+| `imp_schema` | `7` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto, autoAfter?, kind?: "goal"\|"limit", limitSince? }]` |
@@ -71,10 +71,11 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 ## Leveling (Phase 2)
 
 - **Three meters:** Today (XP today ÷ most possible today), Overall (player level), and one per category.
-- **Overall curve:** XP from level L to L+1 = `150 + 30 × (L − 1)` (`js/levels.js`). LV 10 at 2,430 XP, LV 50 at 42,630.
+- **Habit XP:** rated by difficulty × importance (Oct 2026). Difficulty sets a base (daily 5/10/20/30/40 for trivial→brutal; weekly 10/15/25/40/60; monthly 20/30/50/75/100) and importance multiplies it (Nice ×1, Important ×1.5, Core ×2), rounded to 5. Lift sessions use the daily base. Values live in `js/defaults.js`; schema 7 applied them to existing installs.
+- **Overall curve:** XP from level L to L+1 = `300 + 60 × (L − 1)` (`js/levels.js`), doubled with the re-rating. LV 10 at 4,860 XP, LV 50 at 85,260.
 - **Category curves:** the same curve × the category's share of weekly XP you can earn (`js/stats.js`), so equal consistency means equal pace.
 - **Ranks:** Initiate 1, Apprentice 5, Adept 10, Veteran 20, Elite 30, Master 40, Legend 50, Mythic 75, Ascended 100 (editable).
-- **Bonuses** (`js/rewards.js`): Perfect Day +50 (all dailies done). Streak milestones +25 at 7, +100 at 30, +300 at 100 and every 100 after. Undoing a check-in removes a bonus it unlocked; missed periods reset streaks but never remove XP.
+- **Bonuses** (`js/rewards.js`): Perfect Day +100 (all dailies done). Streak milestones +50 at 7, +200 at 30, +600 at 100 and every 100 after. Undoing a check-in removes a bonus it unlocked; missed periods reset streaks but never remove XP.
 - **Limit habits** (`kind: "limit"`, "at most N times", e.g. fast food ≤ 2 a week): taps count uses and give no XP. When a period ends at or under the max (`target`, 0 allowed), the habit's XP is added as bonus `limit:<id>` on the period's last day, with a pop-up on the next open. Going over gives nothing and takes nothing. Each period is judged once (`imp_limit_settled`), from launch day or when the habit became a limit. Streaks count periods kept under; milestones as usual. Daily limits count toward Perfect Day while at or under; they're left out of the Today meter since they pay after the day ends. Switching a habit to a limit turns this period's taps into uses (no XP). Logic in `js/rewards.js` (`settleLimits`), tests in `tests/limits.test.mjs`.
 - Levels are never stored: they're calculated from `imp_log` + `imp_bonus`, so curve changes apply instantly.
 
@@ -112,6 +113,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Auto-check (`js/journal/autocheck.js`): "Journal" ticks when today's section has at least `minWords` words (default 25, gear icon on the tab). Only today counts; editing past days never changes XP.
 - Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
 - Schema 4 upgrade makes the existing "Journal" habit auto.
+- Schema 7 upgrade re-rates XP, removes Weekly review and Wardrobe review, and re-counts ticks/bonuses so far at the new amounts (other added habits are doubled) so levels stay put on the doubled curve.
 - Schema 6 upgrade adds the daily "Be proactive" right after "Kept my word", with the same category and XP.
 
 ## Launch day

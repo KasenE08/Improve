@@ -21,7 +21,7 @@ eq([done('calories'), done('protein')], [false, false], '1000 cal / 119 g: neith
 const e = F.quickAdd({ date: day, meal: 'dinner', label: 'B', cal: 1400, protein: 1 });
 A.recheck(day);
 eq([done('calories'), done('protein')], [true, true], '2400 cal / 120 g: both');
-eq(H.getLog()[day].calories.xp, 20, 'auto check-in carries habit XP');
+eq(H.getLog()[day].calories.xp, 60, 'auto check-in carries habit XP');
 F.updateEntry(e.id, { cal: 2000 });
 A.recheck(day);
 eq(done('calories'), false, '3000 cal (over +10%): calories unchecked');

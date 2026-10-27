@@ -8,8 +8,9 @@
 
 import * as store from './store.js';
 
-export const BASE = 150;
-export const STEP = 30;
+// Doubled when habit XP was re-rated by difficulty × importance (a full day went from ~225 to ~470 XP)
+export const BASE = 300;
+export const STEP = 60;
 
 export const need = (level, scale = 1) => scale * (BASE + STEP * (level - 1));
 

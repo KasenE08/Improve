@@ -27,7 +27,7 @@ eq(done('2026-10-24'), false, '24 words: not yet');
 S.setDay('2026-10-24', words(25));
 A.recheckJournal(sat);
 eq(done('2026-10-24'), true, '25 words: ticked');
-eq(H.getLog()['2026-10-24'].journal.xp, 10, 'earns the habit XP');
+eq(H.getLog()['2026-10-24'].journal.xp, 15, 'earns the habit XP');
 S.setDay('2026-10-24', words(3));
 A.recheckJournal(sat);
 eq(done('2026-10-24'), false, 'deleting back under the goal unticks');
@@ -58,7 +58,7 @@ for (const k of Object.keys(mem)) delete mem[k];
 mem.imp_schema = '3';
 mem.imp_habits = JSON.stringify([{ id: 'journal', name: 'Journal (night)', auto: null, xp: 15 }, { id: 'kept-word', auto: null }]);
 H.init();
-eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto, h.xp ?? null]), [['journal', 'journal:words', 15], ['kept-word', null, null]], 'upgrade makes Journal auto, keeps edits');
+eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto, h.xp ?? null]), [['journal', 'journal:words', 15], ['kept-word', null, 15]], 'upgrade makes Journal auto, keeps edits (XP re-rated in schema 7)');
 
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exitCode = fails ? 1 : 0;

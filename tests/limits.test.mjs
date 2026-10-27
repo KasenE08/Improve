@@ -66,7 +66,7 @@ eq([!!limitBonus('2026-11-15'), !!limitBonus('2026-11-22'), !!limitBonus('2026-1
 eq(R.streak(get('fast'), at(10, 30)).count, 3, 'streak = 3 weeks (Nov 9–29; Nov 2 week was over)');
 for (let w = 0; w < 5; w++) R.sync(at(11, 7 + w * 7));
 const b7 = Object.entries(R.getBonus()).find(([, v]) => v['streak:fast']);
-eq(b7 && [b7[0], b7[1]['streak:fast'].n, b7[1]['streak:fast'].xp], ['2026-12-27', 7, 25], '7th clean week → +25 milestone on that Sunday');
+eq(b7 && [b7[0], b7[1]['streak:fast'].n, b7[1]['streak:fast'].xp], ['2026-12-27', 7, 50], '7th clean week → +50 milestone on that Sunday');
 eq(R.allStreaks(at(11, 30)).find((s) => s.h.id === 'fast').count, 7, 'profile streak list shows it');
 
 // ---- Not before launch / before it became a limit ----
@@ -107,7 +107,7 @@ eq(!!R.getBonus()['2026-11-03']?.perfect, false, '2/1 over → Perfect Day remov
 H.step(get('soda'), -1, at(10, 3));
 R.sync(at(10, 3));
 eq(!!R.getBonus()['2026-11-03']?.perfect, true, 'undo the extra → Perfect Day back');
-eq(S.today(at(10, 3)).max, 20 + 50, 'today meter leaves daily limits out (paid after the day)');
+eq(S.today(at(10, 3)).max, 20 + 100, 'today meter leaves daily limits out (paid after the day)');
 added = R.sync(at(10, 4));
 eq(added.filter((b) => b.type === 'limit').map((b) => [b.n, b.max]), [[1, 1]], 'next morning: yesterday 1/1 → +10');
 eq(!!limitBonus('2026-11-03', 'soda'), true, 'credited to yesterday');

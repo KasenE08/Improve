@@ -45,7 +45,7 @@ eq(done(), false, 'moving a task off today does not count as done');
 save({ tasks: [task('a', 'done'), task('b', 'done')], plan: { items: [] } });
 P.recheckPlanner(day);
 eq(done(), true, 'both done: ticked');
-eq(H.getLog()['2026-10-26']['work-on-schedule'].xp, 20, 'earns the habit XP');
+eq(H.getLog()['2026-10-26']['work-on-schedule'].xp, 60, 'earns the habit XP');
 
 save({ tasks: [task('a', 'done')], plan: { items: [] } });
 P.recheckPlanner(new Date(2026, 9, 27, 16));
