@@ -6,6 +6,7 @@ import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
 import { dayKey, fromDayKey, periodRange } from '../dates.js';
 import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
+import { monthlyOpen } from '../launch.js';
 
 const SUBS = [['overview', 'Overview'], ['history', 'History'], ['budget', 'Budget'], ['settings', 'Settings']];
 const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'Saving' };
@@ -122,6 +123,9 @@ function paydayPanel(s) {
 }
 
 function reviewPanel(s) {
+  if (!monthlyOpen()) {
+    return box('Monthly review', `<p class="mon-note">Your first review is for the first full habit month (Mon Nov 2 – Sun Dec 6). It opens Nov 2.</p>`, icon('scroll'));
+  }
   const mk = L.reviewMonth();
   const done = s.reviews?.[mk];
   return box(`${L.monthLabel(mk).split(' ')[0]} review`, `<div class="mon-stack">

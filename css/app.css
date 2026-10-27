@@ -73,3 +73,6 @@
 .launch__count span { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
 .launch__note { font-size: 19px; color: var(--imp-muted); max-width: 30ch; }
 .launch__ready { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-accent); }
+
+/* Monthly habits before the first full habit month */
+.imp-row.is-waiting { opacity: .55; }

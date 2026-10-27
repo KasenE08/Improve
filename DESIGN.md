@@ -114,7 +114,8 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 
 ## Launch day
 
-- `js/launch.js`: until `START` (Monday 2026-11-02, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews before November, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept. The Food tab re-reads its data after the wipe.
+- `js/launch.js`: until `START` (Monday 2026-10-26, 4:01 AM) the app shows only a countdown and writes nothing. The first open on or after `START` wipes test data once (`imp_launch.wiped`): XP log, bonuses, food/money entries and journal days before `START`, money reviews finished before `START`, and planner tasks created before `START`. Setup (habits, categories, foods, meals, goals, budgets, pay settings, fixed schedule, notifications) is kept. The Food tab re-reads its data after the wipe.
+- Daily and weekly habits count from `START` (a full Mon–Sun first week). Monthly habits wait for the first full habit month, `MONTHLY_START` (Mon 2026-11-02 → Sun Dec 6): until then they show "Starts Mon Nov 2", can't be tapped or auto-ticked, and the Money review panel stays closed.
 
 ## Deploying
 

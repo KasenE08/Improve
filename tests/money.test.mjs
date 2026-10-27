@@ -89,12 +89,20 @@ const id = M.getState().entries[0].id;
 M.deleteEntry(id);
 { const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the week');
-M.setReview('2026-10', true);
-{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
-eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), true, 'review finished: monthly habit ticked');
-M.setReview('2026-10', false);
-{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
-eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-10') && H.getLog()[k]['budget-review']), false, 'review undone: unticked');
+{ // Monthly review habit (habit months start Nov 2; Dec 7 – Jan 3 here)
+  const dec = new Date(2026, 11, 10, 12);
+  const putReview = (doneAt) => { const st = JSON.parse(mem.imp_money); st.reviews = doneAt ? { '2026-12': { doneAt } } : {}; mem.imp_money = JSON.stringify(st); };
+  putReview(new Date(2026, 11, 9, 18).toISOString());
+  A.recheckMoney(dec, dec);
+  eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-12') && H.getLog()[k]['budget-review']), true, 'review finished: monthly habit ticked');
+  putReview(null);
+  A.recheckMoney(dec, dec);
+  eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-12') && H.getLog()[k]['budget-review']), false, 'review undone: unticked');
+  putReview(new Date(2026, 9, 28, 18).toISOString());
+  const oct = new Date(2026, 9, 28, 12);
+  A.recheckMoney(oct, oct);
+  eq(Object.keys(H.getLog()).some((k) => H.getLog()[k]['budget-review']), false, 'no review XP before the first full habit month (Nov 2)');
+}
 // A saving logged later but dated in an earlier payday week ticks that week
 {
   const later = new Date(2026, 10, 2, 12); // the next Monday
