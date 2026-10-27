@@ -43,7 +43,7 @@ mem.imp_habits = JSON.stringify(DEFAULT_HABITS); mem.imp_categories = JSON.strin
 mem.imp_profile = JSON.stringify({ name: 'TESTER' });
 // Phase 1 style log (no "c" field): a perfect day on Oct 20
 const dailies = DEFAULT_HABITS.filter((h) => h.frequency === 'daily');
-mem.imp_log = JSON.stringify({ '2026-10-20': Object.fromEntries(dailies.map((h) => [h.id, { n: 1, xp: h.xp }])) });
+mem.imp_log = JSON.stringify({ '2026-10-20': Object.fromEntries(dailies.map((h) => [h.id, { n: h.target, xp: h.xp }])) });
 const found = H.init();
 eq(found, 1, 'init reports old schema 1');
 eq(H.getProfile().name, 'TESTER', 'profile kept');
@@ -55,7 +55,7 @@ eq(S.compute().categories.find((c) => c.id === 'body').xp, 60, 'old entries coun
 // ---- Perfect Day: earned and undone ----
 const sat = new Date(2026, 9, 24, 10);
 const hs = H.getHabits();
-for (const h of hs.filter((h) => h.frequency === 'daily')) H.step(h, 1, sat);
+for (const h of hs.filter((h) => h.frequency === 'daily')) for (let i = 0; i < h.target; i++) H.step(h, 1, sat);
 let added = R.sync(sat);
 eq(added.some((b) => b.type === 'perfect'), true, 'perfect day added when all dailies done');
 eq(S.today(sat).earned, 470 + 100, 'daily meter includes bonus');

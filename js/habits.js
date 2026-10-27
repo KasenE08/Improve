@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 7;
+export const SCHEMA = 8;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -101,6 +101,37 @@ export function init() {
       }
     }
     store.set('bonus', bonus);
+  }
+  // Schema 8: oral care twice a day (5 XP each, same 10/day), and AM + PM skincare merged into one
+  // "Skincare" twice a day (10 XP each, same 20/day). History is merged so streaks carry on.
+  if (found > 0 && found < 8) {
+    let habits = store.get('habits', []);
+    const today = dayKey(appNow());
+    const log = store.get('log', {});
+    const oral = habits.find((h) => h.id === 'oral-care');
+    if (oral && oral.target === 1) {
+      habits = habits.map((h) => (h.id === 'oral-care' ? { ...h, target: 2, xp: 5 } : h));
+      // A past day that was done stays done (2 × 5 = the same 10 XP); today's tick counts as one of two
+      for (const day in log) { const e = log[day]['oral-care']; if (e) { e.n = day < today ? 2 : Math.min(2, e.n); e.xp = 5; } }
+    }
+    const am = habits.find((h) => h.id === 'am-skincare');
+    const pm = habits.find((h) => h.id === 'pm-skincare');
+    if ((am || pm) && !habits.some((h) => h.id === 'skincare')) {
+      const first = am || pm;
+      const at = first.order;
+      habits = habits.map((h) => (h.id === 'am-skincare' || h.id === 'pm-skincare' ? { ...h, archived: true } : h.order > at ? { ...h, order: h.order + 1 } : h));
+      const archivedBoth = (!am || am.archived) && (!pm || pm.archived);
+      habits.push({ id: 'skincare', name: 'Skincare (AM + PM)', category: first.category, frequency: 'daily', target: 2, xp: 10, order: at + 1, archived: archivedBoth, auto: null });
+      for (const day in log) {
+        const a = log[day]['am-skincare'], p = log[day]['pm-skincare'];
+        if (!a && !p) continue;
+        log[day].skincare = { n: Math.min(2, (a?.n || 0) + (p?.n || 0)), xp: 10, c: first.category };
+        delete log[day]['am-skincare'];
+        delete log[day]['pm-skincare'];
+      }
+    }
+    store.set('habits', habits);
+    store.set('log', log);
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

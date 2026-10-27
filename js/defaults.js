@@ -27,9 +27,8 @@ const rows = [
   ['water', '3L water', 'diet', 'daily', 1, 30],
   ['fast-food', 'Fast food', 'diet', 'weekly', 2, 40, null, 'limit'],
 
-  ['am-skincare', 'AM skincare (cleanser, moisturizer, sunscreen)', 'skin', 'daily', 1, 10],
-  ['pm-skincare', 'PM skincare (cleanser, moisturizer)', 'skin', 'daily', 1, 10],
-  ['oral-care', 'Full oral care (brush, floss, tongue scraper, mouthwash)', 'skin', 'daily', 1, 10],
+  ['skincare', 'Skincare (AM + PM)', 'skin', 'daily', 2, 10],
+  ['oral-care', 'Full oral care (brush, floss, tongue scraper, mouthwash)', 'skin', 'daily', 2, 5],
   ['shower', 'Shower, deodorant, scent', 'skin', 'daily', 1, 5],
   ['hands-off-face', 'Hands off face', 'skin', 'daily', 1, 20],
   ['nails-brows', 'Nails & brows', 'skin', 'weekly', 1, 15],
