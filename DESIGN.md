@@ -62,7 +62,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_last_backup` | ISO date of the last export |
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
 | `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
-| `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving, amount, cat, note, date }], reviews: { 'YYYY-MM': { doneAt } } }`. Amounts in cents |
+| `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving\|transfer\|adjust, amount, cat, account?, from?, to?, note, date, at }], reviews: { 'YYYY-MM': { doneAt } }, accounts: [{ id, name, icon, start, since }] }`. Amounts in cents |
 | `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
