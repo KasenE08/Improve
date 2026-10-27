@@ -129,7 +129,18 @@ function boot() {
   });
 
   // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-  const checkDay = () => { Food.recheckToday(); recheckPlanner(); recheckMoney(); recheckJournal(); if (dayKey() !== shownDay) { R.sync(); refresh(); } };
+  // Also catches auto habits that tick on their own as time passes (e.g. "Work done on schedule" at 3 PM).
+  const checkDay = () => {
+    const before = Stats.compute();
+    const added = [...Food.recheckToday(), ...recheckPlanner(), ...recheckMoney(), ...recheckJournal()];
+    if (dayKey() !== shownDay) { R.sync(); refresh(); return; }
+    const after = Stats.compute();
+    if (after.total === before.total && !added.length) return;
+    renderHud();
+    // Redraw lists that show ticks; leave Food/Money/Journal/Planner alone so typing isn't interrupted
+    if (['today', 'profile'].includes(currentTab())) refresh();
+    celebrate(before, after, added);
+  };
   setInterval(checkDay, 30000);
   document.addEventListener('visibilitychange', () => { if (document.hidden) Journal.flush(); else checkDay(); });
   window.addEventListener('focus', checkDay);
