@@ -135,3 +135,35 @@ export function reviewDone(state, date = appNow()) {
     return k >= start && k <= end;
   });
 }
+
+// ---- Accounts (checking, savings, any you add) ----
+// Balances start from what you entered when you set the account up ("start fresh"), then every entry
+// logged after that moves money:
+//   expense  out of `account` (default checking)        income  into `account` (default checking)
+//   saving   `from` (checking) → `to` (savings)          transfer `from` → `to` (not spending or saving)
+//   adjust   "Match my bank": a signed correction on `account` (not spending or saving)
+export const DEFAULT_ACCOUNTS = [
+  { id: 'checking', name: 'Checking', icon: 'bank' },
+  { id: 'savings', name: 'Savings', icon: 'piggy' },
+];
+
+export function entryMoves(e) {
+  switch (e.kind) {
+    case 'expense': return [[e.account || 'checking', -e.amount]];
+    case 'income': return [[e.account || 'checking', e.amount]];
+    case 'saving': return [[e.from || 'checking', -e.amount], [e.to || 'savings', e.amount]];
+    case 'transfer': return [[e.from, -e.amount], [e.to, e.amount]];
+    case 'adjust': return [[e.account, e.amount]];
+    default: return [];
+  }
+}
+
+// → { accountId: cents }
+export function balances(state) {
+  const out = {}, since = {};
+  for (const a of state.accounts || []) { out[a.id] = a.start || 0; since[a.id] = a.since || ''; }
+  for (const e of state.entries || []) {
+    for (const [id, d] of entryMoves(e)) if (id in out && (e.at || '') >= since[id]) out[id] += d;
+  }
+  return out;
+}

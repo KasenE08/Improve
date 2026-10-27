@@ -62,7 +62,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_last_backup` | ISO date of the last export |
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
 | `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
-| `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving, amount, cat, note, date }], reviews: { 'YYYY-MM': { doneAt } } }`. Amounts in cents |
+| `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving\|transfer\|adjust, amount, cat, account?, from?, to?, note, date, at }], reviews: { 'YYYY-MM': { doneAt } }, accounts: [{ id, name, icon, start, since }] }`. Amounts in cents |
 | `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
 | `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
 
@@ -102,6 +102,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 
 - Built from scratch: `js/money/logic.js` (pure: paydays, save check, month summary; tests in `tests/money.test.mjs`), `js/money/store.js`, `js/screens/money.js`, `css/money.css`. Sub-tabs: Overview / History / Budget / Settings.
 - Per-category monthly budgets (blank = no limit), red when over. Entries: expense (with category), paycheck, saving. Amounts stored in cents.
+- **Accounts** (Overview, top): Checking + Savings, plus any you add (e.g. Cash). Set up once with today's real balances; balances then start fresh from those (entries logged before setup don't count). Paychecks go into Checking, expenses come out of the account you pick (Checking by default), savings move Checking → Savings, "Move money" moves between accounts (not spending or saving), and "Match my bank" adds a balance fix for the difference (not spending or saving). `balances()` / `entryMoves()` in `js/money/logic.js`.
 - Pay schedule: every week / every 2 weeks (from a recent payday) / twice a month (two days) / monthly (a day) / irregular. Days past a short month's end clamp to its last day.
 - Saving: fixed amount per paycheck (default $40) or % of each paycheck.
 - Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); a week with no payday is a week off (no tick, no XP, streak not broken; `imp_excused` under the week's Monday); not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished. The review panel follows the habit month and is named after the month it starts in (Tue Dec 1 is still the November review; Dec 7 starts December's). A saving or paycheck back-dated into an earlier week re-checks that week too.

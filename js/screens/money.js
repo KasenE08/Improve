@@ -9,7 +9,7 @@ import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
 import { monthlyOpen } from '../launch.js';
 
 const SUBS = [['overview', 'Overview'], ['history', 'History'], ['budget', 'Budget'], ['settings', 'Settings']];
-const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'Saving' };
+const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'Saving', transfer: 'Move' };
 const MONEY_ICONS = ['diet', 'gas', 'car', 'game', 'bag', 'cart', 'keys', 'pill', 'cash', 'bank', 'piggy', 'ticket', 'coffee', 'home', 'heart', 'style', 'people', 'book', 'music', 'star'];
 
 const ui = { sub: 'overview', month: dayKey().slice(0, 7) };
@@ -92,10 +92,115 @@ function overview(s) {
   const cats = s.categories.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('');
   const orphan = Object.keys(sum.byCat).filter((id) => !s.categories.some((c) => c.id === id)).reduce((t, id) => t + sum.byCat[id], 0);
 
-  return `${box('Spending', head, icon('wallet'))}
+  return `${current ? accountsPanel(s) : ''}
+    ${box('Spending', head, icon('wallet'))}
     ${current ? paydayPanel(s) : ''}
     ${box('By category', cats + (orphan ? catRow(s, { name: 'Deleted categories', icon: 'scroll', budget: 0 }, orphan) : ''), `<button class="imp-btn imp-btn--sm imp-btn--ghost" data-m="sub" data-sub="budget">Edit</button>`)}
     ${current ? reviewPanel(s) : ''}`;
+}
+
+// ---- Accounts ----
+const acctName = (s, id) => s.accounts.find((a) => a.id === id)?.name || 'Deleted account';
+function accountsPanel(s) {
+  if (!s.accounts?.length) {
+    return box('Accounts', `<div class="mon-stack"><p class="mon-note">Track your checking and savings balances. Enter what each has right now; everything you log after that moves the money.</p>
+      <button class="imp-btn imp-btn--primary imp-btn--block" data-m="acct-setup">Set up accounts</button></div>`, icon('bank'));
+  }
+  const bal = L.balances(s);
+  const rows = s.accounts.map((a) => `<button class="mon-row" data-m="acct" data-id="${esc(a.id)}">${icon(a.icon || 'cash', 'mon-row__icon')}
+      <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span><span class="mon-row__sub">Tap to match your bank</span></span>
+      <span class="mon-row__amt${bal[a.id] < 0 ? ' mon-over' : ''}">${money(s, bal[a.id])}</span></button>`).join('');
+  return box('Accounts', `${rows}
+    <div class="imp-btn-row mon-add">
+      <button class="imp-btn imp-btn--secondary imp-btn--sm" data-m="add" data-kind="transfer">Move money</button>
+      <button class="imp-btn imp-btn--ghost imp-btn--sm" data-m="acct-add">${icon('plus')}Account</button></div>`, icon('bank'));
+}
+
+function openAccountSetup() {
+  sheet.open({
+    title: 'Set up accounts',
+    body: `<p class="mon-note">Enter what each account has right now (check your bank). From here on, paychecks go into Checking, expenses come out of it, and savings move Checking → Savings.</p>
+      <label class="imp-field"><span class="imp-label">Checking balance</span><span class="food-unit"><input class="imp-input" id="a-chk" inputmode="decimal" placeholder="0.00"><span>$</span></span></label>
+      <label class="imp-field"><span class="imp-label">Savings balance</span><span class="food-unit"><input class="imp-input" id="a-sav" inputmode="decimal" placeholder="0.00"><span>$</span></span></label>
+      <p class="food-err" id="a-err"></p>
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="a-save">Start tracking</button>`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        if (!ev.target.closest('#a-save')) return;
+        const chk = L.toCents(b.querySelector('#a-chk').value || '0'), sav = L.toCents(b.querySelector('#a-sav').value || '0');
+        if (Number.isNaN(chk) || Number.isNaN(sav)) { b.querySelector('#a-err').textContent = 'Enter the balances as numbers.'; return; }
+        const since = new Date().toISOString();
+        const start = { checking: chk, savings: sav };
+        M.saveAccounts(L.DEFAULT_ACCOUNTS.map((a) => ({ ...a, start: start[a.id], since })));
+        sheet.close();
+        rerender();
+        toast('Accounts set up');
+      };
+    },
+  });
+}
+
+function openAccount(id) {
+  const s = M.getState();
+  const a = s.accounts.find((x) => x.id === id);
+  if (!a) return;
+  const bal = L.balances(s)[id];
+  const builtIn = L.DEFAULT_ACCOUNTS.some((d) => d.id === id);
+  sheet.open({
+    title: a.name,
+    body: `<div class="mon-pay"><span class="imp-label">Balance in Improve</span><b>${money(s, bal)}</b></div>
+      <label class="imp-field"><span class="imp-label">Match my bank: real balance</span><span class="food-unit"><input class="imp-input" id="a-real" inputmode="decimal" placeholder="${(bal / 100).toFixed(2)}"><span>${esc(s.settings.currency)}</span></span></label>
+      <p class="mon-note">Adds a correction for the difference (like a fee or something you forgot to log). It doesn't count as spending or saving.</p>
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="a-match">Match</button>
+      <label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" id="a-name" maxlength="24" value="${esc(a.name)}"></label>
+      <button class="imp-btn imp-btn--secondary imp-btn--block" id="a-rename">Save name</button>
+      ${builtIn ? '' : `<button class="imp-btn imp-btn--danger imp-btn--block" id="a-del">${icon('trash')}Delete account</button>`}`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        if (t.id === 'a-match') {
+          const real = L.toCents(b.querySelector('#a-real').value);
+          if (Number.isNaN(real)) return toast('Enter the real balance');
+          const diff = real - L.balances(M.getState())[id];
+          sheet.close();
+          if (!diff) return toast('Already matches');
+          M.upsertEntry({ kind: 'adjust', account: id, amount: diff, note: '', date: today() });
+          rerender();
+          toast(`${a.name} matched (${diff > 0 ? '+' : ''}${money(s, diff)})`);
+        }
+        if (t.id === 'a-rename') {
+          const name = b.querySelector('#a-name').value.trim() || a.name;
+          M.saveAccounts(M.getState().accounts.map((x) => (x.id === id ? { ...x, name } : x)));
+          sheet.close(); rerender(); toast('Saved');
+        }
+        if (t.id === 'a-del' && confirm(`Delete "${a.name}"? Entries that used it stay in History.`)) {
+          M.saveAccounts(M.getState().accounts.filter((x) => x.id !== id));
+          sheet.close(); rerender(); toast('Account deleted');
+        }
+      };
+    },
+  });
+}
+
+function openAddAccount() {
+  sheet.open({
+    title: 'New account',
+    body: `<label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" id="n-name" maxlength="24" placeholder="e.g. Cash"></label>
+      <label class="imp-field"><span class="imp-label">Balance right now</span><span class="food-unit"><input class="imp-input" id="n-bal" inputmode="decimal" placeholder="0.00"><span>$</span></span></label>
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="n-save">Add account</button>`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        if (!ev.target.closest('#n-save')) return;
+        const name = b.querySelector('#n-name').value.trim();
+        const start = L.toCents(b.querySelector('#n-bal').value || '0');
+        if (!name) return toast('Name needed');
+        if (Number.isNaN(start)) return toast('Enter the balance as a number');
+        M.saveAccounts([...M.getState().accounts, { id: 'a_' + M.newCategoryId(), name, icon: 'cash', start, since: new Date().toISOString() }]);
+        sheet.close(); rerender(); toast('Account added');
+      };
+    },
+  });
 }
 
 function paydayPanel(s) {
@@ -141,12 +246,12 @@ function history(s) {
   const days = [...new Set(list.map((e) => e.date))];
   const rows = days.map((d) => `<div class="imp-panel__sub">${shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
-    const ic = e.kind === 'income' ? 'bank' : e.kind === 'saving' ? 'piggy' : c?.icon || 'cash';
-    const title = e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
-    const sub = e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense') : KIND[e.kind];
+    const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll' }[e.kind] || c?.icon || 'cash';
+    const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
+    const sub = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense') : KIND[e.kind];
     return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon(ic, `mon-row__icon mon-k-${e.kind}`)}
       <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
-      <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' ? '' : '+'}${money(s, e.amount)}</span></button>`;
+      <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' || e.kind === 'transfer' || e.amount < 0 ? '' : '+'}${money(s, e.amount)}</span></button>`;
   }).join('')).join('');
   return box('History', `${monthNav()}<div class="mon-stack">
     ${ui.month === today().slice(0, 7) ? `<button class="imp-btn imp-btn--primary imp-btn--block" data-m="add" data-kind="expense">${icon('plus')}Expense</button>` : ''}
@@ -206,17 +311,31 @@ function openEntry(kind, e = null) {
   const cur = e || { kind, amount: kind === 'saving' && s.settings.save.mode === 'amount' ? s.settings.save.amount : 0, cat: s.categories[0]?.id, note: '', date: today() };
   let k = cur.kind;
   let cat = cur.cat || s.categories[0]?.id;
+  // Accounts (once set up): which account an entry uses
+  const accts = s.accounts || [];
+  const pairFor = (kind) => (kind === 'transfer' ? ['savings', 'checking'] : ['checking', 'savings']);
+  let acct = cur.account || 'checking';
+  let [from, to] = cur.from ? [cur.from, cur.to] : pairFor(k);
+  const chips = (field, sel) => `<div class="mon-chips">${accts.map((a) => `<button type="button" data-acct="${field}" data-id="${esc(a.id)}" class="mon-chip${sel === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div>`;
+  const acctFields = () => {
+    if (!accts.length) return '';
+    if (k === 'expense') return `<div class="imp-field"><span class="imp-label">Paid from</span>${chips('acct', acct)}</div>`;
+    if (k === 'income') return `<div class="imp-field"><span class="imp-label">Into</span>${chips('acct', acct)}</div>`;
+    return `<div class="imp-field"><span class="imp-label">From</span>${chips('from', from)}</div><div class="imp-field"><span class="imp-label">To</span>${chips('to', to)}</div>`;
+  };
+  const kinds = Object.entries(KIND).filter(([id]) => id !== 'transfer' || accts.length);
   const body = () => `
-    <div class="imp-seg">${Object.entries(KIND).map(([id, v]) => `<button type="button" data-k="${id}" class="${k === id ? 'is-on' : ''}">${v}</button>`).join('')}</div>
+    <div class="imp-seg">${kinds.map(([id, v]) => `<button type="button" data-k="${id}" class="${k === id ? 'is-on' : ''}">${v}</button>`).join('')}</div>
     <label class="imp-field"><span class="imp-label">Amount</span><span class="food-unit"><input class="imp-input mon-amt" id="e-amt" inputmode="decimal" placeholder="0.00" value="${cur.amount ? cur.amount / 100 : ''}" autocomplete="off"><span>${esc(s.settings.currency)}</span></span></label>
     ${k === 'expense' ? `<div class="imp-field"><span class="imp-label">Category</span><div class="mon-chips">${s.categories.map((c) => `<button type="button" data-cat="${c.id}" class="mon-chip${cat === c.id ? ' is-on' : ''}">${icon(c.icon)}${esc(c.name)}</button>`).join('')}</div></div>` : ''}
+    ${acctFields()}
     <label class="imp-field"><span class="imp-label">Note (optional)</span><input class="imp-input" id="e-note" maxlength="60" value="${esc(cur.note || '')}" placeholder="${k === 'expense' ? 'e.g. Chipotle' : k === 'income' ? 'e.g. Job' : 'e.g. Savings account'}" autocomplete="off"></label>
     <label class="imp-field"><span class="imp-label">Date</span><input class="imp-input" type="date" id="e-date" value="${cur.date}" max="${today()}"></label>
     <p class="food-err" id="e-err"></p>
     <button class="imp-btn imp-btn--primary imp-btn--block" id="e-save">${e ? 'Save' : `Add ${KIND[k].toLowerCase()}`}</button>
     ${e ? `<button class="imp-btn imp-btn--danger imp-btn--block" id="e-del">${icon('trash')}Delete</button>` : ''}`;
   sheet.open({
-    title: e ? `Edit ${KIND[cur.kind].toLowerCase()}` : `New ${KIND[k].toLowerCase()}`,
+    title: k === 'transfer' ? (e ? 'Edit move' : 'Move money') : e ? `Edit ${KIND[cur.kind].toLowerCase()}` : `New ${KIND[k].toLowerCase()}`,
     body: body(),
     onMount(b) {
       const keep = () => { cur.amount = L.toCents(b.querySelector('#e-amt').value) || 0; cur.note = b.querySelector('#e-note').value; cur.date = b.querySelector('#e-date').value || today(); };
@@ -224,16 +343,26 @@ function openEntry(kind, e = null) {
       b.onclick = (ev) => {
         const t = ev.target.closest('button');
         if (!t) return;
-        if (t.dataset.k) { k = t.dataset.k; return redraw(); }
+        if (t.dataset.k) { k = t.dataset.k; if (!e) [from, to] = pairFor(k); return redraw(); }
+        if (t.dataset.acct) {
+          if (t.dataset.acct === 'acct') acct = t.dataset.id;
+          if (t.dataset.acct === 'from') from = t.dataset.id;
+          if (t.dataset.acct === 'to') to = t.dataset.id;
+          t.parentElement.querySelectorAll('.mon-chip').forEach((x) => x.classList.toggle('is-on', x === t));
+          return;
+        }
         if (t.dataset.cat) { cat = t.dataset.cat; b.querySelectorAll('.mon-chip').forEach((x) => x.classList.toggle('is-on', x === t)); return; }
         if (t.id === 'e-save') {
           const amount = L.toCents(b.querySelector('#e-amt').value);
           if (!(amount > 0)) { b.querySelector('#e-err').textContent = 'Enter an amount above 0.'; return; }
           const date = b.querySelector('#e-date').value || today();
-          const entry = { ...(e || {}), kind: k, amount, note: b.querySelector('#e-note').value.trim(), date, cat: k === 'expense' ? cat : undefined };
+          const moving = k === 'saving' || k === 'transfer';
+          if (accts.length && moving && from === to) { b.querySelector('#e-err').textContent = 'Pick two different accounts.'; return; }
+          const entry = { ...(e || {}), kind: k, amount, note: b.querySelector('#e-note').value.trim(), date, cat: k === 'expense' ? cat : undefined,
+            account: accts.length && !moving ? acct : undefined, from: accts.length && moving ? from : undefined, to: accts.length && moving ? to : undefined };
           sheet.close();
           changed(() => M.upsertEntry(entry), [entry.date, e?.date]);
-          toast(e ? 'Saved' : `${KIND[k]} added`);
+          toast(e ? 'Saved' : k === 'transfer' ? 'Moved' : `${KIND[k]} added`);
         }
         if (t.id === 'e-del' && confirm('Delete this entry?')) {
           sheet.close();
@@ -304,7 +433,16 @@ export function bind(root) {
       case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.saveMode = null; ui.typed = null; rerender(); break;
       case 'month': ui.month = L.shiftMonth(ui.month, Number(el.dataset.dir)); rerender(); break;
       case 'add': openEntry(el.dataset.kind); break;
-      case 'edit': openEntry(null, s.entries.find((e) => e.id === el.dataset.id)); break;
+      case 'edit': {
+        const entry = s.entries.find((e) => e.id === el.dataset.id);
+        if (entry?.kind === 'adjust') {
+          if (confirm(`Remove this ${money(s, entry.amount)} balance fix?`)) { M.deleteEntry(entry.id); rerender(); toast('Removed'); }
+        } else openEntry(null, entry);
+        break;
+      }
+      case 'acct-setup': openAccountSetup(); break;
+      case 'acct': openAccount(el.dataset.id); break;
+      case 'acct-add': openAddAccount(); break;
       case 'quick-save': {
         const amount = Number(el.dataset.amount);
         changed(() => M.upsertEntry({ kind: 'saving', amount, note: '', date: today() }));

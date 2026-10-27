@@ -66,6 +66,30 @@ eq(m, { spent: 8000, income: 50000, saved: 4000, byCat: { food: 2000, fun: 6000 
 eq(L.shiftMonth('2026-12', 1), '2027-01', 'next month across the year');
 eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
 
+
+// ---- Accounts: balances start fresh from what you enter, then entries move money ----
+{
+  const since = '2026-10-27T05:00:00.000Z';
+  const after = '2026-10-27T06:00:00.000Z', before = '2026-10-26T20:00:00.000Z';
+  const st = {
+    accounts: [{ id: 'checking', start: 50000, since }, { id: 'savings', start: 109646, since }],
+    entries: [
+      { kind: 'expense', amount: 1250, at: before },                       // before setup: ignored (start fresh)
+      { kind: 'income', amount: 80000, at: after },                        // paycheck → checking
+      { kind: 'expense', amount: 2000, at: after },                        // out of checking
+      { kind: 'expense', amount: 500, account: 'savings', at: after },     // paid from savings
+      { kind: 'saving', amount: 4000, at: after },                         // checking → savings
+      { kind: 'transfer', amount: 10000, from: 'savings', to: 'checking', at: after },
+      { kind: 'adjust', account: 'checking', amount: -300, at: after },    // bank fee found via Match
+    ],
+  };
+  eq(L.balances(st), { checking: 50000 + 80000 - 2000 - 4000 + 10000 - 300, savings: 109646 - 500 + 4000 - 10000 }, 'balances: start + every entry after setup');
+  eq(L.monthSummary({ ...st, categories: [] , entries: st.entries.map((e) => ({ ...e, date: '2026-10-27' })) }, '2026-10').spent, 1250 + 2000 + 500, 'moves and balance fixes are not spending');
+  eq(L.monthSummary({ ...st, categories: [], entries: st.entries.map((e) => ({ ...e, date: '2026-10-27' })) }, '2026-10').saved, 4000, 'moving money out of savings is not negative saving');
+  eq(L.balances({ accounts: [], entries: st.entries }), {}, 'no accounts until set up');
+  eq(L.balances({ ...st, accounts: [st.accounts[0]] }).checking, 50000 + 80000 - 2000 - 4000 + 10000 - 300, 'entries for a deleted account are skipped');
+}
+
 // ---- auto-checks through storage ----
 H.init();
 const habits = Object.fromEntries(H.getHabits().map((h) => [h.id, h.auto]));
