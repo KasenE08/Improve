@@ -2,7 +2,8 @@
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
-import { daysLeft, appNow, nextStart } from '../dates.js';
+import { daysLeft, appNow, nextStart, dayKey, fromDayKey } from '../dates.js';
+import { monthlyOpen, MONTHLY_START } from '../launch.js';
 import { recheck } from '../food/autocheck.js';
 import { AUTO, isAuto, autoTab } from '../auto.js';
 import { recheckPlanner } from '../planner-auto.js';
@@ -15,6 +16,7 @@ import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
+const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', planner: 'Planner', money: 'Money' };
 
 let editMode = false;
@@ -46,7 +48,8 @@ export function render(root, refresh) {
     if (!list.length) return '';
     const done = list.filter((h) => prog.get(h.id) >= h.target).length;
     const resetDay = nextStart(freq).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    const left = freq === 'daily' ? '' : ` · ${daysLeft(freq)}D left (${resetDay})`;
+    const waiting = freq === 'monthly' && !monthlyOpen(dayKey(now));
+    const left = freq === 'daily' ? '' : waiting ? ` · starts Mon ${startLabel}` : ` · ${daysLeft(freq)}D left (${resetDay})`;
     const groups = cats.map((c) => {
       const items = list.filter((h) => h.category === c.id);
       if (!items.length) return '';
@@ -73,6 +76,14 @@ function emptyList() {
 function habitRow(h, n, st) {
   const multi = h.target > 1;
   const done = n >= h.target;
+  if (H.notStarted(h)) {
+    const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : chip(h.xp, false);
+    return `<button class="imp-row is-waiting" data-id="${esc(h.id)}" aria-disabled="true">
+    ${check(false, '')}
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span><span class="imp-row__sub">Starts Mon ${startLabel}</span></span>
+    ${end}
+  </button>`;
+  }
   const fire = [isAuto(h) ? `<span class="today-auto">${icon(h.auto.startsWith('planner') ? 'planner' : 'food')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
@@ -127,6 +138,7 @@ export function bind(root) {
 function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
+  if (H.notStarted(h)) return toast(`Monthly habits start Mon ${startLabel}`);
   if (isAuto(h)) return toast(`Auto from ${autoTab(h)} tab`);
   const before = Stats.compute();
   let change;

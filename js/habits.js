@@ -18,6 +18,10 @@
 import * as store from './store.js';
 import { dayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
+import { monthlyOpen } from './launch.js';
+
+// Monthly habits wait for the first full habit month (see launch.js)
+export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
 export const SCHEMA = 6;
 export const FREQS = ['daily', 'weekly', 'monthly'];
@@ -114,7 +118,7 @@ export function step(habit, delta, date = appNow()) {
   const done = progress(habit, date, log);
 
   if (delta > 0) {
-    if (done >= habit.target) return 0;
+    if (done >= habit.target || notStarted(habit, date)) return 0;
     const day = (log[today] ||= {});
     const e = (day[habit.id] ||= { n: 0, xp: habit.xp });
     e.n += 1;
@@ -144,6 +148,7 @@ export function step(habit, delta, date = appNow()) {
 export function autoTimeReached(habit, day, now = new Date()) {
   const today = dayKey(appNow(now));
   if (day > today) return false; // a future day (e.g. food logged ahead) waits until that day comes
+  if (habit.frequency === 'monthly' && !monthlyOpen(day)) return false;
   if (habit.autoAfter == null || day < today) return true;
   const late = (m) => (m < DAY_START_MIN ? m + 1440 : m);
   return late(now.getHours() * 60 + now.getMinutes()) >= late(habit.autoAfter);
