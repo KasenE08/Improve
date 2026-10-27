@@ -26,7 +26,7 @@ H.step(cut, 1, new Date(2026, 11, 8, 12)); eq(H.progress(cut, new Date(2026, 11,
 eq(H.progress(cut, new Date(2027, 0, 3, 12)), 1, 'Sun Jan 3 is still the December habit month');
 eq(H.progress(cut, new Date(2027, 0, 4, 12)), 0, 'monthly resets on the first Monday');
 eq(H.setDone({ ...cut, auto: 'x' }, '2026-10-30', true, new Date(2026, 9, 30, 12)), false, 'auto ticks blocked for monthly before Nov 2 too');
-eq(H.xpOnDay('2026-10-24'), 30 + 180, 'XP Sat = sleep 30 + 3 lifts');
+eq(H.xpOnDay('2026-10-24'), 30 + 120, 'XP Sat = sleep 30 + 3 lifts');
 H.step(lift, -1, mon); eq(H.progress(lift, sun), 5, 'undo Monday cannot touch last week');
 H.step(lift, -1, sun); eq(H.progress(lift, sun), 4, 'undo on Sun removes one');
 eq(JSON.parse(mem.imp_log)['2026-10-25'].lift.n, 1, 'undo took Sunday entry first');
@@ -145,4 +145,14 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', name: 'My work', category: 'mind', frequency: 'daily', target: 1, xp: 60, order: 0 }]);
   H.init();
   eq(H.getHabits()[0].name, 'My work', 'schema 9: a name you chose is kept');
+}
+
+// ---- Upgrade to schema 10: Lift 60 → 40 per session ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '9';
+  mem.imp_habits = JSON.stringify([{ id: 'lift', name: 'Lift', category: 'body', frequency: 'weekly', target: 5, xp: 60, order: 0 }]);
+  mem.imp_log = JSON.stringify({ '2026-10-27': { lift: { n: 1, xp: 60, c: 'body' } } });
+  H.init();
+  eq([H.getHabits()[0].xp, JSON.parse(mem.imp_log)['2026-10-27'].lift.xp], [40, 60], 'schema 10: Lift 40 from now, past session keeps 60');
 }
