@@ -115,6 +115,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Auto-check (`js/journal/autocheck.js`): "Journal" ticks when today's section has at least `minWords` words (default 25, gear icon on the tab). Only today counts; editing past days never changes XP.
 - Saves 0.4 s after typing stops, and immediately when leaving the field, switching tabs or backgrounding the app.
 - Schema 4 upgrade makes the existing "Journal" habit auto.
+- Schema 11 upgrade makes "3L water" the auto "100 oz water"; if it was ticked that day, the day's water starts at the goal so the tick is kept. Schema 10 lowered Lift to 40; schema 9 renamed Work done on schedule.
 - Schema 8 upgrade makes oral care 2×/day (5 XP each) and merges AM + PM skincare into "Skincare (AM + PM)" 2×/day (10 XP each); daily totals and past days' XP stay the same.
 - Schema 7 upgrade re-rates XP, removes Weekly review and Wardrobe review, and re-counts ticks/bonuses so far at the new amounts (other added habits are doubled) so levels stay put on the doubled curve.
 - Schema 6 upgrade adds the daily "Be proactive" right after "Kept my word", with the same category and XP.
