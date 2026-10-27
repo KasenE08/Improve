@@ -14,7 +14,7 @@ eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnig
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
 const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 32, '32 preloaded habits');
+eq(H.getHabits().length, 31, '31 preloaded habits');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');
@@ -101,4 +101,33 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   eq(after >= before * 2 - 20, true, 'schema 7: total at least doubles (curve doubled) so the level never drops');
   H.init();
   eq(JSON.parse(mem.imp_habits).find((h) => h.id === 'sleep').xp, 30, 'schema 7 runs once');
+}
+
+// ---- Upgrade to schema 8: oral care 2×/day, AM + PM skincare merged into one 2×/day ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '7';
+  mem.imp_habits = JSON.stringify([
+    { id: 'am-skincare', name: 'AM skincare', category: 'skin', frequency: 'daily', target: 1, xp: 10, order: 0 },
+    { id: 'pm-skincare', name: 'PM skincare', category: 'skin', frequency: 'daily', target: 1, xp: 10, order: 1 },
+    { id: 'oral-care', name: 'Full oral care', category: 'skin', frequency: 'daily', target: 1, xp: 10, order: 2 },
+    { id: 'shower', name: 'Shower', category: 'skin', frequency: 'daily', target: 1, xp: 5, order: 3 },
+  ]);
+  const today = D.dayKey(D.appNow());
+  const past = D.dayKey(D.addDays(D.appNow(), -1));
+  mem.imp_log = JSON.stringify({
+    [past]: { 'am-skincare': { n: 1, xp: 10, c: 'skin' }, 'pm-skincare': { n: 1, xp: 10, c: 'skin' }, 'oral-care': { n: 1, xp: 10, c: 'skin' } },
+    [today]: { 'am-skincare': { n: 1, xp: 10, c: 'skin' }, 'oral-care': { n: 1, xp: 10, c: 'skin' } },
+  });
+  H.init();
+  const hs = H.getHabits();
+  eq(hs.map((h) => h.id), ['skincare', 'oral-care', 'shower'], 'schema 8: one Skincare in place of AM + PM');
+  const sk = hs.find((h) => h.id === 'skincare'), oc = hs.find((h) => h.id === 'oral-care');
+  eq([sk.target, sk.xp, sk.category, oc.target, oc.xp], [2, 10, 'skin', 2, 5], 'schema 8: both 2×/day, same daily XP');
+  const lg = JSON.parse(mem.imp_log);
+  eq([lg[past].skincare, lg[past]['oral-care']], [{ n: 2, xp: 10, c: 'skin' }, { n: 2, xp: 5, c: 'skin' }], 'schema 8: past day stays done, same XP');
+  eq([lg[today].skincare.n, lg[today]['oral-care'].n, 'am-skincare' in lg[today]], [1, 1, false], 'schema 8: today = 1 of 2 for each');
+  eq(H.xpOnDay(past), 30, 'schema 8: past day XP unchanged (20 skincare + 10 oral)');
+  H.init();
+  eq(H.getHabits().filter((h) => h.id === 'skincare').length, 1, 'schema 8 runs once');
 }
