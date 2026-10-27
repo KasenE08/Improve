@@ -1,7 +1,7 @@
 import type { BlockTag, CutoffRule, Location, Settings as S, TaskScope } from '../core/types';
 import { WHOLE_MORNING } from '../core/availability';
 import { dateKey } from '../core/time';
-import { actions, parseBackup, type AppData } from './model';
+import { actions, endOfDayMin, parseBackup, type AppData } from './model';
 import { commit, OLD_APP_KEY } from './store';
 import { Chips, useUI } from './ui';
 import { Icon, TAG_STYLE, type IconName } from './icons';
@@ -292,7 +292,7 @@ function General({ settings }: { settings: S }) {
         </label>
         <label class="set-row">
           <span>No work after</span>
-          <input type="time" value={minToInput(settings.dayEndMin % 1440)} onChange={(e) => set({ dayEndMin: inputToMin(e.currentTarget.value) || 1440 })} />
+          <input type="time" value={minToInput(settings.dayEndMin % 1440)} onChange={(e) => set({ dayEndMin: endOfDayMin(inputToMin(e.currentTarget.value), settings.earliestStartMin) })} />
         </label>
         {numRow('Break between assignments', 'breakMin')}
         {numRow('Short assignment is at most', 'shortTaskMaxMin')}

@@ -91,7 +91,7 @@ export function saveStatus(state, date = appNow()) {
   const expected = paydaysBetween(settings.pay, start, end);
   const week = inRange(entries, start, end);
   const incomes = week.filter((e) => e.kind === 'income');
-  const saved = sum(week.filter((e) => e.kind === 'saving'));
+  const saved = sum(week.filter((e) => e.kind === 'saving' && !beforeTracking(state, e)));
   const base = { judge: !!settings.setup, start, end, expected, incomes, saved };
   if (!expected.length && !incomes.length) return { ...base, offWeek: true, required: 0, pending: false, hit: true };
   let required;
@@ -166,4 +166,24 @@ export function balances(state) {
     for (const [id, d] of entryMoves(e)) if (id in out && (e.at || '') >= since[id]) out[id] += d;
   }
   return out;
+}
+
+// Savings are one thing: your Savings account. A "saving" logged before accounts were set up is already
+// part of the starting balance, so it doesn't count again (not in totals, not for the paycheck habit).
+export function beforeTracking(state, e) {
+  const sav = (state.accounts || []).find((a) => a.id === 'savings');
+  return !!sav && e.kind === 'saving' && (e.at || '') < (sav.since || '');
+}
+
+// How much an account went up or down during a month (only entries logged after it was set up)
+export function accountChange(state, id, mk) {
+  const a = (state.accounts || []).find((x) => x.id === id);
+  if (!a) return 0;
+  const [start, end] = monthRange(mk);
+  let t = 0;
+  for (const e of state.entries || []) {
+    if (e.date < start || e.date > end || (e.at || '') < (a.since || '')) continue;
+    for (const [aid, d] of entryMoves(e)) if (aid === id) t += d;
+  }
+  return t;
 }

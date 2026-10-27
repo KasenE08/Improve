@@ -17,6 +17,8 @@ const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
 const PERIOD_END = { daily: 'day end', weekly: 'week end', monthly: 'month end' };
 const OFF_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
+// Auto habits show the icon of the tab they tick from
+const AUTO_ICON = { food: 'food', planner: 'planner', money: 'wallet', journal: 'quill' };
 const OFF_WHY = { 'planner:work': 'nothing planned', 'money:save': 'no payday' };
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -99,7 +101,7 @@ function habitRow(h, n, st, dayOff) {
     ${end}
   </button>`;
   }
-  const fire = [isAuto(h) ? `<span class="today-auto">${icon(h.auto.startsWith('planner') ? 'planner' : 'food')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
+  const fire = [isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
