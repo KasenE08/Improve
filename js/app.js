@@ -60,8 +60,10 @@ function boot() {
       planner = m;
       // Every saved planner change: re-check "Work done on schedule" and update the HUD.
       m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
-      recheckPlanner();
+      const added = recheckPlanner();
       renderHud();
+      if (currentTab() === 'today') refresh(); // show Work's tick or day off
+      if (added.length) celebrate(Stats.compute(), Stats.compute(), added);
       return m;
     }).catch((e) => { console.warn('Planner failed to load', e); plannerLoad = null; throw e; });
     return plannerLoad;
@@ -132,10 +134,11 @@ function boot() {
   // Also catches auto habits that tick on their own as time passes (e.g. "Work done on schedule" at 3 PM).
   const checkDay = () => {
     const before = Stats.compute();
+    const offBefore = JSON.stringify(H.getExcused());
     const added = [...Food.recheckToday(), ...recheckPlanner(), ...recheckMoney(), ...recheckJournal()];
     if (dayKey() !== shownDay) { const fresh = R.sync(); refresh(); celebrate(before, Stats.compute(), [...added, ...fresh]); return; }
     const after = Stats.compute();
-    if (after.total === before.total && !added.length) return;
+    if (after.total === before.total && !added.length && JSON.stringify(H.getExcused()) === offBefore) return;
     renderHud();
     // Redraw lists that show ticks; leave Food/Money/Journal/Planner alone so typing isn't interrupted
     if (['today', 'profile'].includes(currentTab())) refresh();

@@ -3,7 +3,8 @@
 //
 // Today's list only grows during the day (imp_planner_day), so moving a task off today
 // (e.g. "Falling behind") doesn't count as finishing it. Deleted tasks drop off the list.
-// A day with nothing planned counts as done, once the planner has tasks or fixed times.
+// A day with nothing planned is a day off (no tick, no XP; streak and Perfect Day unaffected),
+// once the planner has tasks or fixed times.
 import * as store from './store.js';
 import * as H from './habits.js';
 import * as R from './rewards.js';
@@ -17,8 +18,13 @@ export function plannerHit(data, date = appNow()) {
   for (const i of data.plan?.items || []) {
     if (dayKey(new Date(i.start)) === today && !day.ids.includes(i.taskId)) day.ids.push(i.taskId);
   }
+  // Tasks finished today count as today's work too (e.g. done early, before they were planned)
+  for (const t of data.tasks || []) {
+    if (t.status === 'done' && t.completedAt && dayKey(appNow(new Date(t.completedAt))) === today && !day.ids.includes(t.id)) day.ids.push(t.id);
+  }
   day.ids = day.ids.filter((id) => tasks.has(id));
   store.set('planner_day', day);
+  if (!day.ids.length) return 'off';
   return day.ids.every((id) => tasks.get(id).status === 'done');
 }
 
@@ -30,6 +36,10 @@ export function recheckPlanner(date = new Date()) {
   const hit = plannerHit(data, appNow(date));
   let changed = false;
   const day = dayKey(appNow(date));
-  for (const h of H.getHabits()) if (h.auto === 'planner:work') changed = H.setDone(h, day, hit, date) || changed;
+  for (const h of H.getHabits()) {
+    if (h.auto !== 'planner:work') continue;
+    changed = H.setExcused(h, day, hit === 'off') || changed;
+    changed = H.setDone(h, day, hit === true, date) || changed;
+  }
   return changed ? R.sync(appNow(date)) : [];
 }
