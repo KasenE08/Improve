@@ -222,6 +222,23 @@ export function step(habit, delta, date = appNow()) {
   return -xp;
 }
 
+// Days off: a day a habit had nothing to do (e.g. "Work done on schedule" with nothing planned).
+// No tick and no XP, but it doesn't break the streak or block Perfect Day.
+//   imp_excused { "YYYY-MM-DD": { habitId: true } }
+export const getExcused = () => store.get('excused', {});
+export const isExcused = (habitId, day, ex = getExcused()) => !!ex[day]?.[habitId];
+export function setExcused(habit, day, on) {
+  const ex = getExcused();
+  if (isExcused(habit.id, day, ex) === on) return false;
+  if (on) (ex[day] ||= {})[habit.id] = true;
+  else {
+    delete ex[day][habit.id];
+    if (!Object.keys(ex[day]).length) delete ex[day];
+  }
+  store.set('excused', ex);
+  return true;
+}
+
 // When a habit becomes a limit: its taps this period become plain uses (no XP)
 export function clearPeriodXP(habit, date = appNow()) {
   const log = getLog();

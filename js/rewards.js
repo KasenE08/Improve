@@ -63,11 +63,14 @@ function limitRun(h, d, bonus = getBonus()) {
 // Limit habits: finished periods kept at or under the limit; the current one is never "done" until it ends.
 export function streak(h, date = appNow(), counts = H.countsIndex()) {
   if (H.isLimit(h)) return { count: limitRun(h, prevPeriod(h.frequency, date)), current: false };
+  const ex = H.getExcused();
+  const off = (d) => h.frequency === 'daily' && H.isExcused(h.id, dayKey(d), ex); // days off are skipped
   const current = doneIn(h, date, counts) >= h.target;
   let count = current ? 1 : 0;
   let d = prevPeriod(h.frequency, date);
-  for (let i = 0; i < 5000 && doneIn(h, d, counts) >= h.target; i++) {
-    count++;
+  for (let i = 0; i < 5000; i++) {
+    if (doneIn(h, d, counts) >= h.target) count++;
+    else if (!off(d)) break;
     d = prevPeriod(h.frequency, d);
   }
   return { count, current };
@@ -85,7 +88,8 @@ export function sync(date = appNow()) {
   // Perfect Day: every active daily habit done today
   added.push(...settleLimits(date, bonus));
   const dailies = habits.filter((h) => h.frequency === 'daily');
-  const perfect = dailies.length > 0 && dailies.every((h) => H.isDone(h, counts[h.id]?.[today] || 0));
+  const ex = H.getExcused();
+  const perfect = dailies.length > 0 && dailies.every((h) => H.isDone(h, counts[h.id]?.[today] || 0) || H.isExcused(h.id, today, ex));
   if (perfect && !day.perfect) { day.perfect = { type: 'perfect', xp: PERFECT_DAY_XP }; added.push(day.perfect); }
   if (!perfect) delete day.perfect;
 

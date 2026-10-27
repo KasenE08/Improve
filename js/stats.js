@@ -69,7 +69,8 @@ export function today(date = appNow()) {
   const habitXP = H.xpOnDay(key, log);
   const bonusXP = R.bonusXPOnDay(key);
   // Daily limits pay out after the day ends, so they're not part of today's meter
-  const dailyMax = H.getHabits().filter((h) => h.frequency === 'daily' && !H.isLimit(h)).reduce((s, h) => s + h.xp * h.target, 0);
+  // Days off (nothing to do) aren't part of the most you could earn either
+  const dailyMax = H.getHabits().filter((h) => h.frequency === 'daily' && !H.isLimit(h) && !H.isExcused(h.id, key)).reduce((s, h) => s + h.xp * h.target, 0);
   const extra = Object.entries(log[key] || {}).reduce((s, [id, e]) => (byId.get(id)?.frequency === 'daily' ? s : s + e.n * e.xp), 0);
   const earned = habitXP + bonusXP;
   return { earned, max: dailyMax + extra + bonusXP, bonusXP };
