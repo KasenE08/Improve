@@ -15,6 +15,7 @@ import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
+const PERIOD_END = { daily: 'day end', weekly: 'week end', monthly: 'month end' };
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', planner: 'Planner', money: 'Money' };
@@ -46,7 +47,7 @@ export function render(root, refresh) {
   const sections = H.FREQS.map((freq) => {
     const list = habits.filter((h) => h.frequency === freq);
     if (!list.length) return '';
-    const done = list.filter((h) => prog.get(h.id) >= h.target).length;
+    const done = list.filter((h) => H.isDone(h, prog.get(h.id))).length;
     const resetDay = nextStart(freq).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const waiting = freq === 'monthly' && !monthlyOpen(dayKey(now));
     const left = freq === 'daily' ? '' : waiting ? ` · starts Mon ${startLabel}` : ` · ${daysLeft(freq)}D left (${resetDay})`;
@@ -74,6 +75,7 @@ function emptyList() {
 }
 
 function habitRow(h, n, st) {
+  if (H.isLimit(h) && !H.notStarted(h)) return limitRow(h, n, st);
   const multi = h.target > 1;
   const done = n >= h.target;
   if (H.notStarted(h)) {
@@ -92,6 +94,23 @@ function habitRow(h, n, st) {
   return `<button class="imp-row${done ? ' is-done' : ''}" data-id="${esc(h.id)}" aria-pressed="${done}">
     ${check(done, multi && n > 0 ? n : '')}
     <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${sub}</span>
+    ${end}
+  </button>`;
+}
+
+// Limit habit ("at most N"): tap counts a use. On track = at or under the limit; XP comes when the period ends.
+function limitRow(h, n, st) {
+  const over = n > h.target;
+  const left = h.target - n;
+  const state = over ? `Over by ${n - h.target} · no XP ${PERIOD_WORD[h.frequency]}`
+    : left === 0 ? `At the limit · XP at ${PERIOD_END[h.frequency]}` : `On track · ${left} left`;
+  const fire = st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : '';
+  const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : chip(h.xp, false);
+  return `<button class="imp-row is-limit${over ? ' is-over' : ''}" data-id="${esc(h.id)}" aria-label="${esc(h.name)}: ${n} of at most ${h.target}">
+    <span class="imp-check imp-limit-count${over ? ' is-over' : ''}">${n}</span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>
+      <span class="imp-row__sub">${n}/${h.target} max ${PERIOD_WORD[h.frequency]} · ${state}${fire}</span>
+      ${h.target > 0 && h.target <= 12 ? pips(Math.min(n, h.target), h.target) : ''}</span>
     ${end}
   </button>`;
 }
@@ -139,6 +158,7 @@ function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
   if (H.notStarted(h)) return toast(`Monthly habits start Mon ${startLabel}`);
+  if (H.isLimit(h)) return applyLimit(h, delta);
   if (isAuto(h)) return toast(`Auto from ${autoTab(h)} tab`);
   const before = Stats.compute();
   let change;
@@ -155,9 +175,27 @@ function apply(id, delta) {
   celebrate(before, Stats.compute(), added);
 }
 
+function applyLimit(h, delta) {
+  const before = Stats.compute();
+  const n0 = H.progress(h);
+  H.step(h, delta);
+  const n1 = H.progress(h);
+  if (n0 === n1) return;
+  const added = R.sync();
+  ctx.refresh();
+  if (n1 > h.target && n0 <= h.target) toast(`Over the limit ${PERIOD_WORD[h.frequency]} · no XP for this one`);
+  else if (n1 <= h.target && n0 > h.target) toast('Back on track');
+  else toast(`${n1}/${h.target} ${PERIOD_WORD[h.frequency]}`);
+  celebrate(before, Stats.compute(), added);
+}
+
 // Bonus + level-up feedback
 export function celebrate(before, after, added) {
   for (const b of added) {
+    if (b.type === 'limit') {
+      if (b.unit === 'day') toast(`${b.name}: stayed at ${b.n}/${b.max} · +${b.xp} XP`);
+      else burst({ icon: 'shield', title: `Held the line!`, big: `+${b.xp} XP`, sub: `${b.name}: ${b.n}/${b.max} last ${b.unit}` });
+    }
     if (b.type === 'perfect') burst({ icon: 'star', title: 'Perfect day!', big: `+${b.xp} XP`, sub: 'Every daily habit done' });
     if (b.type === 'streak') burst({ icon: 'flame', title: `${b.n}-${b.unit.replace(/s$/, '')} streak!`, big: `+${b.xp} XP`, sub: b.name });
   }
@@ -176,6 +214,7 @@ function openHabitForm(h) {
   const isNew = !h;
   const cats = H.getCategories();
   const cur = h || { name: '', category: cats[0]?.id, frequency: 'daily', target: 1, xp: 10 };
+  const limit0 = H.isLimit(cur);
   const autoNote = cur.auto && !AUTO[cur.auto] ? `<p class="imp-label">Will auto-check from the ${AUTO_TAB[cur.auto.split(':')[0]] || 'other'} tab in a later phase. Manual for now.</p>` : '';
   const autoField = `<label class="imp-field"><span class="imp-label">Auto-check</span><select class="imp-select" id="f-auto">
         <option value="">Off (tap to check)</option>
@@ -191,16 +230,33 @@ function openHabitForm(h) {
         ${cats.map((c) => `<option value="${esc(c.id)}"${c.id === cur.category ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <div class="imp-field"><span class="imp-label">Resets</span><div class="imp-seg" id="f-freq">
         ${H.FREQS.map((f) => `<button type="button" data-f="${f}" class="${f === cur.frequency ? 'is-on' : ''}">${FREQ_LABEL[f]}</button>`).join('')}</div></div>
+      <div class="imp-field"><span class="imp-label">Type</span><div class="imp-seg" id="f-kind">
+        <button type="button" data-k="goal" class="${limit0 ? '' : 'is-on'}">Goal · do it</button>
+        <button type="button" data-k="limit" class="${limit0 ? 'is-on' : ''}">Limit · at most</button></div></div>
       <div class="imp-field-row">
-        <label class="imp-field"><span class="imp-label">Times per period</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="1" max="31" value="${cur.target}"></label>
-        <label class="imp-field"><span class="imp-label">XP each</span><input class="imp-input" id="f-xp" type="number" inputmode="numeric" min="0" max="999" value="${cur.xp}"></label>
+        <label class="imp-field"><span class="imp-label" id="f-target-l">${limit0 ? 'Max times per period' : 'Times per period'}</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="${limit0 ? 0 : 1}" max="31" value="${cur.target}"></label>
+        <label class="imp-field"><span class="imp-label" id="f-xp-l">${limit0 ? 'XP if under' : 'XP each'}</span><input class="imp-input" id="f-xp" type="number" inputmode="numeric" min="0" max="999" value="${cur.xp}"></label>
       </div>
-      ${autoField}
+      <p class="imp-label" id="f-limit-note"${limit0 ? '' : ' hidden'}>Tap each time it happens. Stay at or under the max and you get the XP when the period ends. Going over just means no XP.</p>
+      <div id="f-auto-wrap"${limit0 ? ' hidden' : ''}>${autoField}</div>
       ${autoNote}
       <button class="imp-btn imp-btn--primary imp-btn--block" id="f-save">Save</button>
       ${isNew ? '' : '<button class="imp-btn imp-btn--danger imp-btn--block" id="f-del">' + icon('trash') + 'Delete habit</button>'}`,
     onMount(b) {
       let freq = cur.frequency;
+      let kind = limit0 ? 'limit' : 'goal';
+      b.querySelector('#f-kind').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-k]');
+        if (!btn) return;
+        kind = btn.dataset.k;
+        const lim = kind === 'limit';
+        b.querySelectorAll('#f-kind button').forEach((x) => x.classList.toggle('is-on', x === btn));
+        b.querySelector('#f-target-l').textContent = lim ? 'Max times per period' : 'Times per period';
+        b.querySelector('#f-xp-l').textContent = lim ? 'XP if under' : 'XP each';
+        b.querySelector('#f-target').min = lim ? 0 : 1;
+        b.querySelector('#f-limit-note').hidden = !lim;
+        b.querySelector('#f-auto-wrap').hidden = lim;
+      });
       // The time option only applies to auto-checked habits
       b.querySelector('#f-auto').addEventListener('change', (e) => { b.querySelector('#f-after-wrap').hidden = !e.target.value; });
       b.querySelector('#f-freq').addEventListener('click', (e) => {
@@ -212,12 +268,16 @@ function openHabitForm(h) {
       b.querySelector('#f-save').addEventListener('click', () => {
         const name = b.querySelector('#f-name').value.trim();
         if (!name) { toast('Name needed'); return b.querySelector('#f-name').focus(); }
-        const target = clampInt(b.querySelector('#f-target').value, 1, 31, 1);
+        const lim = kind === 'limit';
+        const target = clampInt(b.querySelector('#f-target').value, lim ? 0 : 1, 31, lim ? 2 : 1);
         const xp = clampInt(b.querySelector('#f-xp').value, 0, 999, 10);
-        const auto = b.querySelector('#f-auto').value || null;
+        const auto = lim ? null : b.querySelector('#f-auto').value || null;
         const afterVal = b.querySelector('#f-after').value;
         const autoAfter = auto && afterVal ? timeToMin(afterVal) : null;
-        H.upsertHabit({ id: isNew ? H.newId('h') : h.id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter });
+        const id = isNew ? H.newId('h') : h.id;
+        H.upsertHabit({ id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter,
+          kind: lim ? 'limit' : 'goal', limitSince: lim ? (limit0 && cur.limitSince) || dayKey(appNow()) : null });
+        if (lim && !limit0 && !isNew) H.clearPeriodXP(H.getHabits().find((x) => x.id === id)); // its taps this period become uses, not XP
         recheckFood();
         R.sync();
         sheet.close();

@@ -11,7 +11,7 @@ export function weeklyPotential(habits = H.getHabits()) {
   const byCat = {};
   let total = 0;
   for (const h of habits) {
-    const v = h.xp * h.target * WEEKLY_FACTOR[h.frequency];
+    const v = h.xp * (H.isLimit(h) ? 1 : h.target) * WEEKLY_FACTOR[h.frequency]; // a limit pays once per period
     byCat[h.category] = (byCat[h.category] || 0) + v;
     total += v;
   }
@@ -33,7 +33,7 @@ export function compute() {
       const xp = e.n * e.xp;
       const c = e.c || byId.get(id)?.category;
       total += xp;
-      checkins += e.n;
+      if (!H.isLimit(byId.get(id))) checkins += e.n; // limit taps count uses (e.g. fast food meals), not check-ins
       if (c) catXP[c] = (catXP[c] || 0) + xp;
     }
   }
@@ -68,7 +68,8 @@ export function today(date = appNow()) {
   const byId = new Map(H.getAllHabits().map((h) => [h.id, h]));
   const habitXP = H.xpOnDay(key, log);
   const bonusXP = R.bonusXPOnDay(key);
-  const dailyMax = H.getHabits().filter((h) => h.frequency === 'daily').reduce((s, h) => s + h.xp * h.target, 0);
+  // Daily limits pay out after the day ends, so they're not part of today's meter
+  const dailyMax = H.getHabits().filter((h) => h.frequency === 'daily' && !H.isLimit(h)).reduce((s, h) => s + h.xp * h.target, 0);
   const extra = Object.entries(log[key] || {}).reduce((s, [id, e]) => (byId.get(id)?.frequency === 'daily' ? s : s + e.n * e.xp), 0);
   const earned = habitXP + bonusXP;
   return { earned, max: dailyMax + extra + bonusXP, bonusXP };

@@ -27,6 +27,7 @@ export function wipeTestData() {
   store.set('log', {});
   store.set('bonus', {});
   store.remove('planner_day');
+  store.remove('limit_settled');
 
   const food = store.get('food', null);
   if (food) store.set('food', { ...food, entries: (food.entries || []).filter((e) => e.date >= START) });

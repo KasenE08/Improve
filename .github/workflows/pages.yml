@@ -41,6 +41,7 @@ jobs:
           node tests/money.test.mjs
           node tests/journal.test.mjs
           node tests/launch.test.mjs
+          node tests/limits.test.mjs
       - name: Collect the site (without Planner sources)
         run: |
           mkdir _site

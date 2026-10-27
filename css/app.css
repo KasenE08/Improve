@@ -76,3 +76,9 @@
 
 /* Monthly habits before the first full habit month */
 .imp-row.is-waiting { opacity: .55; }
+
+/* Limit habits ("at most N"): the box shows uses so far */
+.imp-limit-count { font-family: var(--imp-font-body, inherit); font-size: 18px; color: var(--imp-accent); }
+.imp-limit-count.is-over { color: var(--imp-danger); box-shadow: 0 0 0 var(--imp-px) var(--imp-danger); }
+.imp-row.is-over .imp-row__sub { color: var(--imp-danger); }
+.imp-row.is-over .imp-pip.is-on { background: var(--imp-danger); }

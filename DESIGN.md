@@ -53,9 +53,10 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_schema` | `6` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
-| `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto }]` |
+| `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto, autoAfter?, kind?: "goal"\|"limit", limitSince? }]` |
 | `imp_log` | `{ "YYYY-MM-DD": { habitId: { n, xp, c } } }`, completions per day with the XP value and category at the time |
 | `imp_bonus` | `{ "YYYY-MM-DD": { "perfect" \| "streak:<habitId>": { type, xp, … } } }`, bonus XP on the day it was earned |
+| `imp_limit_settled` | `{ habitId: "YYYY-MM-DD" }`, last period end already judged for each limit habit |
 | `imp_ranks` | `[{ min, name }]`, editable on Profile |
 | `imp_last_backup` | ISO date of the last export |
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
@@ -74,6 +75,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - **Category curves:** the same curve × the category's share of weekly XP you can earn (`js/stats.js`), so equal consistency means equal pace.
 - **Ranks:** Initiate 1, Apprentice 5, Adept 10, Veteran 20, Elite 30, Master 40, Legend 50, Mythic 75, Ascended 100 (editable).
 - **Bonuses** (`js/rewards.js`): Perfect Day +50 (all dailies done). Streak milestones +25 at 7, +100 at 30, +300 at 100 and every 100 after. Undoing a check-in removes a bonus it unlocked; missed periods reset streaks but never remove XP.
+- **Limit habits** (`kind: "limit"`, "at most N times", e.g. fast food ≤ 2 a week): taps count uses and give no XP. When a period ends at or under the max (`target`, 0 allowed), the habit's XP is added as bonus `limit:<id>` on the period's last day, with a pop-up on the next open. Going over gives nothing and takes nothing. Each period is judged once (`imp_limit_settled`), from launch day or when the habit became a limit. Streaks count periods kept under; milestones as usual. Daily limits count toward Perfect Day while at or under; they're left out of the Today meter since they pay after the day ends. Switching a habit to a limit turns this period's taps into uses (no XP). Logic in `js/rewards.js` (`settleLimits`), tests in `tests/limits.test.mjs`.
 - Levels are never stored: they're calculated from `imp_log` + `imp_bonus`, so curve changes apply instantly.
 
 ## Food tab (Phase 3)

@@ -44,7 +44,7 @@ function boot() {
   Food.recheckToday();
   recheckMoney();
   recheckJournal();
-  R.sync();
+  const openedWith = R.sync(); // e.g. limit habits paid out for a week that just ended
 
   function currentTab() {
     const t = location.hash.replace('#', '').split('?')[0];
@@ -133,7 +133,7 @@ function boot() {
   const checkDay = () => {
     const before = Stats.compute();
     const added = [...Food.recheckToday(), ...recheckPlanner(), ...recheckMoney(), ...recheckJournal()];
-    if (dayKey() !== shownDay) { R.sync(); refresh(); return; }
+    if (dayKey() !== shownDay) { const fresh = R.sync(); refresh(); celebrate(before, Stats.compute(), [...added, ...fresh]); return; }
     const after = Stats.compute();
     if (after.total === before.total && !added.length) return;
     renderHud();
@@ -156,6 +156,7 @@ function boot() {
   const tappedTask = takeTaskFromHash();
 
   refresh();
+  if (openedWith.length) { const st = Stats.compute(); celebrate(st, st, openedWith); }
 
   // Load the planner in the background: replans on a new day and keeps notifications in sync.
   const plannerReady = loadPlanner().catch(() => null);
