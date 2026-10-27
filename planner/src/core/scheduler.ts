@@ -120,8 +120,17 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
     return allowNight.has(t.id) ? nightFree[scope] : free[scope];
   };
 
+  // A planner "day" ends when you stop working ("No work after"): with 2am, 12am–2am still belongs to
+  // the night before. With midnight or earlier this is just the calendar day.
+  const dayShift = Math.max(0, s.dayEndMin - 1440);
+  const dayStart = (k: string) => at(k, dayShift);
+  const dayOf = (ms: Ms) => {
+    const k = dateKey(ms);
+    return ms < dayStart(k) ? addDays(k, -1) : k;
+  };
+
   // Hand moves: a pin to a past day no longer applies.
-  const today = dateKey(now);
+  const today = dayOf(now);
   const pinOf = (t: Task) => (t.pinDay && t.pinDay >= today ? t.pinDay : undefined);
   const spread = s.spreadWork !== false;
   /** Spreading: the chosen day per task (filled in below, once the priority order is known). */
@@ -135,12 +144,12 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
   function targetDays(): Map<string, string> {
     const load = new Map<string, number>();
     const addLoad = (k: string, min: number) => load.set(k, (load.get(k) ?? 0) + min + s.breakMin);
-    for (const f of fixed) addLoad(dateKey(f.start), (f.end - f.start) / MIN);
+    for (const f of fixed) addLoad(dayOf(f.start), (f.end - f.start) / MIN);
     const days = Array.from({ length: s.horizonDays }, (_, i) => addDays(today, i));
     /** Free minutes on day k for t before `until`, and the longest single stretch. */
     const room = (t: Task, k: string, until: Ms) => {
-      const lo = Math.max(at(k, 0), now);
-      const hi = Math.min(at(addDays(k, 1), 0), until);
+      const lo = Math.max(dayStart(k), now);
+      const hi = Math.min(dayStart(addDays(k, 1)), until);
       let total = 0;
       let longest = 0;
       for (const iv of free[isSchoolwork(t) ? 'schoolwork' : 'all']) {
@@ -165,7 +174,7 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
       const prev = t.group ? partDay.get(t.group) : undefined;
       const first = prev ? addDays(prev, 1) : today;
       const ok = days.filter((k) => {
-        if (k < first || at(k, 0) >= until) return false;
+        if (k < first || dayStart(k) >= until) return false;
         const r = room(t, k, until);
         return r.longest >= t.estimateMin && r.total - (load.get(k) ?? 0) >= t.estimateMin;
       });
@@ -201,12 +210,12 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
   const startFor = (t: Task, st: State): Ms | null => {
     if (!ready(t, st)) return null;
     const pin = pinOf(t);
-    const base = pin ? Math.max(baseFrom(t, st), at(pin, 0), t.pinAfter ?? 0) : baseFrom(t, st);
+    const base = pin ? Math.max(baseFrom(t, st), dayStart(pin), t.pinAfter ?? 0) : baseFrom(t, st);
     const dur = t.estimateMin * MIN;
     // Spreading: try its chosen day first; if that would make it late, the earliest slot as usual.
     const day = pin ? undefined : target.get(t.id);
     if (day) {
-      const s0 = placeFrom(t, st, Math.max(base, at(day, 0)));
+      const s0 = placeFrom(t, st, Math.max(base, dayStart(day)));
       if (s0 !== null && (t.due === null || s0 + dur <= t.due)) return s0;
     }
     return placeFrom(t, st, base);
@@ -223,8 +232,8 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
     if (!placed?.size) return fit(from);
     // Spread parts: next part goes on a later day than the last placed one...
     const lastEnd = Math.max(...placed.values());
-    // The next day starts at midnight, or after tonight's late window (12am–2am still counts as tonight).
-    let nextDay = at(addDays(dateKey(lastEnd), 1), 0);
+    // The next day starts when the planner day ends (midnight, or e.g. 2am), or after tonight's late window.
+    let nextDay = dayStart(addDays(dayOf(lastEnd), 1));
     for (const n of night) if (nextDay >= n.start && nextDay < n.end) nextDay = n.end;
     const spread = fit(Math.max(from, nextDay));
     if (spread !== null && (t.due === null || spread + dur <= t.due)) return spread;
