@@ -230,11 +230,13 @@ export function step(habit, delta, date = appNow()) {
   return -xp;
 }
 
-// Days off: a day a habit had nothing to do (e.g. "Finished today's work" with nothing planned).
-// No tick and no XP, but it doesn't break the streak or block Perfect Day.
+// Days/weeks off: a period a habit had nothing to do ("Finished today's work" with nothing planned,
+// "Save from paycheck" in a week with no payday). No tick and no XP, but it doesn't break the streak
+// or block Perfect Day. Stored under the period's first day:
 //   imp_excused { "YYYY-MM-DD": { habitId: true } }
 export const getExcused = () => store.get('excused', {});
 export const isExcused = (habitId, day, ex = getExcused()) => !!ex[day]?.[habitId];
+export const offIn = (habit, date = appNow(), ex = getExcused()) => isExcused(habit.id, periodRange(habit.frequency, date)[0], ex);
 export function setExcused(habit, day, on) {
   const ex = getExcused();
   if (isExcused(habit.id, day, ex) === on) return false;

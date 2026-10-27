@@ -64,7 +64,7 @@ function limitRun(h, d, bonus = getBonus()) {
 export function streak(h, date = appNow(), counts = H.countsIndex()) {
   if (H.isLimit(h)) return { count: limitRun(h, prevPeriod(h.frequency, date)), current: false };
   const ex = H.getExcused();
-  const off = (d) => h.frequency === 'daily' && H.isExcused(h.id, dayKey(d), ex); // days off are skipped
+  const off = (d) => H.offIn(h, d, ex); // days/weeks off are skipped
   const current = doneIn(h, date, counts) >= h.target;
   let count = current ? 1 : 0;
   let d = prevPeriod(h.frequency, date);

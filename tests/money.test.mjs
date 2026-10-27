@@ -77,14 +77,14 @@ A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), false, 'not set up: save habit untouched');
 M.saveSettings({ pay: bi, setup: true });
 A.recheckMoney(offWeek, offWeek);
-eq(done('save-paycheck', '2026-10-28'), true, 'off week ticks on its own');
+eq([done('save-paycheck', '2026-10-28'), H.isExcused('save-paycheck', '2026-10-26')], [false, true], 'week with no payday: week off (no tick, no XP)');
 A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), false, 'payday week: not yet');
 M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
 A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), true, 'saved $40: ticked');
 { const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
-eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 2, 'rechecking later in the week adds no second check-in');
+eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 1, 'rechecking later in the week adds no second check-in');
 const id = M.getState().entries[0].id;
 M.deleteEntry(id);
 { const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
@@ -111,6 +111,17 @@ eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the 
   M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
   A.recheckMoney(new Date(2026, 9, 23, 12), later);
   eq(Object.keys(H.getLog()).some((k) => k >= '2026-10-19' && k <= '2026-10-25' && H.getLog()[k]['save-paycheck']), true, 'back-dated saving ticks its own week');
+}
+// Weeks off don't break the saving streak
+{
+  const R = await import(J('rewards.js'));
+  const save = H.getHabits().find((h) => h.id === 'save-paycheck');
+  mem.imp_log = '{}'; mem.imp_excused = '{}';
+  H.setPeriodDone(save, new Date(2026, 10, 4, 12), true, new Date(2026, 10, 4, 12)); // payday week Nov 2
+  H.setExcused(save, '2026-11-09', true);                                            // no payday Nov 9
+  H.setPeriodDone(save, new Date(2026, 10, 18, 12), true, new Date(2026, 10, 18, 12)); // payday week Nov 16
+  eq(R.streak(save, new Date(2026, 10, 18, 12)).count, 2, 'saving streak skips the week off (2 payday weeks)');
+  eq(R.streak(save, new Date(2026, 10, 25, 12)), { count: 2, current: false }, 'next week not done yet: streak alive');
 }
 eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys');
 

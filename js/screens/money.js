@@ -107,7 +107,7 @@ function paydayPanel(s) {
   const next = L.nextPayday(s.settings.pay, today());
   const target = s.settings.save.mode === 'percent' ? `${s.settings.save.percent}% of each paycheck` : `${money(s, s.settings.save.amount)} per paycheck`;
   let status;
-  if (st.offWeek) status = `<p class="mon-status is-on">${icon('check')} No payday this week: nothing to save.</p>`;
+  if (st.offWeek) status = `<p class="mon-status">No payday this week: a week off for your saving habit (no XP, streak safe).</p>`;
   else if (st.pending) status = `<p class="mon-status">Payday ${st.expected.map(shortDate).join(', ')}: log the paycheck to see what to save.</p>`;
   else status = `<p class="mon-status${st.hit ? ' is-on' : ''}">${st.hit ? icon('check') : ''} This week: saved ${money(s, st.saved)} of ${money(s, st.required)}</p>`;
   // One-tap saving for what's still owed this week (or the usual amount in an off week)
