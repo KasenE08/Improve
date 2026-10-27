@@ -12,6 +12,7 @@
 import * as store from './store.js';
 import * as H from './habits.js';
 import { dayKey, addDays, weekStart, periodRange, appNow, fromDayKey } from './dates.js';
+import { START, MONTHLY_START } from './launch.js';
 
 export const PERFECT_DAY_XP = 50;
 export const MILESTONES = [[7, 25], [30, 100], [100, 300]]; // [streak length, XP]
@@ -46,8 +47,22 @@ function doneIn(h, d, counts) {
   return n;
 }
 
+// Consecutive limit periods that earned their XP, counting back from the period containing d
+function limitRun(h, d, bonus = getBonus()) {
+  let n = 0;
+  for (let i = 0; i < 5000; i++) {
+    const [s, e] = periodRange(h.frequency, d);
+    if (!bonus[e]?.['limit:' + h.id]) break;
+    n++;
+    d = addDays(fromDayKey(s), -1);
+  }
+  return n;
+}
+
 // → { count, current: is this period already done }
+// Limit habits: finished periods kept at or under the limit; the current one is never "done" until it ends.
 export function streak(h, date = appNow(), counts = H.countsIndex()) {
+  if (H.isLimit(h)) return { count: limitRun(h, prevPeriod(h.frequency, date)), current: false };
   const current = doneIn(h, date, counts) >= h.target;
   let count = current ? 1 : 0;
   let d = prevPeriod(h.frequency, date);
@@ -68,13 +83,15 @@ export function sync(date = appNow()) {
   const day = (bonus[today] ||= {});
 
   // Perfect Day: every active daily habit done today
+  added.push(...settleLimits(date, bonus));
   const dailies = habits.filter((h) => h.frequency === 'daily');
-  const perfect = dailies.length > 0 && dailies.every((h) => (counts[h.id]?.[today] || 0) >= h.target);
+  const perfect = dailies.length > 0 && dailies.every((h) => H.isDone(h, counts[h.id]?.[today] || 0));
   if (perfect && !day.perfect) { day.perfect = { type: 'perfect', xp: PERFECT_DAY_XP }; added.push(day.perfect); }
   if (!perfect) delete day.perfect;
 
   // Streak milestones, one per habit per period
   for (const h of habits) {
+    if (H.isLimit(h)) continue; // limit milestones are added when a period is settled
     const id = 'streak:' + h.id;
     const [start] = periodRange(h.frequency, date);
     const holder = Object.keys(bonus).find((k) => k >= start && k <= today && bonus[k][id]);
@@ -102,9 +119,49 @@ export function awardPastPerfectDays(date = appNow()) {
   const bonus = getBonus();
   for (const k in log) {
     if (k >= today) continue;
-    if (dailies.every((h) => (log[k][h.id]?.n || 0) >= h.target)) (bonus[k] ||= {}).perfect = { type: 'perfect', xp: PERFECT_DAY_XP };
+    if (dailies.every((h) => H.isDone(h, log[k][h.id]?.n || 0))) (bonus[k] ||= {}).perfect = { type: 'perfect', xp: PERFECT_DAY_XP };
   }
   saveBonus(bonus);
+}
+
+// Limit habits ("at most N times"): once a period is over, it earns the habit's XP if uses stayed
+// at or under the limit, credited to the period's last day (bonus "limit:<id>"). Going over earns nothing
+// and loses nothing. Each period is judged once (imp_limit_settled remembers the last one judged), starting
+// from launch day (monthly: the first full habit month) or when the habit became a limit.
+// Returns the bonuses added (for celebrations).
+export function settleLimits(date = appNow(), bonus = getBonus()) {
+  const today = dayKey(date);
+  const settled = store.get('limit_settled', {});
+  const log = H.getLog();
+  const added = [];
+  for (const h of H.getHabits().filter(H.isLimit)) {
+    const next = settled[h.id] ? dayKey(addDays(fromDayKey(settled[h.id]), 1)) : null;
+    const from = [next, h.limitSince, START, h.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop();
+    let d = fromDayKey(from);
+    for (let i = 0; i < 1000; i++) {
+      const [, e] = periodRange(h.frequency, d);
+      if (e >= today) break; // period not over yet
+      const uses = H.progress(h, d, log);
+      if (uses <= h.target) {
+        const day = (bonus[e] ||= {});
+        const id = 'limit:' + h.id;
+        if (!day[id]) {
+          day[id] = { type: 'limit', habit: h.id, name: h.name, n: uses, max: h.target, unit: UNIT[h.frequency][0], xp: h.xp, c: h.category };
+          added.push(day[id]);
+          const run = limitRun(h, fromDayKey(e), bonus);
+          const mx = milestoneXP(run);
+          if (mx && !day['streak:' + h.id]) {
+            day['streak:' + h.id] = { type: 'streak', habit: h.id, name: h.name, n: run, unit: UNIT[h.frequency][1], xp: mx, c: h.category };
+            added.push(day['streak:' + h.id]);
+          }
+        }
+      }
+      settled[h.id] = e;
+      d = addDays(fromDayKey(e), 1);
+    }
+  }
+  store.set('limit_settled', settled);
+  return added;
 }
 
 // Current streaks for every active habit, longest first

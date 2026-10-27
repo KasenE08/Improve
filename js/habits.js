@@ -20,6 +20,13 @@ import { dayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 import { monthlyOpen } from './launch.js';
 
+// Habit kinds: a goal ("do it N times", the default) or a limit ("at most N times", e.g. fast food ≤ 2 a week).
+// Taps on a limit habit only count uses (no XP); its XP comes when the period ends at or under the limit (rewards.js).
+export const isLimit = (h) => h?.kind === 'limit';
+// Done for the period: goal reached, or for a limit, still at or under it
+export const isDone = (h, n) => (isLimit(h) ? n <= h.target : n >= h.target);
+export const LIMIT_MAX_USES = 99;
+
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
@@ -117,6 +124,15 @@ export function step(habit, delta, date = appNow()) {
   const today = dayKey(date);
   const done = progress(habit, date, log);
 
+  if (delta > 0 && isLimit(habit)) {
+    if (done >= LIMIT_MAX_USES || notStarted(habit, date)) return 0;
+    const e = ((log[today] ||= {})[habit.id] ||= { n: 0, xp: 0 });
+    e.n += 1;
+    e.xp = 0;
+    e.c = habit.category;
+    saveLog(log);
+    return 0; // uses never give XP directly
+  }
   if (delta > 0) {
     if (done >= habit.target || notStarted(habit, date)) return 0;
     const day = (log[today] ||= {});
@@ -140,6 +156,14 @@ export function step(habit, delta, date = appNow()) {
   if (!Object.keys(log[day]).length) delete log[day];
   saveLog(log);
   return -xp;
+}
+
+// When a habit becomes a limit: its taps this period become plain uses (no XP)
+export function clearPeriodXP(habit, date = appNow()) {
+  const log = getLog();
+  const [start, end] = periodRange(habit.frequency, date);
+  for (const day in log) if (day >= start && day <= end && log[day][habit.id]) log[day][habit.id].xp = 0;
+  saveLog(log);
 }
 
 // Auto habits never tick a day that hasn't started yet, and can wait until a time of day
