@@ -14,13 +14,13 @@ import * as H from './habits.js';
 import { dayKey, addDays, weekStart, periodRange, appNow, fromDayKey } from './dates.js';
 import { START, MONTHLY_START } from './launch.js';
 
-export const PERFECT_DAY_XP = 50;
-export const MILESTONES = [[7, 25], [30, 100], [100, 300]]; // [streak length, XP]
+export const PERFECT_DAY_XP = 100;
+export const MILESTONES = [[7, 50], [30, 200], [100, 600]]; // [streak length, XP]
 export const UNIT = { daily: ['day', 'days'], weekly: ['week', 'weeks'], monthly: ['month', 'months'] };
 
 export function milestoneXP(n) {
   for (const [len, xp] of MILESTONES) if (n === len) return xp;
-  if (n > 100 && n % 100 === 0) return 300; // every 100 after that
+  if (n > 100 && n % 100 === 0) return MILESTONES[2][1]; // every 100 after that
   return 0;
 }
 

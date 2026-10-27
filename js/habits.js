@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 6;
+export const SCHEMA = 7;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -39,7 +39,9 @@ export function init() {
   const found = store.get('schema') ?? 0;
   if (found === 0) {
     store.set('categories', DEFAULT_CATEGORIES);
-    store.set('habits', DEFAULT_HABITS);
+    // Limit habits are judged from install day on (no payout for weeks before the app was used)
+    const today = dayKey(appNow());
+    store.set('habits', DEFAULT_HABITS.map((h) => (h.kind === 'limit' ? { ...h, limitSince: today } : h)));
     store.set('profile', DEFAULT_PROFILE);
     store.set('log', {});
     store.set('bonus', {});
@@ -68,6 +70,37 @@ export function init() {
       shifted.push({ id: 'proactive', name: 'Be proactive', category: kw?.category || 'mind', frequency: 'daily', target: 1, xp: kw?.xp ?? 10, order: at, archived: false, auto: null });
       store.set('habits', shifted);
     }
+  }
+  // Schema 7: XP re-rated by difficulty × importance, Weekly review + Wardrobe review removed, and the level
+  // curve doubled to match. Ticks and bonuses so far are re-counted at the new amounts so levels stay put.
+  if (found > 0 && found < 7) {
+    const NEW_XP = Object.fromEntries(DEFAULT_HABITS.map((h) => [h.id, h.xp]));
+    const REMOVED = ['weekly-review', 'wardrobe-review'];
+    const habits = store.get('habits', []).map((h) => {
+      if (REMOVED.includes(h.id)) return { ...h, archived: true };
+      if (h.id in NEW_XP) return { ...h, xp: NEW_XP[h.id] };
+      if (/fast\s*food/i.test(h.name || '')) return { ...h, xp: 40 };
+      return { ...h, xp: h.xp * 2 }; // other habits you added keep the same weight on the new curve
+    });
+    store.set('habits', habits);
+    const byId = new Map(habits.map((h) => [h.id, h]));
+    const log = store.get('log', {});
+    for (const day in log) {
+      for (const id in log[day]) {
+        const e = log[day][id], h = byId.get(id);
+        if (!e.xp) continue; // limit uses stay at 0
+        e.xp = h && !h.archived ? h.xp : e.xp * 2;
+      }
+    }
+    store.set('log', log);
+    const bonus = store.get('bonus', {});
+    for (const day in bonus) {
+      for (const b of Object.values(bonus[day])) {
+        if (b.type === 'limit' && byId.get(b.habit)) b.xp = byId.get(b.habit).xp;
+        else b.xp *= 2; // Perfect Day 50 → 100, streak milestones doubled
+      }
+    }
+    store.set('bonus', bonus);
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

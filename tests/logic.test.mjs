@@ -14,7 +14,7 @@ eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnig
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
 const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 34, '34 preloaded habits');
+eq(H.getHabits().length, 32, '32 preloaded habits');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');
@@ -26,7 +26,7 @@ H.step(cut, 1, new Date(2026, 11, 8, 12)); eq(H.progress(cut, new Date(2026, 11,
 eq(H.progress(cut, new Date(2027, 0, 3, 12)), 1, 'Sun Jan 3 is still the December habit month');
 eq(H.progress(cut, new Date(2027, 0, 4, 12)), 0, 'monthly resets on the first Monday');
 eq(H.setDone({ ...cut, auto: 'x' }, '2026-10-30', true, new Date(2026, 9, 30, 12)), false, 'auto ticks blocked for monthly before Nov 2 too');
-eq(H.xpOnDay('2026-10-24'), 20 + 60, 'XP Sat = sleep 20 + 3 lifts');
+eq(H.xpOnDay('2026-10-24'), 30 + 180, 'XP Sat = sleep 30 + 3 lifts');
 H.step(lift, -1, mon); eq(H.progress(lift, sun), 5, 'undo Monday cannot touch last week');
 H.step(lift, -1, sun); eq(H.progress(lift, sun), 4, 'undo on Sun removes one');
 eq(JSON.parse(mem.imp_log)['2026-10-25'].lift.n, 1, 'undo took Sunday entry first');
@@ -63,7 +63,42 @@ H.init();
 const up = H.getHabits();
 eq(up.map((h) => h.id), ['journal', 'kept-word', 'proactive', 'fast-food'], 'upgrade: Be proactive sits right after Kept my word');
 const pro = up.find((h) => h.id === 'proactive');
-eq([pro.name, pro.category, pro.frequency, pro.target, pro.xp, pro.auto], ['Be proactive', 'mind', 'daily', 1, 15, null], 'upgrade: same category + XP as Kept my word (edited to 15)');
+eq([pro.name, pro.category, pro.frequency, pro.target, pro.xp, pro.auto], ['Be proactive', 'mind', 'daily', 1, 30, null], 'upgrade: added with Kept my word\'s category (XP then re-rated to 30 in schema 7)');
 eq(mem.imp_log, '{"2026-11-03":{"kept-word":{"n":1,"xp":15}}}', 'upgrade: history untouched');
 H.init();
 eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs once');
+
+// ---- Upgrade to schema 7: XP re-rated, two habits removed, history re-counted so the level stays put ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  const S = await import(R + 'stats.js');
+  mem.imp_schema = '6';
+  mem.imp_habits = JSON.stringify([
+    { id: 'sleep', name: '7–9 hrs sleep', category: 'body', frequency: 'daily', target: 1, xp: 20, order: 0 },
+    { id: 'calories', name: 'Hit calories', category: 'diet', frequency: 'daily', target: 1, xp: 20, order: 1, auto: 'food:calories' },
+    { id: 'weekly-review', name: 'Weekly review', category: 'mind', frequency: 'weekly', target: 1, xp: 25, order: 2 },
+    { id: 'wardrobe-review', name: 'Wardrobe review', category: 'style', frequency: 'monthly', target: 1, xp: 50, order: 3 },
+    { id: 'h_abc', name: 'Fast food ≤2', category: 'diet', frequency: 'weekly', target: 2, xp: 25, order: 4, kind: 'limit', limitSince: '2026-10-26' },
+    { id: 'h_mine', name: 'Read 10 pages', category: 'mind', frequency: 'daily', target: 1, xp: 10, order: 5 },
+  ]);
+  mem.imp_log = JSON.stringify({
+    '2026-10-26': { sleep: { n: 1, xp: 20, c: 'body' }, calories: { n: 1, xp: 20, c: 'diet' }, 'weekly-review': { n: 1, xp: 25, c: 'mind' }, h_abc: { n: 1, xp: 0, c: 'diet' }, h_mine: { n: 1, xp: 10, c: 'mind' } },
+  });
+  mem.imp_bonus = JSON.stringify({ '2026-10-26': { perfect: { type: 'perfect', xp: 50 }, 'streak:sleep': { type: 'streak', xp: 25, c: 'body' } }, '2026-11-01': { 'limit:h_abc': { type: 'limit', habit: 'h_abc', xp: 25, c: 'diet' } } });
+  const before = 20 + 20 + 25 + 10 + 50 + 25 + 25; // 175 XP on the old curve
+  H.init();
+  const hs = Object.fromEntries(JSON.parse(mem.imp_habits).map((h) => [h.id, h]));
+  eq([hs.sleep.xp, hs.calories.xp], [30, 60], 'schema 7: default habits get their new XP');
+  eq([hs['weekly-review'].archived, hs['wardrobe-review'].archived], [true, true], 'schema 7: Weekly review + Wardrobe review removed');
+  eq([hs.h_abc.xp, hs.h_abc.kind], [40, 'limit'], 'schema 7: your fast food limit → 40 XP');
+  eq(hs.h_mine.xp, 20, 'schema 7: other habits you added are doubled to keep their weight');
+  const log = JSON.parse(mem.imp_log)['2026-10-26'];
+  eq([log.sleep.xp, log.calories.xp, log['weekly-review'].xp, log.h_abc.xp, log.h_mine.xp], [30, 60, 50, 0, 20], 'schema 7: ticks so far re-counted (removed habit doubled, uses stay 0)');
+  const bonus = JSON.parse(mem.imp_bonus);
+  eq([bonus['2026-10-26'].perfect.xp, bonus['2026-10-26']['streak:sleep'].xp, bonus['2026-11-01']['limit:h_abc'].xp], [100, 50, 40], 'schema 7: Perfect Day 100, milestone doubled, limit payout = new XP');
+  const after = S.compute().total;
+  eq(after, 30 + 60 + 50 + 20 + 100 + 50 + 40, 'schema 7: total re-counted');
+  eq(after >= before * 2 - 20, true, 'schema 7: total at least doubles (curve doubled) so the level never drops');
+  H.init();
+  eq(JSON.parse(mem.imp_habits).find((h) => h.id === 'sleep').xp, 30, 'schema 7 runs once');
+}

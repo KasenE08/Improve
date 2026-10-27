@@ -51,7 +51,7 @@ export function render(root) {
       title: 'Bonus XP',
       body: `<div class="prof-bonus"><span>Perfect Day (all dailies)</span><span class="imp-accent">+${R.PERFECT_DAY_XP}</span></div>
         ${R.MILESTONES.map(([n, xp]) => `<div class="prof-bonus"><span>${n}-period streak</span><span class="imp-accent">+${xp}</span></div>`).join('')}
-        <div class="prof-bonus"><span>Every 100 after that</span><span class="imp-accent">+300</span></div>
+        <div class="prof-bonus"><span>Every 100 after that</span><span class="imp-accent">+${R.MILESTONES[2][1]}</span></div>
         <p class="prof-note">A period is a day, week or month depending on the habit. Missing one resets the streak; you never lose XP.</p>`,
     })}
     ${panel({

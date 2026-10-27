@@ -18,13 +18,13 @@ const eq = (a, b, m) => {
 };
 
 // ---- Level curve (2× faster: 150 + 30 per level) ----
-eq(L.need(1), 150, 'LV1→2 needs 150');
-eq(L.need(10), 420, 'LV10→11 needs 420');
+eq(L.need(1), 300, 'LV1→2 needs 300');
+eq(L.need(10), 840, 'LV10→11 needs 840');
 eq(L.levelFromXP(0).level, 1, '0 XP = LV1');
-eq(L.levelFromXP(149).level, 1, '149 XP = LV1');
-eq(L.levelFromXP(150).level, 2, '150 XP = LV2');
-eq(L.xpToReach(10), 2430, 'LV10 at 2,430 total XP');
-eq(L.xpToReach(50), 42630, 'LV50 at 42,630 total XP');
+eq(L.levelFromXP(299).level, 1, '299 XP = LV1');
+eq(L.levelFromXP(300).level, 2, '300 XP = LV2');
+eq(L.xpToReach(10), 4860, 'LV10 at 4,860 total XP');
+eq(L.xpToReach(50), 85260, 'LV50 at 85,260 total XP');
 eq(L.levelFromXP(L.xpToReach(50)).level, 50, 'levelFromXP matches xpToReach');
 eq(L.rankFor(1).name, 'Initiate', 'rank LV1');
 eq(L.rankFor(9).name, 'Apprentice', 'rank LV9');
@@ -48,9 +48,9 @@ const found = H.init();
 eq(found, 1, 'init reports old schema 1');
 eq(H.getProfile().name, 'TESTER', 'profile kept');
 R.awardPastPerfectDays(new Date(2026, 9, 24));
-eq(R.getBonus()['2026-10-20']?.perfect?.xp, 50, 'past perfect day awarded on upgrade');
-eq(S.compute().total, 225 + 50, 'total XP = 225 dailies + 50 bonus');
-eq(S.compute().categories.find((c) => c.id === 'body').xp, 40, 'old entries count toward category via habit');
+eq(R.getBonus()['2026-10-20']?.perfect?.xp, 100, 'past perfect day awarded on upgrade');
+eq(S.compute().total, 470 + 100, 'total XP = 470 dailies + 100 bonus');
+eq(S.compute().categories.find((c) => c.id === 'body').xp, 60, 'old entries count toward category via habit');
 
 // ---- Perfect Day: earned and undone ----
 const sat = new Date(2026, 9, 24, 10);
@@ -58,8 +58,8 @@ const hs = H.getHabits();
 for (const h of hs.filter((h) => h.frequency === 'daily')) H.step(h, 1, sat);
 let added = R.sync(sat);
 eq(added.some((b) => b.type === 'perfect'), true, 'perfect day added when all dailies done');
-eq(S.today(sat).earned, 225 + 50, 'daily meter includes bonus');
-eq(S.today(sat).max, 225 + 50, 'daily meter full on perfect day');
+eq(S.today(sat).earned, 470 + 100, 'daily meter includes bonus');
+eq(S.today(sat).max, 470 + 100, 'daily meter full on perfect day');
 H.step(hs.find((h) => h.id === 'journal'), -1, sat);
 R.sync(sat);
 eq(!!R.getBonus()['2026-10-24']?.perfect, false, 'undo removes perfect day');
@@ -74,7 +74,7 @@ eq(R.streak(sleep, addDays(start, 5)).count, 6, '6-day streak');
 eq(R.streak(sleep, addDays(start, 6)), { count: 6, current: false }, 'streak alive before today is done');
 H.step(sleep, 1, addDays(start, 6));
 added = R.sync(addDays(start, 6));
-eq(added.map((b) => [b.type, b.n, b.xp]), [['streak', 7, 25]], '7-day milestone +25');
+eq(added.map((b) => [b.type, b.n, b.xp]), [['streak', 7, 50]], '7-day milestone +50');
 eq(R.sync(addDays(start, 6)).length, 0, 'milestone not awarded twice');
 H.step(sleep, -1, addDays(start, 6)); R.sync(addDays(start, 6));
 eq(Object.values(R.getBonus()['2026-11-07'] || {}).length, 0, 'undo removes milestone');
@@ -102,7 +102,7 @@ eq(!!R.getBonus()['2027-01-20']['streak:family'], true, 'later sync same week ke
 // ---- Category meters are scaled ----
 const st = S.compute();
 const pot = S.weeklyPotential();
-eq(Math.round(pot.total), Math.round(225 * 7 + 275 + 300 * 12 / 52), 'weekly potential total');
+eq(Math.round(pot.total), Math.round(470 * 7 + 525 + 320 * 12 / 52), 'weekly potential total');
 const people = st.categories.find((c) => c.id === 'people');
 eq(people.scale < 0.05, true, 'People curve scaled down');
 eq(st.categories.every((c) => c.level >= 1), true, 'all categories have a level');
