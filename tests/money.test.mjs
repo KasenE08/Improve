@@ -30,28 +30,38 @@ eq(L.paydaysBetween({ freq: 'irregular' }, '2026-10-01', '2026-12-31'), [], 'irr
 eq(L.paydaysBetween({ freq: 'biweekly', anchor: null }, '2026-10-01', '2026-12-31'), [], 'no anchor yet: none');
 eq(L.nextPayday(bi, '2026-10-24'), '2026-11-06', 'next payday');
 
-// ---- save check (fixed $40 every 2 weeks, anchor Fri Oct 23) ----
-const st = (entries, save = { mode: 'amount', amount: 4000, percent: 20 }, setup = true) => ({
-  settings: { pay: bi, save, setup }, entries, categories: [], reviews: {},
+// ---- paycheck split ----
+const sp85 = { rest: 'checking', parts: [{ account: 'savings', mode: 'percent', value: 85 }] };
+eq(L.splitPaycheck(sp85, 12198), [{ account: 'savings', amount: 10368 }, { account: 'checking', amount: 1830 }], '85% of $121.98 → Savings $103.68, rest $18.30');
+const sp3 = { rest: 'checking', parts: [{ account: 'savings', mode: 'percent', value: 50 }, { account: 'car', mode: 'amount', value: 2000 }] };
+eq(L.splitPaycheck(sp3, 100000), [{ account: 'savings', amount: 50000 }, { account: 'car', amount: 2000 }, { account: 'checking', amount: 48000 }], 'mix % and fixed $');
+eq(L.splitPaycheck(sp3, 3000), [{ account: 'savings', amount: 1500 }, { account: 'car', amount: 1500 }], 'fixed $ never takes more than what is left');
+eq(L.splitPaycheck({ rest: 'checking', parts: [] }, 5000), [{ account: 'checking', amount: 5000 }], 'no parts: all to the rest account');
+eq(L.splitPaycheck({ rest: 'savings', parts: [{ account: 'savings', mode: 'percent', value: 50 }] }, 1000), [{ account: 'savings', amount: 1000 }], 'a part on the rest account is ignored');
+eq(L.setAside(sp3, L.splitPaycheck(sp3, 100000)), 52000, 'set aside = everything not going to the rest account');
+eq(L.entryMoves({ kind: 'income', amount: 12198, splits: [{ account: 'savings', amount: 10368 }, { account: 'checking', amount: 1830 }] }), [['savings', 10368], ['checking', 1830]], 'a split paycheck deposits into each account');
+eq(L.entryMoves({ kind: 'income', amount: 500 }), [['checking', 500]], 'old paychecks without a split go to checking');
+
+// ---- save check (every 2 weeks, anchor Fri Oct 23; split 85% to Savings) ----
+const st = (entries, split = sp85, setup = true) => ({
+  settings: { pay: bi, split, setup }, entries, categories: [], reviews: {},
 });
 const payWeek = new Date(2026, 9, 21, 12); // Wed in the week of Oct 19–25 (payday Fri 23)
 const offWeek = new Date(2026, 9, 28, 12); // week of Oct 26–Nov 1 (no payday)
-eq(L.saveStatus(st([]), offWeek).offWeek && L.saveStatus(st([]), offWeek).hit, true, 'off week counts as done');
-eq(L.saveStatus(st([]), payWeek).hit, false, 'payday week, nothing saved');
-eq(L.saveStatus(st([{ kind: 'saving', amount: 3000, date: '2026-10-23' }]), payWeek).hit, false, '$30 saved < $40');
-eq(L.saveStatus(st([{ kind: 'saving', amount: 4000, date: '2026-10-23' }]), payWeek).hit, true, '$40 saved: done');
-eq(L.saveStatus(st([{ kind: 'saving', amount: 4000, date: '2026-10-16' }]), payWeek).hit, false, 'saving from last week does not count');
+const paid = (splits) => ({ kind: 'income', amount: splits.reduce((t, x) => t + x.amount, 0), date: '2026-10-23', splits });
+eq(L.saveStatus(st([]), offWeek).offWeek, true, 'no payday: week off');
+eq(L.saveStatus(st([]), payWeek).pending, true, 'payday, paycheck not logged yet → pending');
+eq(L.saveStatus(st([paid([{ account: 'savings', amount: 42500 }, { account: 'checking', amount: 7500 }])]), payWeek).hit, true, '$500 paycheck split 85% → done');
+eq(L.saveStatus(st([paid([{ account: 'savings', amount: 40000 }, { account: 'checking', amount: 10000 }])]), payWeek).hit, false, 'split changed to less than 85% → not done');
+eq(L.saveStatus(st([paid([{ account: 'savings', amount: 40000 }, { account: 'checking', amount: 10000 }]), { kind: 'transfer', amount: 2500, from: 'checking', to: 'savings', date: '2026-10-24' }]), payWeek).hit, true, 'make it up with a move from checking that week');
+eq(L.saveStatus(st([{ kind: 'income', amount: 50000, date: '2026-10-23' }, { kind: 'saving', amount: 42500, date: '2026-10-23' }]), payWeek).hit, true, 'older "To savings" entries still count');
+eq(L.saveStatus(st([{ kind: 'income', amount: 50000, date: '2026-10-16' }]), payWeek).pending, true, 'last week\'s paycheck does not count');
 eq(L.saveStatus(st([], undefined, false), payWeek).judge, false, 'not set up: not judged');
-// percent mode
-const pct = { mode: 'percent', amount: 0, percent: 20 };
-eq(L.saveStatus(st([{ kind: 'saving', amount: 9999, date: '2026-10-23' }], pct), payWeek).pending, true, 'percent: paycheck not logged yet → pending');
-const pay = { kind: 'income', amount: 50000, date: '2026-10-23' };
-eq(L.saveStatus(st([pay, { kind: 'saving', amount: 9999, date: '2026-10-23' }], pct), payWeek).hit, false, '20% of $500 = $100: $99.99 not enough');
-eq(L.saveStatus(st([pay, { kind: 'saving', amount: 10000, date: '2026-10-24' }], pct), payWeek).hit, true, '20% of $500: $100 saved');
+const noSplit = { rest: 'checking', parts: [] };
+eq(L.saveStatus(st([paid([{ account: 'checking', amount: 50000 }])], noSplit), payWeek).hit, true, 'nothing to set aside: logging the paycheck is enough');
 // irregular: a logged paycheck creates the obligation
-const irr = { settings: { pay: { freq: 'irregular' }, save: { mode: 'amount', amount: 4000 }, setup: true }, entries: [{ kind: 'income', amount: 30000, date: '2026-10-28' }] };
-eq(L.saveStatus(irr, offWeek).hit, false, 'irregular: paycheck logged, not saved yet');
-eq(L.saveTarget({ mode: 'percent', percent: 15 }, 33333), 5000, '15% of $333.33 rounds to $50');
+const irr = { settings: { pay: { freq: 'irregular' }, split: sp85, setup: true }, entries: [{ kind: 'income', amount: 30000, date: '2026-10-28', splits: [{ account: 'checking', amount: 30000 }] }] };
+eq(L.saveStatus(irr, offWeek).hit, false, 'irregular: paycheck logged all to checking → not saved');
 
 // ---- month summary ----
 const m = L.monthSummary({ categories: [{ id: 'food', budget: 20000 }, { id: 'fun', budget: 5000 }], entries: [
@@ -94,10 +104,11 @@ eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
 {
   const since = '2026-10-27T05:00:00.000Z';
   const st = {
-    settings: { setup: true, pay: { freq: 'biweekly', anchor: '2026-10-30' }, save: { mode: 'amount', amount: 4000 } },
+    settings: { setup: true, pay: { freq: 'biweekly', anchor: '2026-10-30' }, split: { rest: 'checking', parts: [{ account: 'savings', mode: 'amount', value: 4000 }] } },
     accounts: [{ id: 'checking', start: 30, since }, { id: 'savings', start: 109646, since }],
     entries: [
       { kind: 'saving', amount: 109546, date: '2026-10-26', at: '2026-10-26T20:00:00.000Z' }, // logged old balance before setup
+      { kind: 'income', amount: 50000, date: '2026-10-30', at: '2026-10-30T17:00:00.000Z' },
       { kind: 'saving', amount: 4000, date: '2026-10-30', at: '2026-10-30T18:00:00.000Z' },
       { kind: 'transfer', amount: 1000, from: 'savings', to: 'checking', date: '2026-10-31', at: '2026-10-31T18:00:00.000Z' },
     ],
@@ -109,7 +120,7 @@ eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
   eq(L.accountChange(st, 'savings', '2026-11'), 0, 'nothing in November yet');
   const wk = L.saveStatus(st, new Date(2026, 9, 28, 12));
   eq([wk.saved, wk.hit], [4000, true], 'paycheck habit: only the real $40 counts, not the old balance');
-  const noSave = { ...st, entries: [st.entries[0]] };
+  const noSave = { ...st, entries: [st.entries[0], st.entries[1]] };
   eq(L.saveStatus(noSave, new Date(2026, 9, 28, 12)).hit, false, 'old balance logged as a saving no longer ticks the habit');
 }
 
@@ -129,7 +140,11 @@ A.recheckMoney(payWeek, payWeek);
 eq(done('save-paycheck', '2026-10-21'), false, 'payday week: not yet');
 M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
 A.recheckMoney(payWeek, payWeek);
-eq(done('save-paycheck', '2026-10-21'), true, 'saved $40: ticked');
+eq(done('save-paycheck', '2026-10-21'), false, 'saved $40 but paycheck not logged yet: pending');
+eq(M.getState().settings.split, { rest: 'checking', parts: [{ account: 'savings', mode: 'amount', value: 4000 }] }, 'old "save $40 per paycheck" becomes the split');
+M.upsertEntry({ kind: 'income', amount: 50000, date: '2026-10-23', note: '' });
+A.recheckMoney(payWeek, payWeek);
+eq(done('save-paycheck', '2026-10-21'), true, 'paycheck logged + $40 saved: ticked');
 { const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 1, 'rechecking later in the week adds no second check-in');
 const id = M.getState().entries[0].id;

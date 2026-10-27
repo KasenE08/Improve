@@ -17,8 +17,10 @@ export const DEFAULT_SETTINGS = {
   currency: '$',
   // anchor: any known payday (YYYY-MM-DD) for weekly / every-2-weeks schedules
   pay: { freq: 'biweekly', anchor: null, days: [1, 15], day: 1 },
-  // mode 'amount': save `amount` cents per paycheck; mode 'percent': save `percent` % of each paycheck
+  // Older versions: how much to save per paycheck. Only read once, to build the paycheck split below.
   save: { mode: 'amount', amount: 4000, percent: 20 },
+  // How each paycheck is divided between accounts (see logic.js splitPaycheck). null = from `save`.
+  split: null,
   setup: false, // true once paydays are set in Money → Settings
 };
 
@@ -35,10 +37,14 @@ export function getState() {
   const s = store.get(KEY, null);
   if (!s) return empty();
   const d = DEFAULT_SETTINGS;
-  return {
-    ...empty(), ...s,
-    settings: { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save } },
-  };
+  const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save } };
+  settings.split ||= splitFromSave(settings.save);
+  return { ...empty(), ...s, settings };
+}
+// The old "save X% / $X per paycheck" becomes the first paycheck split: that much to Savings, the rest to Checking.
+function splitFromSave(sv) {
+  const percent = sv.mode === 'percent';
+  return { rest: 'checking', parts: [{ account: 'savings', mode: percent ? 'percent' : 'amount', value: percent ? sv.percent : sv.amount }] };
 }
 const save = (s) => store.set(KEY, s);
 const update = (fn) => { const s = getState(); fn(s); save(s); return s; };

@@ -87,7 +87,7 @@ function overview(s) {
     ${current ? `<div class="imp-btn-row mon-add">
       <button class="imp-btn imp-btn--primary" data-m="add" data-kind="expense">${icon('plus')}Expense</button>
       <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="income">Paycheck</button>
-      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="saving">To savings</button></div>` : ''}`;
+      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="${s.accounts?.length ? 'transfer' : 'saving'}">${s.accounts?.length ? 'Move money' : 'Saving'}</button></div>` : ''}`;
 
   const cats = s.categories.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('');
   const orphan = Object.keys(sum.byCat).filter((id) => !s.categories.some((c) => c.id === id)).reduce((t, id) => t + sum.byCat[id], 0);
@@ -122,9 +122,7 @@ function accountsPanel(s) {
       <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span><span class="mon-row__sub">Tap to match your bank</span></span>
       <span class="mon-row__amt${bal[a.id] < 0 ? ' mon-over' : ''}">${money(s, bal[a.id])}</span></button>`).join('');
   return box('Accounts', `${rows}
-    <div class="imp-btn-row mon-add">
-      <button class="imp-btn imp-btn--secondary imp-btn--sm" data-m="add" data-kind="transfer">Move money</button>
-      <button class="imp-btn imp-btn--ghost imp-btn--sm" data-m="acct-add">${icon('plus')}Account</button></div>`, icon('bank'));
+    <button class="imp-btn imp-btn--ghost imp-btn--sm mon-acct-add" data-m="acct-add">${icon('plus')}Add account</button>`, icon('bank'));
 }
 
 function openAccountSetup() {
@@ -214,28 +212,29 @@ function openAddAccount() {
   });
 }
 
+// "Savings 85% · Car $20 · rest → Checking"
+function splitText(s, sp) {
+  const parts = (sp?.parts || []).filter((p) => p.value && p.account !== sp.rest && s.accounts?.some((a) => a.id === p.account))
+    .map((p) => `${acctName(s, p.account)} ${p.mode === 'percent' ? `${p.value}%` : money(s, p.value)}`);
+  return [...parts, `rest → ${acctName(s, sp?.rest || 'checking')}`].join(' · ');
+}
+
 function paydayPanel(s) {
   if (!s.settings.setup) {
-    return box('Paydays', `<div class="mon-stack"><p class="mon-note">Set your pay schedule and how much to save, and your paycheck-saving habit will tick itself on the Today tab.</p>
+    return box('Paydays', `<div class="mon-stack"><p class="mon-note">Set your pay schedule and how each paycheck is split, and your paycheck-saving habit will tick itself on the Today tab.</p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-m="sub" data-sub="settings">Set up paydays</button></div>`, icon('piggy'));
   }
   const st = L.saveStatus(s);
   const next = L.nextPayday(s.settings.pay, today());
-  const target = s.settings.save.mode === 'percent' ? `${s.settings.save.percent}% of each paycheck` : `${money(s, s.settings.save.amount)} per paycheck`;
   let status;
   if (st.offWeek) status = `<p class="mon-status">No payday this week: a week off for your saving habit (no XP, streak safe).</p>`;
-  else if (st.pending) status = `<p class="mon-status">Payday ${st.expected.map(shortDate).join(', ')}: log the paycheck to see what to save.</p>`;
-  else status = `<p class="mon-status${st.hit ? ' is-on' : ''}">${st.hit ? icon('check') : ''} This week: saved ${money(s, st.saved)} of ${money(s, st.required)}</p>`;
-  // One-tap saving for what's still owed this week (or the usual amount in an off week)
-  const quick = st.hit && !st.offWeek ? 0 : !st.offWeek && !st.pending ? Math.max(0, st.required - st.saved) : s.settings.save.mode === 'amount' ? s.settings.save.amount : 0;
+  else if (st.pending) status = `<p class="mon-status">Payday ${st.expected.map(shortDate).join(', ')}: log the paycheck and it splits itself.</p>`;
+  else status = `<p class="mon-status${st.hit ? ' is-on' : ''}">${st.hit ? icon('check') : ''} This week: set aside ${money(s, st.saved)} of ${money(s, st.required)}</p>`;
   return box('Paydays', `<div class="mon-stack">
       <div class="mon-pay"><span class="imp-label">Next payday</span><b>${next === today() ? 'Today' : next ? shortDate(next) : '—'}</b></div>
-      <div class="mon-pay"><span class="imp-label">Save</span><b>${target}</b></div>
+      <div class="mon-pay"><span class="imp-label">Split</span><b>${esc(splitText(s, s.settings.split))}</b></div>
       ${status}
-      <div class="imp-btn-row">
-        <button class="imp-btn imp-btn--secondary imp-btn--sm" data-m="add" data-kind="income">Log paycheck</button>
-        ${quick ? `<button class="imp-btn imp-btn--primary imp-btn--sm" data-m="quick-save" data-amount="${quick}">${icon('piggy')}Save ${money(s, quick)}</button>` : ''}
-      </div></div>`, icon('piggy'));
+      <button class="imp-btn imp-btn--primary imp-btn--block" data-m="add" data-kind="income">Log paycheck</button></div>`, icon('piggy'));
 }
 
 function reviewPanel(s) {
@@ -260,7 +259,8 @@ function history(s) {
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll' }[e.kind] || c?.icon || 'cash';
     const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
     const sub = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money'
-      : L.beforeTracking(s, e) ? 'Before tracking · already in balance' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense') : KIND[e.kind];
+      : L.beforeTracking(s, e) ? 'Before tracking · already in balance' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense')
+      : e.kind === 'income' && e.splits?.length > 1 ? e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ') : KIND[e.kind];
     return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon(ic, `mon-row__icon mon-k-${e.kind}`)}
       <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
       <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' || e.kind === 'transfer' || e.amount < 0 ? '' : '+'}${money(s, e.amount)}</span></button>`;
@@ -289,9 +289,7 @@ function budget(s) {
 
 function settings(s) {
   const p = s.settings.pay;
-  const sv = s.settings.save;
   const f = ui.payFreq || p.freq;
-  const mode = ui.saveMode || sv.mode;
   const fields = {
     weekly: `<label class="imp-field"><span class="imp-label">A recent payday</span><input class="imp-input" type="date" id="p-anchor" value="${p.anchor || ''}"></label>`,
     biweekly: `<label class="imp-field"><span class="imp-label">A recent payday</span><input class="imp-input" type="date" id="p-anchor" value="${p.anchor || ''}"></label>`,
@@ -303,13 +301,7 @@ function settings(s) {
   return `${box('Pay schedule', `<div class="mon-stack">
       <div class="imp-seg mon-seg">${Object.entries(L.FREQS).map(([k, v]) => `<button data-m="freq" data-freq="${k}" class="${f === k ? 'is-on' : ''}">${v}</button>`).join('')}</div>
       ${fields}</div>`, icon('bank'))}
-    ${box('Saving', `<div class="mon-stack">
-      <div class="imp-seg"><button data-m="mode" data-mode="amount" class="${mode === 'amount' ? 'is-on' : ''}">Fixed amount</button>
-        <button data-m="mode" data-mode="percent" class="${mode === 'percent' ? 'is-on' : ''}">% of paycheck</button></div>
-      ${mode === 'amount'
-        ? `<label class="imp-field"><span class="imp-label">Save per paycheck</span><span class="food-unit"><input class="imp-input" id="s-amount" inputmode="decimal" value="${sv.amount / 100}"><span>${esc(s.settings.currency)}</span></span></label>`
-        : `<label class="imp-field"><span class="imp-label">Save of each paycheck</span><span class="food-unit"><input class="imp-input" id="s-percent" inputmode="decimal" value="${sv.percent}"><span>%</span></span></label>`}
-      <p class="mon-note">Your paycheck-saving habit on the Today tab ticks when you've logged that much saving in a payday week. Weeks without a payday tick on their own.</p></div>`, icon('piggy'))}
+    ${splitBox(s)}
     ${box('Other', `<div class="mon-stack">
       <label class="imp-field"><span class="imp-label">Currency symbol</span><input class="imp-input" id="s-cur" maxlength="3" value="${esc(s.settings.currency)}"></label>
       <p class="food-err" id="s-err"></p>
@@ -317,10 +309,34 @@ function settings(s) {
       <p class="mon-note">Money data is included in Improve's backup on the Profile tab.</p></div>`)}`;
 }
 
+// Paycheck split editor (works on a draft until Save settings)
+const splitDraft = (s) => (ui.split ||= structuredClone(s.settings.split));
+function splitBox(s) {
+  const accts = s.accounts || [];
+  if (!accts.length) {
+    return box('Paycheck split', `<div class="mon-stack"><p class="mon-note">Set up your accounts on Overview first. Then choose how each paycheck is divided: a % or a fixed amount into any account, the rest into your spending account.</p></div>`, icon('piggy'));
+  }
+  const sp = splitDraft(s);
+  const rows = accts.filter((a) => a.id !== sp.rest).map((a) => {
+    const part = sp.parts.find((x) => x.account === a.id) || { mode: 'percent', value: 0 };
+    const val = part.value ? (part.mode === 'percent' ? part.value : part.value / 100) : '';
+    return `<div class="mon-split">${icon(a.icon || 'cash', 'mon-split__icon')}<span class="mon-split__name">${esc(a.name)}</span>
+      <div class="imp-seg mon-split__mode"><button data-m="split-mode" data-id="${esc(a.id)}" data-mode="percent" class="${part.mode === 'percent' ? 'is-on' : ''}">%</button><button data-m="split-mode" data-id="${esc(a.id)}" data-mode="amount" class="${part.mode === 'amount' ? 'is-on' : ''}">${esc(s.settings.currency)}</button></div>
+      <input class="imp-input mon-split__val" data-split="${esc(a.id)}" inputmode="decimal" placeholder="0" value="${val}" aria-label="${esc(a.name)} share"></div>`;
+  }).join('');
+  const ex = L.splitPaycheck(sp, 100000).map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ');
+  return box('Paycheck split', `<div class="mon-stack">
+    <p class="mon-note">Each paycheck is divided as it's logged. Set a % or a fixed amount for any account; leave blank for none.</p>
+    ${rows}
+    <div class="imp-field"><span class="imp-label">Rest goes to</span><div class="mon-chips">${accts.map((a) => `<button type="button" data-m="split-rest" data-id="${esc(a.id)}" class="mon-chip${sp.rest === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>
+    <p class="mon-note" id="split-ex">Example: a $1,000 paycheck → ${esc(ex)}</p>
+    <p class="mon-note">Your paycheck-saving habit ticks in payday weeks once the paycheck is logged with at least this much set aside (everything not going to "${esc(acctName(s, sp.rest))}").</p></div>`, icon('piggy'));
+}
+
 // ---------- Sheets ----------
 function openEntry(kind, e = null) {
   const s = M.getState();
-  const cur = e || { kind, amount: kind === 'saving' && s.settings.save.mode === 'amount' ? s.settings.save.amount : 0, cat: s.categories[0]?.id, note: '', date: today() };
+  const cur = e || { kind, amount: 0, cat: s.categories[0]?.id, note: '', date: today() };
   let k = cur.kind;
   let cat = cur.cat || s.categories[0]?.id;
   // Accounts (once set up): which account an entry uses
@@ -329,13 +345,31 @@ function openEntry(kind, e = null) {
   let acct = cur.account || 'checking';
   let [from, to] = cur.from ? [cur.from, cur.to] : pairFor(k);
   const chips = (field, sel) => `<div class="mon-chips">${accts.map((a) => `<button type="button" data-acct="${field}" data-id="${esc(a.id)}" class="mon-chip${sel === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div>`;
+  // Paycheck split: pre-filled from Settings, editable for this one paycheck; the rest is worked out live
+  const rule = s.settings.split;
+  const restAcct = accts.find((a) => a.id === rule.rest) || accts[0];
+  const splitAccts = accts.filter((a) => a.id !== restAcct?.id);
+  const over = {}; // amounts typed by hand for this paycheck
+  if (cur.splits) for (const x of cur.splits) if (x.account !== restAcct?.id) over[x.account] = x.amount;
+  const shares = (amount) => {
+    const def = Object.fromEntries(L.splitPaycheck(rule, amount).map((x) => [x.account, x.amount]));
+    const vals = splitAccts.map((a) => [a, a.id in over ? over[a.id] : def[a.id] || 0]);
+    return { vals, rest: amount - vals.reduce((t, [, v]) => t + v, 0) };
+  };
+  const splitRows = (amount) => {
+    const { vals, rest } = shares(amount);
+    return `${vals.map(([a, v]) => `<div class="mon-split">${icon(a.icon || 'cash', 'mon-split__icon')}<span class="mon-split__name">${esc(a.name)}</span>
+        <input class="imp-input mon-split__val" data-esplit="${esc(a.id)}" inputmode="decimal" placeholder="0" value="${v ? v / 100 : ''}" aria-label="${esc(a.name)} amount"></div>`).join('')}
+      <div class="mon-split is-rest">${icon(restAcct.icon || 'cash', 'mon-split__icon')}<span class="mon-split__name">${esc(restAcct.name)} <small>(rest)</small></span><b id="e-rest" class="${rest < 0 ? 'mon-over' : ''}">${money(s, rest)}</b></div>`;
+  };
   const acctFields = () => {
     if (!accts.length) return '';
     if (k === 'expense') return `<div class="imp-field"><span class="imp-label">Paid from</span>${chips('acct', acct)}</div>`;
-    if (k === 'income') return `<div class="imp-field"><span class="imp-label">Into</span>${chips('acct', acct)}</div>`;
+    if (k === 'income') return `<div class="imp-field"><span class="imp-label">Split</span><div id="e-split">${splitRows(cur.amount || 0)}</div></div>`;
     return `<div class="imp-field"><span class="imp-label">From</span>${chips('from', from)}</div><div class="imp-field"><span class="imp-label">To</span>${chips('to', to)}</div>`;
   };
-  const kinds = Object.entries(KIND).filter(([id]) => id !== 'transfer' || accts.length);
+  // "Move" needs accounts; the old "To savings" only shows without accounts (or when editing an old one)
+  const kinds = Object.entries(KIND).filter(([id]) => (id !== 'transfer' || accts.length) && (id !== 'saving' || !accts.length || cur.kind === 'saving'));
   const body = () => `
     <div class="imp-seg">${kinds.map(([id, v]) => `<button type="button" data-k="${id}" class="${k === id ? 'is-on' : ''}">${v}</button>`).join('')}</div>
     <label class="imp-field"><span class="imp-label">Amount</span><span class="food-unit"><input class="imp-input mon-amt" id="e-amt" inputmode="decimal" placeholder="0.00" value="${cur.amount ? cur.amount / 100 : ''}" autocomplete="off"><span>${esc(s.settings.currency)}</span></span></label>
@@ -370,8 +404,15 @@ function openEntry(kind, e = null) {
           const date = b.querySelector('#e-date').value || today();
           const moving = k === 'saving' || k === 'transfer';
           if (accts.length && moving && from === to) { b.querySelector('#e-err').textContent = 'Pick two different accounts.'; return; }
-          const entry = { ...(e || {}), kind: k, amount, note: b.querySelector('#e-note').value.trim(), date, cat: k === 'expense' ? cat : undefined,
-            account: accts.length && !moving ? acct : undefined, from: accts.length && moving ? from : undefined, to: accts.length && moving ? to : undefined };
+          let splits;
+          if (k === 'income' && accts.length) {
+            const { vals, rest } = shares(amount);
+            if (rest < 0) { b.querySelector('#e-err').textContent = 'The split is more than the paycheck.'; return; }
+            splits = vals.filter(([, v]) => v > 0).map(([a, v]) => ({ account: a.id, amount: v }));
+            if (rest > 0 || !splits.length) splits.push({ account: restAcct.id, amount: rest });
+          }
+          const entry = { ...(e || {}), kind: k, amount, note: b.querySelector('#e-note').value.trim(), date, cat: k === 'expense' ? cat : undefined, splits,
+            account: accts.length && k === 'expense' ? acct : undefined, from: accts.length && moving ? from : undefined, to: accts.length && moving ? to : undefined };
           sheet.close();
           changed(() => M.upsertEntry(entry), [entry.date, e?.date]);
           toast(e ? 'Saved' : k === 'transfer' ? 'Moved' : k === 'saving' ? 'Moved to savings' : `${KIND[k]} added`);
@@ -380,6 +421,19 @@ function openEntry(kind, e = null) {
           sheet.close();
           changed(() => M.deleteEntry(e.id), [e.date]);
           toast('Deleted');
+        }
+      };
+      // Live split: typing the paycheck re-splits it; typing an account's share updates the rest
+      b.oninput = (ev) => {
+        if (k !== 'income' || !accts.length) return;
+        const t = ev.target;
+        if (t.id === 'e-amt') { const box2 = b.querySelector('#e-split'); if (box2) box2.innerHTML = splitRows(L.toCents(t.value) || 0); }
+        if (t.dataset.esplit) {
+          over[t.dataset.esplit] = L.toCents(t.value) || 0;
+          const { rest } = shares(L.toCents(b.querySelector('#e-amt').value) || 0);
+          const r = b.querySelector('#e-rest');
+          r.textContent = money(s, rest);
+          r.classList.toggle('mon-over', rest < 0);
         }
       };
       if (!e) setTimeout(() => b.querySelector('#e-amt')?.focus(), 50);
@@ -431,8 +485,18 @@ export function bind(root) {
   const mine = () => root.dataset.tab === 'money';
 
   root.addEventListener('input', (ev) => {
-    if (!mine() || ui.sub !== 'budget') return;
+    if (!mine()) return;
     const t = ev.target;
+    if (ui.sub === 'settings' && t.dataset.split != null) {
+      const sp = splitDraft(M.getState());
+      const part = sp.parts.find((x) => x.account === t.dataset.split) || sp.parts[sp.parts.push({ account: t.dataset.split, mode: 'percent', value: 0 }) - 1];
+      const raw = t.value.trim();
+      part.value = !raw ? 0 : part.mode === 'percent' ? Number(raw) : L.toCents(raw);
+      const ex = ctx.root.querySelector('#split-ex');
+      if (ex && !Number.isNaN(part.value)) ex.textContent = `Example: a $1,000 paycheck → ${L.splitPaycheck(sp, 100000).map((x) => `${acctName(M.getState(), x.account)} ${money(M.getState(), x.amount)}`).join(' · ')}`;
+      return;
+    }
+    if (ui.sub !== 'budget') return;
     const d = draft(M.getState());
     if (t.dataset.name != null) d[+t.dataset.name].name = t.value;
     if (t.dataset.budget != null) d[+t.dataset.budget].budget = t.value.trim() ? L.toCents(t.value) : 0;
@@ -444,7 +508,7 @@ export function bind(root) {
     if (!el) return;
     const s = M.getState();
     switch (el.dataset.m) {
-      case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.saveMode = null; ui.typed = null; rerender(); break;
+      case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null; rerender(); break;
       case 'month': ui.month = L.shiftMonth(ui.month, Number(el.dataset.dir)); rerender(); break;
       case 'add': openEntry(el.dataset.kind); break;
       case 'edit': {
@@ -457,12 +521,6 @@ export function bind(root) {
       case 'acct-setup': openAccountSetup(); break;
       case 'acct': openAccount(el.dataset.id); break;
       case 'acct-add': openAddAccount(); break;
-      case 'quick-save': {
-        const amount = Number(el.dataset.amount);
-        changed(() => M.upsertEntry({ kind: 'saving', amount, note: '', date: today() }));
-        toast(`Saved ${money(s, amount)}`);
-        break;
-      }
       case 'review': openReview(); break;
 
       // Budget editing works on a draft until Save
@@ -489,7 +547,15 @@ export function bind(root) {
       }
 
       case 'freq': keepTyped(); ui.payFreq = el.dataset.freq; rerender(); break;
-      case 'mode': keepTyped(); ui.saveMode = el.dataset.mode; rerender(); break;
+      case 'split-mode': {
+        keepTyped();
+        const sp = splitDraft(s);
+        const part = sp.parts.find((x) => x.account === el.dataset.id) || sp.parts[sp.parts.push({ account: el.dataset.id, mode: 'percent', value: 0 }) - 1];
+        if (part.mode !== el.dataset.mode) { part.mode = el.dataset.mode; part.value = 0; delete (ui.typed || {})[`split-${el.dataset.id}`]; }
+        rerender();
+        break;
+      }
+      case 'split-rest': keepTyped(); splitDraft(s).rest = el.dataset.id; rerender(); break;
       case 'save-settings': saveSettings(s); break;
     }
   });
@@ -509,7 +575,6 @@ function renderDraft() {
 function saveSettings(s) {
   const err = ctx.root.querySelector('#s-err');
   const freq = ui.payFreq || s.settings.pay.freq;
-  const mode = ui.saveMode || s.settings.save.mode;
   const pay = { ...s.settings.pay, freq };
   const num = (id) => Number(ctx.root.querySelector(id)?.value);
   if (freq === 'weekly' || freq === 'biweekly') {
@@ -524,19 +589,20 @@ function saveSettings(s) {
     pay.day = num('#p-day');
     if (!(pay.day >= 1 && pay.day <= 31 && Number.isInteger(pay.day))) { err.textContent = 'Day must be 1–31.'; return; }
   }
-  const save = { ...s.settings.save, mode };
-  if (mode === 'amount') {
-    save.amount = L.toCents(ctx.root.querySelector('#s-amount').value);
-    if (!(save.amount > 0)) { err.textContent = 'Enter an amount to save per paycheck.'; return; }
-  } else {
-    save.percent = Number(ctx.root.querySelector('#s-percent').value);
-    if (!(save.percent > 0 && save.percent <= 100)) { err.textContent = 'Percent must be 1–100.'; return; }
+  let split = s.settings.split;
+  if (ui.split) {
+    const sp = ui.split;
+    const parts = sp.parts.filter((x) => x.value > 0 && x.account !== sp.rest && s.accounts.some((a) => a.id === x.account));
+    if (sp.parts.some((x) => Number.isNaN(x.value) || x.value < 0)) { err.textContent = 'Check the split amounts.'; return; }
+    const pct = parts.filter((x) => x.mode === 'percent').reduce((t, x) => t + x.value, 0);
+    if (pct > 100) { err.textContent = `The split adds up to ${pct}%. Keep it at 100% or less.`; return; }
+    split = { rest: sp.rest, parts };
   }
   const currency = ctx.root.querySelector('#s-cur').value.trim() || '$';
   ui.payFreq = null;
-  ui.saveMode = null;
+  ui.split = null;
   ui.typed = null;
-  changed(() => M.saveSettings({ pay, save, currency, setup: true }));
+  changed(() => M.saveSettings({ pay, split, currency, setup: true }));
   toast('Settings saved');
 }
 
