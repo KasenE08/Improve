@@ -36,10 +36,10 @@ if (isLocked()) showCountdown();
 else boot();
 
 function boot() {
-  // The Food tab keeps its data in memory, so re-read it after the wipe (or old entries come back on the next save)
-  if (wipeTestData()) reloadFood();
+  wipeTestData();
   // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
   const foundSchema = H.init();
+  reloadFood(); // the Food tab keeps its data in memory: re-read it after the launch wipe and upgrades (e.g. schema 11 water)
   if (foundSchema === 1) R.awardPastPerfectDays();
   Food.recheckToday();
   recheckMoney();

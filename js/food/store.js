@@ -8,7 +8,8 @@ const KEY = 'food';
 // Goals: calorie + protein goal, plus the rules for auto-checking habits.
 //   calRange   "Hit calories" = within ±calRange % of calGoal
 //   proteinMin "Hit protein"  = at least proteinMin grams (goal can be higher)
-export const DEFAULT_GOALS = { calGoal: 2600, proteinGoal: 150, proteinMin: 120, calRange: 10 };
+//   waterGoal  "Hit water" = at least this many oz
+export const DEFAULT_GOALS = { calGoal: 2600, proteinGoal: 150, proteinMin: 120, calRange: 10, waterGoal: 100 };
 
 const empty = () => ({
   version: 1,
@@ -16,6 +17,7 @@ const empty = () => ({
   foods: [],      // { id, name, servingGrams, cal, protein }
   entries: [],    // { id, kind: 'food'|'quick', name, date, meal, cal, protein, … }
   savedMeals: [], // { id, name, category, items }
+  water: {},      // { 'YYYY-MM-DD': oz } per food day
 });
 
 let state = load();
@@ -95,6 +97,16 @@ export function addEntries(items, { date, meal }) {
   save();
 }
 
+// ---------- Water (oz per food day) ----------
+export const waterFor = (date) => state.water?.[date] || 0;
+export function addWater(date, oz) {
+  state.water ||= {};
+  const v = Math.max(0, Math.round((waterFor(date) + oz) * 10) / 10);
+  if (v) state.water[date] = v; else delete state.water[date];
+  save();
+  return v;
+}
+
 // ---------- Saved meals ----------
 export const getMeal = (id) => state.savedMeals.find((m) => m.id === id);
 
@@ -129,6 +141,7 @@ export function importFromCalorieTracker(data) {
     foods: structuredClone(data.foods),
     entries: structuredClone(data.entries),
     savedMeals: structuredClone(data.savedMeals),
+    water: state.water || {}, // the old app didn't track water: keep Improve's
     settings: { ...keep, calGoal: data.settings.calGoal || keep.calGoal },
   };
   save();
