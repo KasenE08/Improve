@@ -126,3 +126,19 @@ eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.
   P.recheckPlanner(new Date(2026, 10, 10, 15, 30));
   eq([!!H.getLog()['2026-11-10']?.['work-on-schedule'], H.isExcused('work-on-schedule', '2026-11-10')], [true, false], 'finished a task today (unplanned): ticks, not a day off');
 }
+
+// Work planned after midnight (12–2am) belongs to the night before, like the rest of the app
+{
+  mem.imp_planner_day = 'null';
+  const tue = (h, m = 0) => new Date(2026, 10, 10, h, m).getTime();
+  const wed = (h, m = 0) => new Date(2026, 10, 11, h, m).getTime();
+  save({ tasks: [task('eve'), task('late')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'eve', start: tue(21), end: tue(22) }, { taskId: 'late', start: wed(0, 30), end: wed(1, 10) }] } });
+  P.recheckPlanner(new Date(2026, 10, 10, 21, 30));
+  eq(JSON.parse(mem.imp_planner_day).ids, ['eve', 'late'], '12:30am task counts as Tuesday night');
+  save({ tasks: [task('eve', 'done'), task('late')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'late', start: wed(0, 30), end: wed(1, 10) }] } });
+  P.recheckPlanner(new Date(2026, 10, 10, 23, 0));
+  eq(!!H.getLog()['2026-11-10']?.['work-on-schedule'], false, '11 PM: 12:30am task still to do → not ticked');
+  save({ tasks: [task('eve', 'done'), task('late', 'done')], blocks: [{ id: 'school' }], plan: { items: [] } });
+  P.recheckPlanner(new Date(2026, 10, 11, 1, 15));
+  eq(!!H.getLog()['2026-11-10']?.['work-on-schedule'], true, 'finished at 1:15am → Tuesday ticks');
+}

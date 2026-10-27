@@ -1,6 +1,6 @@
 // A light "profile" screen: friendly stats worked out from the data already on this phone.
 import type { Ms } from '../core/types';
-import { addDays, dateKey } from '../core/time';
+import { addDays, planDay } from '../core/time';
 import type { AppData } from './model';
 import { fmtDay } from './format';
 import { Icon } from './icons';
@@ -8,13 +8,13 @@ import { Icon } from './icons';
 export function Profile({ data, now }: { data: AppData; now: Ms }) {
   const done = data.tasks.filter((t) => t.status === 'done');
   const open = data.tasks.filter((t) => t.status !== 'done');
-  const today = dateKey(now);
+  const today = planDay(now);
   const weekEnd = addDays(today, 7);
   const tasks = new Map(data.tasks.map((t) => [t.id, t]));
   const plannedMin = (data.plan?.items ?? [])
-    .filter((i) => tasks.get(i.taskId)?.status !== 'done' && dateKey(i.start) >= today && dateKey(i.start) < weekEnd)
+    .filter((i) => tasks.get(i.taskId)?.status !== 'done' && planDay(i.start) >= today && planDay(i.start) < weekEnd)
     .reduce((m, i) => m + (i.end - i.start) / 60_000, 0);
-  const doneThisWeek = done.filter((t) => t.completedAt && dateKey(t.completedAt) > addDays(today, -7)).length;
+  const doneThisWeek = done.filter((t) => t.completedAt && planDay(t.completedAt) > addDays(today, -7)).length;
   const timedMin = data.history.reduce((m, h) => m + h.actualMin, 0);
   const since = data.tasks.length ? Math.min(...data.tasks.map((t) => t.createdAt)) : now;
   const hours = (min: number) => (min >= 60 ? `${Math.round((min / 60) * 10) / 10}h` : `${Math.round(min)}m`);

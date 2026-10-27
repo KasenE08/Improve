@@ -1,5 +1,5 @@
 import type { Ms, Task } from '../core/types';
-import { addDays, dateKey } from '../core/time';
+import { addDays, planDay } from '../core/time';
 import { comparePriority } from '../core/priority';
 import type { AppData } from './model';
 
@@ -30,7 +30,7 @@ const inCat = (t: Task, c: Cat) =>
  * newest first. Category chips narrow the list (any selected category matches; none = all).
  */
 export function filterTasks(d: AppData, view: View, cats: Cat[], now: Ms): Task[] {
-  const today = dateKey(now);
+  const today = planDay(now);
   const weekEnd = addDays(today, 7);
   const slot = new Map((d.plan?.items ?? []).map((i) => [i.taskId, i]));
   const late = new Set([
@@ -48,7 +48,7 @@ export function filterTasks(d: AppData, view: View, cats: Cat[], now: Ms): Task[
   const open = d.tasks.filter((t) => t.status !== 'done' && byCat(t));
   const day = (t: Task) => {
     const s = slot.get(t.id);
-    return s ? dateKey(s.start) : null;
+    return s ? planDay(s.start) : null;
   };
   const pick =
     view === 'today'

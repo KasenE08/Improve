@@ -3,7 +3,7 @@ import type {
 } from '../core/types';
 import { DEFAULT_RULES, DEFAULT_SETTINGS, HOME } from '../core/defaults';
 import { schedule } from '../core/scheduler';
-import { addDays, at, dateKey, MIN } from '../core/time';
+import { addDays, at, dateKey, MIN, planDay } from '../core/time';
 import { splitMinutes, type DoneRecord } from '../core/estimate';
 
 export interface Plan {
@@ -184,7 +184,7 @@ export function nightWindow(d: AppData, now: Ms): { start: Ms; end: Ms } {
 
 /** Replan when opening the app on a new day, so yesterday's leftovers move forward. */
 export function refreshIfStale(d: AppData, now: Ms): AppData {
-  return !d.plan || dateKey(d.plan.at) !== dateKey(now) ? replan(d, now) : d;
+  return !d.plan || planDay(d.plan.at) !== planDay(now) ? replan(d, now) : d;
 }
 
 const patchTask = (d: AppData, id: string, patch: Partial<Task>): AppData => ({
