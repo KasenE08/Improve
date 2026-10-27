@@ -156,3 +156,22 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   H.init();
   eq([H.getHabits()[0].xp, JSON.parse(mem.imp_log)['2026-10-27'].lift.xp], [40, 60], 'schema 10: Lift 40 from now, past session keeps 60');
 }
+
+// ---- Upgrade to schema 11: water tracked in Food, "3L water" → "100 oz water" (auto) ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '10';
+  mem.imp_habits = JSON.stringify([{ id: 'water', name: '3L water', category: 'diet', frequency: 'daily', target: 1, xp: 30, order: 0, auto: null }]);
+  const today = D.dayKey(D.appNow());
+  mem.imp_log = JSON.stringify({ [today]: { water: { n: 1, xp: 30, c: 'diet' } } });
+  mem.imp_food = JSON.stringify({ version: 1, settings: { calGoal: 2600 }, foods: [], entries: [], savedMeals: [] });
+  H.init();
+  const w = H.getHabits()[0];
+  eq([w.name, w.auto, w.xp], ['100 oz water', 'food:water', 30], 'schema 11: renamed + auto from Food, XP kept');
+  eq(JSON.parse(mem.imp_food).water[today], 100, 'schema 11: already ticked today → today starts at the 100 oz goal (tick kept)');
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '10';
+  mem.imp_habits = JSON.stringify([{ id: 'water', name: 'Drink water!', category: 'diet', frequency: 'daily', target: 1, xp: 30, order: 0 }]);
+  H.init();
+  eq([H.getHabits()[0].name, mem.imp_food], ['Drink water!', undefined], 'schema 11: your own name kept; nothing added if not ticked');
+}

@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 10;
+export const SCHEMA = 11;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -140,6 +140,17 @@ export function init() {
   // Schema 10: Lift 60 → 40 XP per session (200 a week). Sessions already logged keep what they earned.
   if (found > 0 && found < 10) {
     store.set('habits', store.get('habits', []).map((h) => (h.id === 'lift' && h.xp === 60 ? { ...h, xp: 40 } : h)));
+  }
+  // Schema 11: water is tracked in the Food tab; "3L water" becomes "100 oz water" and ticks itself.
+  // If it was already ticked today, today's water starts at the goal so the tick isn't lost.
+  if (found > 0 && found < 11) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'water' ? { ...h, auto: 'food:water', name: h.name === '3L water' ? '100 oz water' : h.name } : h)));
+    const today = dayKey(appNow());
+    if (store.get('log', {})[today]?.water) {
+      const food = store.get('food', null) || {};
+      const goal = food.settings?.waterGoal || 100;
+      store.set('food', { ...food, water: { ...(food.water || {}), [today]: Math.max(goal, food.water?.[today] || 0) } });
+    }
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

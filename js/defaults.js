@@ -24,7 +24,7 @@ const rows = [
 
   ['calories', 'Hit calories', 'diet', 'daily', 1, 60, 'food:calories'],
   ['protein', 'Hit protein', 'diet', 'daily', 1, 40, 'food:protein'],
-  ['water', '3L water', 'diet', 'daily', 1, 30],
+  ['water', '100 oz water', 'diet', 'daily', 1, 30, 'food:water'],
   ['fast-food', 'Fast food', 'diet', 'weekly', 2, 40, null, 'limit'],
 
   ['skincare', 'Skincare (AM + PM)', 'skin', 'daily', 2, 10],

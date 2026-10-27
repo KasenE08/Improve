@@ -31,7 +31,7 @@ export function wipeTestData() {
   store.remove('excused');
 
   const food = store.get('food', null);
-  if (food) store.set('food', { ...food, entries: (food.entries || []).filter((e) => e.date >= START) });
+  if (food) store.set('food', { ...food, entries: (food.entries || []).filter((e) => e.date >= START), water: Object.fromEntries(Object.entries(food.water || {}).filter(([k]) => k >= START)) });
 
   const money = store.get('money', null);
   if (money) {

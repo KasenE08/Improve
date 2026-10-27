@@ -157,6 +157,10 @@ export function hitCalories(eaten, goal, rangePct) {
   return eaten >= goal - r && eaten <= goal + r;
 }
 
+export function hitWater(oz, goal) {
+  return goal > 0 && oz >= goal;
+}
+
 export function hitProtein(eaten, min) {
   return min > 0 && eaten >= min;
 }

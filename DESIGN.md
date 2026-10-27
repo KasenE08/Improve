@@ -50,7 +50,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 
 | Key | Shape |
 |---|---|
-| `imp_schema` | `10` |
+| `imp_schema` | `11` |
 | `imp_profile` | `{ name }` |
 | `imp_categories` | `[{ id, name, icon }]` |
 | `imp_habits` | `[{ id, name, category, frequency: "daily"\|"weekly"\|"monthly", target, xp, order, archived, auto, autoAfter?, kind?: "goal"\|"limit", limitSince? }]` |
@@ -64,10 +64,10 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_planner_day` | `{ date, ids }`: tasks that were on today's plan (for "Work done on schedule") |
 | `imp_money` | Money tab: `{ settings: { currency, pay: { freq, anchor, days, day }, save: { mode, amount, percent }, setup }, categories: [{ id, name, icon, budget }], entries: [{ id, kind: expense\|income\|saving\|transfer\|adjust, amount, cat, account?, from?, to?, note, date, at }], reviews: { 'YYYY-MM': { doneAt } }, accounts: [{ id, name, icon, start, since }] }`. Amounts in cents |
 | `imp_journal` | `{ settings: { minWords }, days: { 'YYYY-MM-DD': text } }`; blank days aren't stored |
-| `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange }, foods, entries, savedMeals }` (same shape as the old Calorie Tracker) |
+| `imp_food` | Food tab: `{ version, settings: { calGoal, proteinGoal, proteinMin, calRange, waterGoal }, foods, entries, savedMeals, water: { 'YYYY-MM-DD': oz } }` (same shape as the old Calorie Tracker) |
 
 Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, same as the Food tab), so daily resets at 4:01 AM and weekly on Monday 4:01 AM. Habit months start on the month's first Monday and run to the day before the next month's first Monday (4 or 5 whole weeks), so monthly resets on a Monday at 4:01 AM too. Money budgets stay on calendar months. Late-night check-ins count for the period you're finishing. Progress is counted from the log inside the current period, so resets happen on their own and history is never deleted.
-`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap. Auto habits never tick a day that hasn't started yet (food logged ahead counts once that day comes). An auto habit can also wait until a time of day before ticking (`autoAfter`, minutes after midnight; "Only tick after" in the habit editor). "Work done on schedule" waits until 3 PM. Past days and the 12–4 AM tail of a day always count as after.
+`auto` marks habits that tick themselves (`js/auto.js`: `food:calories`, `food:protein`, `food:water`, `planner:work`, `money:save`, `money:review`, `journal:words`). "Log spending" stays a manual tap. Auto habits never tick a day that hasn't started yet (food logged ahead counts once that day comes). An auto habit can also wait until a time of day before ticking (`autoAfter`, minutes after midnight; "Only tick after" in the habit editor). "Work done on schedule" waits until 3 PM. Past days and the 12–4 AM tail of a day always count as after.
 
 ## Leveling (Phase 2)
 
@@ -84,7 +84,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 
 - Ported from `KasenE08/calorie-tracker` (read-only copy). Logic in `js/food/logic.js` is the original file plus the hit rules; tests in `tests/food-logic.test.mjs`.
 - Food day runs 4:01 AM → 4:00 AM (late night counts toward the previous date). Meals: Breakfast 4:01–11:00, Lunch 11:01–4:00 PM, Dinner 4:01–9:00 PM, Late Night 9:01 PM–4:00 AM.
-- Auto-checks (`js/food/autocheck.js`): habits with `auto: "food:calories"` tick when calories are within ±`calRange`% of `calGoal`; `auto: "food:protein"` ticks at `proteinMin` g or more. These habits can't be tapped on Today.
+- Auto-checks (`js/food/autocheck.js`): habits with `auto: "food:calories"` tick when calories are within ±`calRange`% of `calGoal`; `auto: "food:protein"` ticks at `proteinMin` g or more; `auto: "food:water"` ("100 oz water") ticks at `waterGoal` oz (default 100). Water is logged per food day under the Protein bar (+8 / +16 / +32 / custom / −8 oz) with a blue bar (`--imp-water`). These habits can't be tapped on Today.
 - Colors: calories use the accent, protein `--imp-protein` (orange), over goal `--imp-danger`. Bar variants: `imp-xpbar--protein`, `imp-xpbar--over`.
 - Import from the old app: its backup file (works on iPhone) or a direct read of `calorie-tracker.v1` when both apps share storage. The old data is never modified.
 

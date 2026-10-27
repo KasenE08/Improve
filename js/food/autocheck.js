@@ -6,7 +6,7 @@ import * as R from '../rewards.js';
 import * as F from './store.js';
 import * as L from './logic.js';
 
-export const AUTO = { 'food:calories': 'Food: calories', 'food:protein': 'Food: protein' };
+export const AUTO = { 'food:calories': 'Food: calories', 'food:protein': 'Food: protein', 'food:water': 'Food: water' };
 export const isFoodAuto = (h) => !!h && typeof h.auto === 'string' && h.auto.startsWith('food:');
 
 export function hitsFor(date) {
@@ -15,6 +15,7 @@ export function hitsFor(date) {
   return {
     'food:calories': L.hitCalories(t.cal, g.calGoal, g.calRange),
     'food:protein': L.hitProtein(t.protein, g.proteinMin),
+    'food:water': L.hitWater(F.waterFor(date), g.waterGoal),
   };
 }
 
