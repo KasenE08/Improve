@@ -57,7 +57,7 @@ To add more, pick from game-icons.net (credit stays on the Profile tab).
 | `imp_log` | `{ "YYYY-MM-DD": { habitId: { n, xp, c } } }`, completions per day with the XP value and category at the time |
 | `imp_bonus` | `{ "YYYY-MM-DD": { "perfect" \| "streak:<habitId>": { type, xp, … } } }`, bonus XP on the day it was earned |
 | `imp_limit_settled` | `{ habitId: "YYYY-MM-DD" }`, last period end already judged for each limit habit |
-| `imp_excused` | `{ "YYYY-MM-DD": { habitId: true } }`, days a habit had nothing to do (skipped by streaks and Perfect Day) |
+| `imp_excused` | `{ "YYYY-MM-DD": { habitId: true } }`, days/weeks a habit had nothing to do, keyed by the period's first day (skipped by streaks and Perfect Day) |
 | `imp_ranks` | `[{ min, name }]`, editable on Profile |
 | `imp_last_backup` | ISO date of the last export |
 | `imp_planner` | Planner tab data (same shape as Schedule-App-Planner's `planner-data-v1`). `push` = this phone's notification keys, never exported |
@@ -104,7 +104,7 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 - Per-category monthly budgets (blank = no limit), red when over. Entries: expense (with category), paycheck, saving. Amounts stored in cents.
 - Pay schedule: every week / every 2 weeks (from a recent payday) / twice a month (two days) / monthly (a day) / irregular. Days past a short month's end clamp to its last day.
 - Saving: fixed amount per paycheck (default $40) or % of each paycheck.
-- Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); weeks with no payday tick on their own; not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished. The review panel follows the habit month and is named after the month it starts in (Tue Dec 1 is still the November review; Dec 7 starts December's). A saving or paycheck back-dated into an earlier week re-checks that week too.
+- Auto-checks (`js/money/autocheck.js`, using `setPeriodDone` in `js/habits.js`): `money:save` (weekly) ticks when the week's saving covers its paycheck(s); a week with no payday is a week off (no tick, no XP, streak not broken; `imp_excused` under the week's Monday); not judged until paydays are set up. `money:review` (monthly) ticks when this month's review is finished. The review panel follows the habit month and is named after the month it starts in (Tue Dec 1 is still the November review; Dec 7 starts December's). A saving or paycheck back-dated into an earlier week re-checks that week too.
 - Schema 3 upgrade sets those autos on existing "Save % of paycheck" / "Budget review" habits and makes "Log spending" manual.
 
 ## Journal tab

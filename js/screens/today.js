@@ -16,6 +16,8 @@ import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
 const PERIOD_END = { daily: 'day end', weekly: 'week end', monthly: 'month end' };
+const OFF_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
+const OFF_WHY = { 'planner:work': 'nothing planned', 'money:save': 'no payday' };
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', planner: 'Planner', money: 'Money' };
@@ -32,8 +34,9 @@ export function render(root, refresh) {
   const prog = new Map(habits.map((h) => [h.id, H.progress(h, now, log)]));
   const counts = H.countsIndex(log);
   const streaks = new Map(habits.map((h) => [h.id, R.streak(h, now, counts)]));
-  const off = H.getExcused()[dayKey(now)] || {};
-  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id), h.frequency === 'daily' && off[h.id]);
+  const ex = H.getExcused();
+  const isOff = (h) => H.offIn(h, now, ex);
+  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id), isOff(h));
 
   const toolbar = editMode
     ? `<div class="today-toolbar">
@@ -48,7 +51,7 @@ export function render(root, refresh) {
   const sections = H.FREQS.map((freq) => {
     const list = habits.filter((h) => h.frequency === freq);
     if (!list.length) return '';
-    const counted = list.filter((h) => !(freq === 'daily' && off[h.id])); // days off don't count either way
+    const counted = list.filter((h) => !isOff(h)); // days/weeks off don't count either way
     const done = counted.filter((h) => H.isDone(h, prog.get(h.id))).length;
     const resetDay = nextStart(freq).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     const waiting = freq === 'monthly' && !monthlyOpen(dayKey(now));
@@ -81,7 +84,7 @@ function habitRow(h, n, st, dayOff) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : chip(h.xp, false);
     return `<button class="imp-row is-waiting" data-id="${esc(h.id)}">
     ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span><span class="imp-row__sub">Day off · nothing planned${st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''}</span></span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span><span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}${st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''}</span></span>
     ${end}
   </button>`;
   }
