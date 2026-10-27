@@ -28,6 +28,7 @@ const empty = () => ({
   categories: structuredClone(DEFAULT_CATEGORIES),
   entries: [], // { id, kind: 'expense'|'income'|'saving', amount, cat?, note, date, at }
   reviews: {}, // { 'YYYY-MM': { doneAt } }
+  accounts: [], // { id, name, icon, start (cents), since (ISO) }; empty until set up (see logic.js balances)
 });
 
 export function getState() {
@@ -45,6 +46,7 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 export const saveSettings = (settings) => update((s) => { s.settings = { ...s.settings, ...settings }; });
 export const saveCategories = (categories) => update((s) => { s.categories = categories; });
+export const saveAccounts = (accounts) => update((s) => { s.accounts = accounts; });
 
 export function upsertEntry(e) {
   return update((s) => {
