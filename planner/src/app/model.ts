@@ -63,6 +63,12 @@ export function emptyData(): AppData {
 }
 
 /** Fills in anything missing from older saves or hand-edited backups. */
+/** "No work after" picked from a time input: a time at or before the earliest start (e.g. 2:00 AM)
+ *  means after midnight, so it's stored past 1440 (2am = 1560). Otherwise the day would end before it starts. */
+export function endOfDayMin(min: number, earliestStartMin: number): number {
+  return min <= earliestStartMin ? min + 1440 : min;
+}
+
 export function normalize(raw: Partial<AppData>): AppData {
   const base = emptyData();
   const { sync: _oldReminderSync, ...rest } = raw as Partial<AppData> & { sync?: unknown };
@@ -70,7 +76,7 @@ export function normalize(raw: Partial<AppData>): AppData {
     ...base,
     ...rest,
     version: 1,
-    settings: { ...base.settings, ...raw.settings },
+    settings: healSettings({ ...base.settings, ...raw.settings }),
     locations: raw.locations?.some((l) => l.id === HOME.id) ? raw.locations : [HOME, ...(raw.locations ?? [])],
     arrivals: raw.arrivals ?? {},
     plan: raw.plan ?? null,
@@ -78,6 +84,11 @@ export function normalize(raw: Partial<AppData>): AppData {
     history: raw.history ?? [],
     night: raw.night ?? null,
   };
+}
+
+// Saves from before the fix could hold "2am" as 120 (before the day starts): repair them on load.
+function healSettings(s: AppData['settings']): AppData['settings'] {
+  return { ...s, dayEndMin: endOfDayMin(s.dayEndMin, s.earliestStartMin) };
 }
 
 export function replan(d: AppData, now: Ms, exactStart?: Ms): AppData {
@@ -165,8 +176,10 @@ export function nightWindow(d: AppData, now: Ms): { start: Ms; end: Ms } {
   const today = dateKey(now);
   const { dayEndMin, latestNightMin } = d.settings;
   // Already past midnight: tonight's window is the one that started yesterday.
-  if (now < at(today, latestNightMin)) return { start: at(addDays(today, -1), dayEndMin), end: at(today, latestNightMin) };
-  return { start: at(today, dayEndMin), end: at(addDays(today, 1), latestNightMin) };
+  // If the normal day already runs past the falling-behind time, there's no extra time (empty, never backwards).
+  const win = (start: Ms, end: Ms) => ({ start, end: Math.max(start, end) });
+  if (now < at(today, latestNightMin)) return win(at(addDays(today, -1), dayEndMin), at(today, latestNightMin));
+  return win(at(today, dayEndMin), at(addDays(today, 1), latestNightMin));
 }
 
 /** Replan when opening the app on a new day, so yesterday's leftovers move forward. */

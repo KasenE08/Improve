@@ -90,6 +90,29 @@ eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
   eq(L.balances({ ...st, accounts: [st.accounts[0]] }).checking, 50000 + 80000 - 2000 - 4000 + 10000 - 300, 'entries for a deleted account are skipped');
 }
 
+// ---- Savings = the Savings account (one number) ----
+{
+  const since = '2026-10-27T05:00:00.000Z';
+  const st = {
+    settings: { setup: true, pay: { freq: 'biweekly', anchor: '2026-10-30' }, save: { mode: 'amount', amount: 4000 } },
+    accounts: [{ id: 'checking', start: 30, since }, { id: 'savings', start: 109646, since }],
+    entries: [
+      { kind: 'saving', amount: 109546, date: '2026-10-26', at: '2026-10-26T20:00:00.000Z' }, // logged old balance before setup
+      { kind: 'saving', amount: 4000, date: '2026-10-30', at: '2026-10-30T18:00:00.000Z' },
+      { kind: 'transfer', amount: 1000, from: 'savings', to: 'checking', date: '2026-10-31', at: '2026-10-31T18:00:00.000Z' },
+    ],
+  };
+  eq(L.beforeTracking(st, st.entries[0]), true, 'a saving logged before setup is "before tracking"');
+  eq(L.beforeTracking(st, st.entries[1]), false, 'savings after setup count');
+  eq(L.balances(st).savings, 109646 + 4000 - 1000, 'Savings balance');
+  eq(L.accountChange(st, 'savings', '2026-10'), 4000 - 1000, 'this month: +$40 in, −$10 out = +$30');
+  eq(L.accountChange(st, 'savings', '2026-11'), 0, 'nothing in November yet');
+  const wk = L.saveStatus(st, new Date(2026, 9, 28, 12));
+  eq([wk.saved, wk.hit], [4000, true], 'paycheck habit: only the real $40 counts, not the old balance');
+  const noSave = { ...st, entries: [st.entries[0]] };
+  eq(L.saveStatus(noSave, new Date(2026, 9, 28, 12)).hit, false, 'old balance logged as a saving no longer ticks the habit');
+}
+
 // ---- auto-checks through storage ----
 H.init();
 const habits = Object.fromEntries(H.getHabits().map((h) => [h.id, h.auto]));

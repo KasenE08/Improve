@@ -9,7 +9,7 @@ import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
 import { monthlyOpen } from '../launch.js';
 
 const SUBS = [['overview', 'Overview'], ['history', 'History'], ['budget', 'Budget'], ['settings', 'Settings']];
-const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'Saving', transfer: 'Move' };
+const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'To savings', transfer: 'Move' };
 const MONEY_ICONS = ['diet', 'gas', 'car', 'game', 'bag', 'cart', 'keys', 'pill', 'cash', 'bank', 'piggy', 'ticket', 'coffee', 'home', 'heart', 'style', 'people', 'book', 'music', 'star'];
 
 const ui = { sub: 'overview', month: dayKey().slice(0, 7) };
@@ -82,12 +82,12 @@ function overview(s) {
       <div class="mon-cap">spent${sum.budget ? ` of ${money(s, sum.budget)} budget` : ''}</div>
       ${sum.budget ? `${xpbar(Math.min(100, Math.round((sum.spent / sum.budget) * 100)), over ? 'imp-xpbar--over' : '')}
         <p class="mon-left">${over ? `${money(s, -left)} over budget` : `${money(s, left)} left`}</p>` : ''}
-      <div class="mon-mini"><span>Paychecks <b class="mon-in">${money(s, sum.income)}</b></span><span>Saved <b class="imp-accent">${money(s, sum.saved)}</b></span></div>
+      <div class="mon-mini"><span>Paychecks <b class="mon-in">${money(s, sum.income)}</b></span>${savingsMini(s, current)}</div>
     </div>
     ${current ? `<div class="imp-btn-row mon-add">
       <button class="imp-btn imp-btn--primary" data-m="add" data-kind="expense">${icon('plus')}Expense</button>
       <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="income">Paycheck</button>
-      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="saving">Saving</button></div>` : ''}`;
+      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="saving">To savings</button></div>` : ''}`;
 
   const cats = s.categories.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('');
   const orphan = Object.keys(sum.byCat).filter((id) => !s.categories.some((c) => c.id === id)).reduce((t, id) => t + sum.byCat[id], 0);
@@ -97,6 +97,17 @@ function overview(s) {
     ${current ? paydayPanel(s) : ''}
     ${box('By category', cats + (orphan ? catRow(s, { name: 'Deleted categories', icon: 'scroll', budget: 0 }, orphan) : ''), `<button class="imp-btn imp-btn--sm imp-btn--ghost" data-m="sub" data-sub="budget">Edit</button>`)}
     ${current ? reviewPanel(s) : ''}`;
+}
+
+// Savings = the Savings account (one number). Before accounts are set up, it's the month's savings logged.
+function savingsMini(s, current) {
+  const sav = s.accounts?.find((a) => a.id === 'savings');
+  if (!sav) return `<span>Saved <b class="imp-accent">${money(s, L.monthSummary(s, ui.month).saved)}</b></span>`;
+  const ch = L.accountChange(s, 'savings', ui.month);
+  const change = `${ch >= 0 ? '+' : '−'}${money(s, Math.abs(ch))}`;
+  return current
+    ? `<span>Savings <b class="imp-accent">${money(s, L.balances(s).savings)}</b><small class="imp-muted">${change} this month</small></span>`
+    : `<span>Savings <b class="imp-accent">${change}</b></span>`;
 }
 
 // ---- Accounts ----
@@ -248,7 +259,8 @@ function history(s) {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll' }[e.kind] || c?.icon || 'cash';
     const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
-    const sub = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense') : KIND[e.kind];
+    const sub = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money'
+      : L.beforeTracking(s, e) ? 'Before tracking · already in balance' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense') : KIND[e.kind];
     return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon(ic, `mon-row__icon mon-k-${e.kind}`)}
       <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
       <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' || e.kind === 'transfer' || e.amount < 0 ? '' : '+'}${money(s, e.amount)}</span></button>`;
@@ -362,7 +374,7 @@ function openEntry(kind, e = null) {
             account: accts.length && !moving ? acct : undefined, from: accts.length && moving ? from : undefined, to: accts.length && moving ? to : undefined };
           sheet.close();
           changed(() => M.upsertEntry(entry), [entry.date, e?.date]);
-          toast(e ? 'Saved' : k === 'transfer' ? 'Moved' : `${KIND[k]} added`);
+          toast(e ? 'Saved' : k === 'transfer' ? 'Moved' : k === 'saving' ? 'Moved to savings' : `${KIND[k]} added`);
         }
         if (t.id === 'e-del' && confirm('Delete this entry?')) {
           sheet.close();
@@ -393,7 +405,9 @@ function openReview() {
       ${sum.budget ? line('Budget', `${money(s, sum.budget)} · ${sum.spent > sum.budget ? `${money(s, sum.spent - sum.budget)} over` : `${money(s, sum.budget - sum.spent)} left`}`, sum.spent > sum.budget ? 'mon-over' : 'imp-accent') : ''}
       ${line('Vs. last month', prev.spent ? `${diff > 0 ? '+' : ''}${money(s, diff)}` : '—', diff > 0 ? 'mon-over' : 'imp-accent')}
       ${line('Paychecks', money(s, sum.income), 'mon-in')}
-      ${line('Saved', money(s, sum.saved), 'imp-accent')}
+      ${s.accounts?.some((a) => a.id === 'savings')
+        ? line('Savings', `${money(s, L.balances(s).savings)} (${L.accountChange(s, 'savings', mk) >= 0 ? '+' : '−'}${money(s, Math.abs(L.accountChange(s, 'savings', mk)))} this month)`, 'imp-accent')
+        : line('Saved', money(s, sum.saved), 'imp-accent')}
       <div class="imp-panel__sub">Biggest categories</div>
       ${top.length ? top.map((x) => line(esc(x.c.name), money(s, x.spent))).join('') : '<p class="mon-note">No spending logged yet.</p>'}
       <div class="imp-panel__sub">Over budget</div>
