@@ -58,7 +58,7 @@ function boot() {
   function loadPlanner() {
     plannerLoad ||= import('./planner/planner.js').then((m) => {
       planner = m;
-      // Every saved planner change: re-check "Work done on schedule" and update the HUD.
+      // Every saved planner change: re-check "Finished today's work" and update the HUD.
       m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
       const added = recheckPlanner();
       renderHud();
@@ -131,7 +131,7 @@ function boot() {
   });
 
   // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
-  // Also catches auto habits that tick on their own as time passes (e.g. "Work done on schedule" at 3 PM).
+  // Also catches auto habits that tick on their own as time passes (e.g. "Finished today's work" at 3 PM).
   const checkDay = () => {
     const before = Stats.compute();
     const offBefore = JSON.stringify(H.getExcused());

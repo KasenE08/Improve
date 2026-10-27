@@ -36,7 +36,7 @@ const rows = [
   ['restock', 'Restock products', 'skin', 'monthly', 1, 45],
 
   ['no-fap', 'No fap', 'mind', 'daily', 1, 60],
-  ['work-on-schedule', 'Work done on schedule', 'mind', 'daily', 1, 60, 'planner:work'],
+  ['work-on-schedule', "Finished today's work", 'mind', 'daily', 1, 60, 'planner:work'],
   ['no-phone-am', 'No phone first 30 min of morning', 'mind', 'daily', 1, 20],
   ['journal', 'Journal', 'mind', 'daily', 1, 15, 'journal:words'],
   ['kept-word', 'Kept my word', 'mind', 'daily', 1, 15],

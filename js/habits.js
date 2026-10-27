@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 8;
+export const SCHEMA = 9;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -133,6 +133,10 @@ export function init() {
     store.set('habits', habits);
     store.set('log', log);
   }
+  // Schema 9: "Work done on schedule" renamed to "Finished today's work" (unless you renamed it yourself)
+  if (found > 0 && found < 9) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'work-on-schedule' && h.name === 'Work done on schedule' ? { ...h, name: "Finished today's work" } : h)));
+  }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
 }
@@ -222,7 +226,7 @@ export function step(habit, delta, date = appNow()) {
   return -xp;
 }
 
-// Days off: a day a habit had nothing to do (e.g. "Work done on schedule" with nothing planned).
+// Days off: a day a habit had nothing to do (e.g. "Finished today's work" with nothing planned).
 // No tick and no XP, but it doesn't break the streak or block Perfect Day.
 //   imp_excused { "YYYY-MM-DD": { habitId: true } }
 export const getExcused = () => store.get('excused', {});
