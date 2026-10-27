@@ -340,6 +340,9 @@ function TaskEntry({ e, dnd, at }: { e: Extract<Entry, { kind: 'task' }>; dnd: R
   );
 }
 
+// "Even working until 2am" only makes sense when there was extra late-night time before the due time
+const lateNightHelps = (data: AppData, due: number) => !!data.night && data.night.end > data.night.start && due > data.night.start;
+
 function Warnings({ data }: { data: AppData }) {
   const ui = useUI();
   const tasks = new Map(data.tasks.map((t) => [t.id, t]));
@@ -353,7 +356,7 @@ function Warnings({ data }: { data: AppData }) {
         return (
           <button class="link warn-row" onClick={() => ui.open({ kind: 'detail', id: t.id })}>
             {w.kind === 'late'
-              ? `${t.title}: finishes ${fmtDue(w.end)}, due ${fmtDue(w.due)}${data.night ? ' (even working until ' + fmtTime(data.night.end) + ')' : ''}`
+              ? `${t.title}: finishes ${fmtDue(w.end)}, due ${fmtDue(w.due)}${lateNightHelps(data, w.due) ? ' (even working until ' + fmtTime(data.night!.end) + ')' : ''}`
               : `${t.title}: no time fits in the next ${data.settings.horizonDays} days`}
           </button>
         );
