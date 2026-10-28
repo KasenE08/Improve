@@ -37,10 +37,11 @@ save({ tasks: [task('a', 'done'), task('b', 'inProgress')], plan: { items: [{ ta
 P.recheckPlanner(day);
 eq(done(), false, 'one done, one in progress');
 
-// "Falling behind" moved b to tomorrow: still counts as today's
+// b's time (5 PM) came and went; "Falling behind" then moved it to tomorrow: still counts as today's
+P.recheckPlanner(new Date(2026, 9, 26, 17, 30));
 save({ tasks: [task('a', 'done'), task('b')], plan: { items: [{ taskId: 'b', start: t(17) + 86400000, end: t(18) + 86400000 }] } });
-P.recheckPlanner(day);
-eq(done(), false, 'moving a task off today does not count as done');
+P.recheckPlanner(new Date(2026, 9, 26, 17, 35));
+eq(done(), false, 'moving a task off today after its time came does not count as done');
 
 save({ tasks: [task('a', 'done'), task('b', 'done')], plan: { items: [] } });
 P.recheckPlanner(day);
@@ -134,11 +135,23 @@ eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.
   const wed = (h, m = 0) => new Date(2026, 10, 11, h, m).getTime();
   save({ tasks: [task('eve'), task('late')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'eve', start: tue(21), end: tue(22) }, { taskId: 'late', start: wed(0, 30), end: wed(1, 10) }] } });
   P.recheckPlanner(new Date(2026, 10, 10, 21, 30));
-  eq(JSON.parse(mem.imp_planner_day).ids, ['eve', 'late'], '12:30am task counts as Tuesday night');
+  eq(P.plannerHit(JSON.parse(mem.imp_planner), new Date(2026, 10, 10, 21, 30), new Date(2026, 10, 10, 21, 30)), false, '12:30am task counts as Tuesday night (still to do)');
   save({ tasks: [task('eve', 'done'), task('late')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'late', start: wed(0, 30), end: wed(1, 10) }] } });
   P.recheckPlanner(new Date(2026, 10, 10, 23, 0));
   eq(!!H.getLog()['2026-11-10']?.['work-on-schedule'], false, '11 PM: 12:30am task still to do → not ticked');
   save({ tasks: [task('eve', 'done'), task('late', 'done')], blocks: [{ id: 'school' }], plan: { items: [] } });
   P.recheckPlanner(new Date(2026, 10, 11, 1, 15));
   eq(!!H.getLog()['2026-11-10']?.['work-on-schedule'], true, 'finished at 1:15am → Tuesday ticks');
+}
+
+// Your case: a task planned for this afternoon that the planner moved to tomorrow before its time
+// came (e.g. replanned in the morning) is NOT today's work: an otherwise empty day is a day off
+{
+  mem.imp_planner_day = JSON.stringify({ date: '2026-11-18', ids: ['poem'] }); // older save format is ignored
+  const wedPm = new Date(2026, 10, 18, 16, 20).getTime();
+  save({ tasks: [task('poem')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'poem', start: wedPm, end: wedPm + 35 * 60000 }] } });
+  P.recheckPlanner(new Date(2026, 10, 18, 8, 0)); // morning: planned for 4:20 PM today
+  save({ tasks: [task('poem')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'poem', start: wedPm + 86400000, end: wedPm + 86400000 + 35 * 60000 }] } });
+  P.recheckPlanner(new Date(2026, 10, 18, 15, 55)); // moved to Thursday before 4:20 PM
+  eq([!!H.getLog()['2026-11-18']?.['work-on-schedule'], H.isExcused('work-on-schedule', '2026-11-18')], [false, true], 'moved off today before its time: day off, not stuck');
 }
