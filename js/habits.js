@@ -16,7 +16,7 @@
 // wiped and the full by-date history stays available for streaks and stats.
 
 import * as store from './store.js';
-import { dayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
+import { dayKey, fromDayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
 import { monthlyOpen } from './launch.js';
 
@@ -249,6 +249,7 @@ export const getExcused = () => store.get('excused', {});
 export const isExcused = (habitId, day, ex = getExcused()) => !!ex[day]?.[habitId];
 export const offIn = (habit, date = appNow(), ex = getExcused()) => isExcused(habit.id, periodRange(habit.frequency, date)[0], ex);
 export function setExcused(habit, day, on) {
+  if (on && isOverridden(habit, day)) on = false; // a manual tick beats a day off
   const ex = getExcused();
   if (isExcused(habit.id, day, ex) === on) return false;
   if (on) (ex[day] ||= {})[habit.id] = true;
@@ -258,6 +259,48 @@ export function setExcused(habit, day, on) {
   }
   store.set('excused', ex);
   return true;
+}
+
+// Manual override for auto habits: you tick it yourself for this period (day / week / month).
+// Full XP, counts like a normal tick, and the auto-checks can't take it back. Next period it's auto again.
+// Stored under the period's first day:  imp_override { "YYYY-MM-DD": { habitId: true } }
+export const getOverrides = () => store.get('override', {});
+export function isOverridden(habit, date = appNow(), ov = getOverrides()) {
+  const d = typeof date === 'string' ? fromDayKey(date) : date;
+  return !!ov[periodRange(habit.frequency, d)[0]]?.[habit.id];
+}
+export function setOverride(habit, on, date = appNow()) {
+  const ov = getOverrides();
+  const start = periodRange(habit.frequency, date)[0];
+  if (on) {
+    (ov[start] ||= {})[habit.id] = true;
+    store.set('override', ov);
+    setExcused(habit, start, false);
+    const log = getLog();
+    const [s, e] = periodRange(habit.frequency, date);
+    const n = Object.keys(log).filter((d) => d >= s && d <= e).reduce((t, d) => t + (log[d][habit.id]?.n || 0), 0);
+    const want = habit.frequency === 'daily' ? Math.max(1, habit.target) : 1;
+    if (n < want) {
+      const today = dayKey(date);
+      (log[today] ||= {})[habit.id] = { n: (log[today][habit.id]?.n || 0) + want - n, xp: habit.xp, c: habit.category };
+      saveLog(log);
+    }
+    return;
+  }
+  if (ov[start]) {
+    delete ov[start][habit.id];
+    if (!Object.keys(ov[start]).length) delete ov[start];
+    store.set('override', ov);
+  }
+  // Clear the period's ticks; the auto-check puts them back if the other tab says it's earned
+  const log = getLog();
+  const [s, e] = periodRange(habit.frequency, date);
+  for (const d of Object.keys(log)) {
+    if (d < s || d > e || !log[d][habit.id]) continue;
+    delete log[d][habit.id];
+    if (!Object.keys(log[d]).length) delete log[d];
+  }
+  saveLog(log);
 }
 
 // When a habit becomes a limit: its taps this period become plain uses (no XP)
@@ -283,6 +326,7 @@ export function autoTimeReached(habit, day, now = new Date()) {
 // Set a habit done / not done on a date (used by auto-checks from other tabs).
 // Returns true if anything changed.
 export function setDone(habit, day, done, now = new Date()) {
+  if (isOverridden(habit, day)) return false; // ticked by hand: auto leaves it alone
   if (done && !autoTimeReached(habit, day, now)) done = false;
   const log = getLog();
   const cur = log[day]?.[habit.id]?.n || 0;
@@ -302,6 +346,7 @@ export function setDone(habit, day, done, now = new Date()) {
 // Returns true if anything changed.
 export function setPeriodDone(habit, date, done, now = new Date()) {
   if (habit.frequency === 'daily') return setDone(habit, dayKey(date), done, now);
+  if (isOverridden(habit, date)) return false;
   if (done && !autoTimeReached(habit, dayKey(date), now)) done = false;
   const log = getLog();
   const [start, end] = periodRange(habit.frequency, date);

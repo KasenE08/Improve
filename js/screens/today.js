@@ -11,7 +11,7 @@ import { recheckMoney } from '../money/autocheck.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import { appDateFor } from '../food/logic.js';
 const recheckFood = () => { recheck(appDateFor(new Date())); recheckPlanner(); recheckMoney(); recheckJournal(); };
-import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, PICKER_ICONS } from '../ui.js';
+import { esc, icon, panel, check, chip, pips, attrRow, streakTag, floatXP, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
@@ -38,7 +38,8 @@ export function render(root, refresh) {
   const streaks = new Map(habits.map((h) => [h.id, R.streak(h, now, counts)]));
   const ex = H.getExcused();
   const isOff = (h) => H.offIn(h, now, ex);
-  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id), isOff(h));
+  const ov = H.getOverrides();
+  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id), isOff(h), isAuto(h) && H.isOverridden(h, now, ov));
 
   const toolbar = editMode
     ? `<div class="today-toolbar">
@@ -81,7 +82,7 @@ function emptyList() {
   return panel({ title: 'No habits', body: `<p class="imp-muted" style="padding:8px 0">Tap Edit → New habit to add one.</p>` });
 }
 
-function habitRow(h, n, st, dayOff) {
+function habitRow(h, n, st, dayOff, manual) {
   if (dayOff && !n) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : chip(h.xp, false);
     return `<button class="imp-row is-waiting" data-id="${esc(h.id)}">
@@ -101,7 +102,8 @@ function habitRow(h, n, st, dayOff) {
     ${end}
   </button>`;
   }
-  const fire = [isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
+  const fire = [manual ? `<span class="today-auto">${icon('edit')}Manual</span>`
+    : isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
   const sub = multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
@@ -174,7 +176,7 @@ function apply(id, delta) {
   if (!h) return;
   if (H.notStarted(h)) return toast(`Monthly habits start Mon ${startLabel}`);
   if (H.isLimit(h)) return applyLimit(h, delta);
-  if (isAuto(h)) return toast(`Auto from ${autoTab(h)} tab`);
+  if (isAuto(h)) return applyOverride(h);
   const before = Stats.compute();
   let change;
   if (delta > 0 && h.target === 1 && H.progress(h) >= 1) change = H.step(h, -1); // tap on a checked single habit unchecks it
@@ -187,6 +189,30 @@ function apply(id, delta) {
   ctx.refresh();
   const el = ctx.root.querySelector(`.imp-row[data-id="${CSS.escape(id)}"]`);
   if (el) floatXP(el, change);
+  celebrate(before, Stats.compute(), added);
+}
+
+// Auto habits: tap to tick it yourself for this period (override), tap again to hand it back to auto
+let overrideOpen = false;
+async function applyOverride(h) {
+  if (overrideOpen) return;
+  overrideOpen = true;
+  const on = H.isOverridden(h);
+  const word = PERIOD_WORD[h.frequency];
+  const ok = await confirmBox(on
+    ? { title: 'Back to auto?', text: `Removes your manual tick. The ${autoTab(h)} tab decides ${word} again.`, ok: 'Back to auto', icon: 'info' }
+    : { title: 'Tick it yourself?', text: `Auto from the ${autoTab(h)} tab. Counts as done ${word} with full XP, and the auto check won't undo it.`, ok: 'Tick it', icon: 'check' });
+  overrideOpen = false;
+  if (!ok) return;
+  const before = Stats.compute();
+  const xp0 = H.xpOnDay();
+  H.setOverride(h, !on);
+  if (on) recheckFood(); // let auto put it back if it's earned
+  const added = R.sync();
+  ctx.refresh();
+  const change = H.xpOnDay() - xp0;
+  const el = ctx.root.querySelector(`.imp-row[data-id="${CSS.escape(h.id)}"]`);
+  if (el && change) floatXP(el, change);
   celebrate(before, Stats.compute(), added);
 }
 

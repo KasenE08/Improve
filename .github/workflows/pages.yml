@@ -42,6 +42,7 @@ jobs:
           node tests/journal.test.mjs
           node tests/launch.test.mjs
           node tests/limits.test.mjs
+          node tests/override.test.mjs
       - name: Collect the site (without Planner sources)
         run: |
           mkdir _site
