@@ -29,6 +29,7 @@ export function wipeTestData() {
   store.remove('planner_day');
   store.remove('limit_settled');
   store.remove('excused');
+  store.remove('override');
 
   const food = store.get('food', null);
   if (food) store.set('food', { ...food, entries: (food.entries || []).filter((e) => e.date >= START), water: Object.fromEntries(Object.entries(food.water || {}).filter(([k]) => k >= START)) });
