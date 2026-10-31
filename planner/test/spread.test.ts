@@ -48,14 +48,6 @@ describe('spreading work over the days', () => {
     expect(days[0] < days[1] && days[1] < days[2]).toBe(true);
   });
 
-  it('falling behind still starts the first one exactly 5 minutes from now', () => {
-    let d = replan({ ...emptyData(), blocks: BLOCKS, locations: LOCATIONS }, NOW);
-    d = actions.saveTask(d, task({ id: 'a', estimateMin: 30, due: T(MON, '23:59') }), NOW);
-    d = actions.saveTask(d, task({ id: 'b', estimateMin: 30, due: T(THU, '23:59') }), NOW);
-    d = actions.fallingBehind(d, T(MON, '18:03'));
-    expect(fmt(d.plan!.items.find((i) => i.taskId === 'a')!.start)).toBe(`${MON} 18:08`);
-  });
-
   it('can be turned off to pack the earliest days again', () => {
     const due = T(THU, '23:59');
     const r = schedule(input(NOW, ['a', 'b'].map((id) => task({ id, estimateMin: 45, due })), { settings: { ...DEFAULT_SETTINGS, spreadWork: false } }));

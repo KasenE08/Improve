@@ -1,62 +1,64 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
-import type { BlockTag, DateKey, FixedBlock, Ms, SchoolClass, Task } from '../core/types';
-import { addDays, at, DAY_START_MIN, planDay } from '../core/time';
+import type { DateKey, FixedBlock, Ms, SchoolClass, Task } from '../core/types';
+import { addDays, at, planDay } from '../core/time';
 import { occurrencesOn } from '../core/availability';
-import type { AppData } from './model';
-import { actions } from './model';
+import { actions, type AppData } from './model';
 import { commit, getData } from './store';
-import { fixLateness, moveInOrder, newlyLate } from './model';
 import { useDrag, type DropTarget } from './drag';
 import { MonthGrid, monthStart } from './MonthGrid';
-import { CATEGORY_ICONS, Icon, TAG_STYLE } from './icons';
-import { categoryRank } from '../core/priority';
-import { choose } from './dialog';
+import { Icon } from './icons';
 import { useUI } from './ui';
 import { ClassTag } from './ClassPicker';
-import { category, fmtDay, fmtDue, fmtDur, fmtTime, inputToMin, minToInput, TAG_LABELS } from './format';
+import { fmtDay, fmtDue, fmtTime } from './format';
 
+// The day is a calendar, like Google Calendar: everything sits at the time you put it.
 type Entry =
-  | { kind: 'block'; start: Ms; end: Ms; title: string; sub: string; soft: boolean; tag: string; tagKey: BlockTag; block: FixedBlock }
-  | { kind: 'task'; start: Ms; end: Ms; task: Task; late: boolean; night?: boolean; cls?: SchoolClass }
-  | { kind: 'reminder'; start: Ms; title: string }
-  | { kind: 'now'; start: Ms };
+  | { kind: 'event'; start: Ms; end: Ms; block: FixedBlock }
+  | { kind: 'task'; start: Ms; end: Ms; task: Task; late: boolean; cls?: SchoolClass };
 
-function entriesFor(d: AppData, key: DateKey, now: Ms): Entry[] {
-  // A day on screen runs 4:01 AM → 4:00 AM (late-night work shows under the night before)
-  const dayStart = at(key, DAY_START_MIN);
-  const dayEnd = at(addDays(key, 1), DAY_START_MIN);
-  const inDay = (t: Ms) => t >= dayStart && t < dayEnd;
-  const locs = new Map(d.locations.map((l) => [l.id, l]));
+const PX = 1.25; // pixels per minute (75 px an hour)
+const LABEL_W = 48;
+const MIN_H = 24;
+const hourLabel = (h: number) => (h === 0 ? '12 AM' : h === 12 ? 'Noon' : h < 12 ? `${h} AM` : `${h - 12} PM`);
+
+function entriesFor(d: AppData, key: DateKey): Entry[] {
+  // A day on screen runs 4 AM → 4 AM, like the rest of Improve (late-night work shows under the night before)
+  const from = at(key, 4 * 60);
+  const to = at(addDays(key, 1), 4 * 60);
   const tasks = new Map(d.tasks.map((t) => [t.id, t]));
   const out: Entry[] = [];
-
-  for (const o of occurrencesOn(key, d.blocks, d.locations, d.arrivals)) {
-    const loc = locs.get(o.block.locationId);
-    const away = o.leave !== o.start || o.arrive !== o.end;
-    const travel = o.fromTitle || o.toTitle
-      ? [o.fromTitle ? `from ${o.fromTitle} · leave ${fmtTime(o.leave)}` : away ? `leave ${fmtTime(o.leave)}` : null, o.toTitle ? `then ${o.toTitle}` : `home ${fmtTime(o.arrive)}`].filter(Boolean).join(' · ')
-      : away ? `leave ${fmtTime(o.leave)} · home ${fmtTime(o.arrive)}` : null;
-    out.push({
-      kind: 'block',
-      block: o.block,
-      start: o.start,
-      end: o.end,
-      title: o.block.title,
-      sub: [loc && loc.id !== 'home' ? loc.name : null, travel].filter(Boolean).join(' · '),
-      soft: o.block.blocksScheduling === false,
-      tag: TAG_LABELS[o.block.tag],
-      tagKey: o.block.tag,
-    });
+  for (const o of [...occurrencesOn(addDays(key, -1), d.blocks, d.locations), ...occurrencesOn(key, d.blocks, d.locations)]) {
+    if (o.end > from && o.start < to) out.push({ kind: 'event', start: o.start, end: o.end, block: o.block });
   }
   for (const i of d.plan?.items ?? []) {
     const task = tasks.get(i.taskId);
-    if (task && inDay(i.start)) out.push({ kind: 'task', start: i.start, end: i.end, task, late: i.late, night: i.night, cls: d.classes.find((c) => c.id === task.classId) });
+    if (task && i.start >= from && i.start < to) out.push({ kind: 'task', start: i.start, end: i.end, task, late: i.late, cls: d.classes.find((c) => c.id === task.classId) });
   }
-  for (const r of d.plan?.blockReminders ?? []) {
-    if (inDay(r.at)) out.push({ kind: 'reminder', start: r.at, title: r.title });
+  return out.sort((a, b) => a.start - b.start);
+}
+
+/** Side-by-side lanes for things that overlap (like Google Calendar). */
+function layoutLanes<T extends { start: Ms; end: Ms }>(list: T[]): { e: T; lane: number; lanes: number }[] {
+  const out: { e: T; lane: number; lanes: number }[] = [];
+  let group: { e: T; lane: number; lanes: number }[] = [];
+  let groupEnd = -Infinity;
+  const flush = () => {
+    const n = Math.max(1, ...group.map((g) => g.lane + 1));
+    for (const g of group) g.lanes = n;
+    out.push(...group);
+    group = [];
+  };
+  for (const e of [...list].sort((a, b) => a.start - b.start || b.end - a.end)) {
+    if (e.start >= groupEnd && group.length) flush();
+    const ends: Ms[] = [];
+    for (const g of group) ends[g.lane] = Math.max(ends[g.lane] ?? -Infinity, g.e.end);
+    let lane = 0;
+    while (ends[lane] !== undefined && ends[lane] > e.start) lane++;
+    group.push({ e, lane, lanes: 1 });
+    groupEnd = Math.max(groupEnd, e.end);
   }
-  if (inDay(now)) out.push({ kind: 'now', start: now });
-  return out.sort((a, b) => a.start - b.start || (a.kind === 'now' ? -1 : b.kind === 'now' ? 1 : 0));
+  if (group.length) flush();
+  return out;
 }
 
 export function Today({ data, now }: { data: AppData; now: Ms }) {
@@ -67,100 +69,36 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   const [month, setMonth] = useState<DateKey>(monthStart(today));
   const ui = useUI();
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, weekOffset * 7 + i));
-  const entries = entriesFor(data, day, now);
-  const school = occurrencesOn(day, data.blocks, data.locations).find((o) => o.block.tag === 'school');
-  const tasks = new Map(data.tasks.map((t) => [t.id, t]));
-  /** This day's assignments that can be reordered, top to bottom. */
-  const order = entries.filter((e): e is Extract<Entry, { kind: 'task' }> => e.kind === 'task' && e.task.status === 'todo').map((e) => e.task.id);
-  /**
-   * Dropping `id` before entry `p`: the day's new order, the fixed time just above it (start after that ends)
-   * and the one just below (it should fit before that). Null when it would land where it already is.
-   */
-  const spotAt = (p: number, id: string) => {
-    const isTodo = (e: Entry) => e.kind === 'task' && e.task.status === 'todo';
-    const isSelf = (e: Entry) => e.kind === 'task' && e.task.id === id;
-    type Card = Extract<Entry, { kind: 'block' | 'task' }>;
-    const cards = entries.map((e, i) => ({ e, i })).filter((c): c is { e: Card; i: number } => c.e.kind === 'block' || c.e.kind === 'task');
-    const self = cards.findIndex(({ e }) => isSelf(e));
-    if (self === -1 || p === cards[self].i || p === (cards[self + 1]?.i ?? entries.length)) return null;
-    const above = cards.filter(({ e, i }) => i < p && !isSelf(e));
-    const slot = above.filter(({ e }) => isTodo(e)).length + (cards[self].i < p ? 1 : 0);
-    let lastTodo = -1;
-    above.forEach(({ e }, k) => isTodo(e) && (lastTodo = k));
-    const fixedAbove = above.slice(lastTodo + 1).map(({ e }) => e.end);
-    const below = cards.find(({ e, i }) => i >= p && !isSelf(e))?.e;
-    return {
-      ids: moveInOrder(order, id, slot) ?? order,
-      after: fixedAbove.length ? Math.max(...fixedAbove) : undefined,
-      before: below && !isTodo(below)
-        ? { start: below.start, title: below.kind === 'block' ? below.title : below.task.title }
-        : undefined,
-    };
-  };
-  const onDrop = async (id: string, target: DropTarget) => {
+  const entries = entriesFor(data, day);
+  const toDo = data.tasks.filter((t) => t.status !== 'done').length;
+  const countFor = (k: DateKey) => entriesFor(data, k).filter((e) => e.kind === 'task' && e.task.status !== 'done').length; // dot = assignments to do
+
+  // Drag an assignment or a one-time event: onto a date (same time that day) or to a time on the day
+  const onDrop = (id: string, target: DropTarget) => {
     const cur = getData();
     const n = Date.now();
-    let next: AppData;
-    const notes: string[] = [];
-    const movedTitle = cur.tasks.find((t) => t.id === id)?.title ?? 'this';
-    if ('day' in target) {
-      next = actions.moveToDay(cur, id, target.day, n);
-      const slot = next.plan?.items.find((i) => i.taskId === id);
-      if (slot && planDay(slot.start) !== target.day) {
-        notes.push(`No room on ${fmtDay(target.day)}, so it goes to ${fmtDue(slot.start)}.`);
-      }
-    } else {
-      // Reorder this day's list: the dragged one goes into the outlined spot, the rest shift up or down.
-      const spot = spotAt(target.at, id);
-      if (!spot) return;
-      next = actions.reorderDay(cur, day, spot.ids, n, { id, after: spot.after });
-      const slot = next.plan?.items.find((i) => i.taskId === id);
-      if (slot && planDay(slot.start) !== day) notes.push(`No room on ${fmtDay(day)}, so it goes to ${fmtDue(slot.start)}.`);
-      else if (slot && spot.before && slot.start >= spot.before.start) {
-        notes.push(`It doesn't fit before "${spot.before.title}", so it goes after it (${fmtTime(slot.start)}).`);
-      }
-    }
-    // If anything ends up late, offer the smallest help that gets it done on time.
-    const fix = fixLateness(cur, next, id, n, 'day' in target ? target.day === planDay(n) : day === planDay(n));
-    if (fix) {
-      const allOnTime = fix.tasks.every((t) => !fix.data.plan!.items.some((i) => i.taskId === t.id && i.late));
-      const how = fix.skipBreak && fix.night
-        ? 'Skipping the break and working past midnight (until 2am)'
-        : fix.skipBreak
-          ? 'Skipping the 30-minute break'
-          : 'Working past midnight (until 2am)';
-      const pick = await choose(
-        `Moving "${movedTitle}": ${fix.tasks.map((t) => `"${t.title}"`).join(', ')} would be late. ${how} gets ${allOnTime ? 'it' : 'more'} done on time.`,
-        [fix.skipBreak && fix.night ? 'Skip break & work late' : fix.skipBreak ? 'Skip the break' : 'Work past midnight', 'Move anyway (late)', 'Cancel'],
-      );
-      if (pick === 0) commit(() => fix.data);
-      else if (pick === 1) commit(() => next);
-      return;
-    }
-    const late = newlyLate(cur, next);
-    if (late.length) notes.push(`This makes ${late.map((t) => `"${t.title}"`).join(', ')} late.`);
-    if (notes.length && !confirm(`Moving "${movedTitle}": ${notes.join(' ')} Move anyway?`)) return;
-    commit(() => next);
+    const ev = id.startsWith('ev:') ? cur.blocks.find((b) => b.id === id.slice(3)) : undefined;
+    const task = ev ? undefined : cur.tasks.find((t) => t.id === id);
+    if (!ev && !task?.at) return;
+    const oldStart = ev ? at(day, ev.startMin) : task!.at!;
+    const start = 'time' in target
+      ? target.time
+      : at(target.day, Math.round((oldStart - at(planDay(oldStart), 0)) / 60_000));
+    if (ev) {
+      const k = planDay(start);
+      commit((d) => actions.moveEvent(d, ev.id, k, Math.round((start - at(k, 0)) / 60_000), n));
+    } else commit((d) => actions.moveTask(d, id, start, n));
   };
   const dnd = useDrag(onDrop);
-  const dropAt = (() => {
-    const over = dnd.drag?.over;
-    return over && 'at' in over && spotAt(over.at, dnd.drag!.id) ? over.at : null;
-  })();
 
-  const countFor = (k: DateKey) =>
-    (data.plan?.items ?? []).filter((i) => planDay(i.start) === k && tasks.get(i.taskId)?.status !== 'done').length;
-  const toDo = data.tasks.filter((t) => t.status !== 'done').length;
-
-  // ---- 24-hour timeline (like Google Calendar): the app day runs 4 AM → 4 AM; 1 minute = PX px ----
+  // ---- 24-hour day: 4 AM → 4 AM, 1 minute = PX px ----
   const gridStart = at(day, 4 * 60);
   const y = (ms: Ms) => ((ms - gridStart) / 60_000) * PX;
-  const placed = layoutLanes(entries.filter((e): e is Extract<Entry, { kind: 'block' | 'task' }> => e.kind === 'block' || e.kind === 'task'));
-  const nowEntry = entries.find((e) => e.kind === 'now');
-  const firstEvent = entries.find((e) => e.kind === 'block' || e.kind === 'task');
+  const placed = layoutLanes(entries);
+  const showNow = planDay(now) === day;
   const gridRef = useRef<HTMLDivElement>(null);
-  // The hours scroll in their own area under the fixed top (like Google Calendar), sized to the screen,
-  // and open scrolled to now (today) or the first thing planned (other days).
+  // The hours scroll in their own area under the fixed top, sized to the screen; they open at now
+  // (today) or the first thing that day.
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -172,11 +110,11 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
-    const target = nowEntry ? nowEntry.start : firstEvent ? firstEvent.start : at(day, 8 * 60);
+    const target = showNow ? now : entries[0]?.start ?? at(day, 8 * 60);
     el.scrollTop = Math.max(0, y(target) - el.clientHeight * 0.3);
   }, [day, mode]);
-  const lastEnd = Math.max(gridStart, ...placed.map((p) => p.e.end));
-  const dropY = dropAt === null ? null : dropAt < entries.length ? y(entries[dropAt].start) : y(lastEnd);
+  const over = dnd.drag?.over;
+  const dropY = over && 'time' in over ? y(over.time) : null;
 
   return (
     <div class="plan">
@@ -216,7 +154,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
             >
               <span>{fmtDay(k, { weekday: 'narrow' })}</span>
               <strong>{fmtDay(k, { day: 'numeric' })}</strong>
-              <i class={countFor(k) ? 'has' : ''} aria-label={countFor(k) ? `${countFor(k)} assignments` : undefined} />
+              <i class={countFor(k) ? 'has' : ''} />
             </button>
           ))}
           <button class="icon-btn" aria-label="Next week" onClick={() => setWeekOffset(weekOffset + 1)}>
@@ -225,73 +163,36 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
         </div>
       )}
 
-      {school && day === today && now >= school.end && (
-        <div class="arrival-pill">
-          <span>Home from school</span>
-          {data.arrivals[day] === undefined ? (
-            <button class="link" onClick={() => { const t = new Date(); commit((d, n) => actions.setArrival(d, day, t.getHours() * 60 + t.getMinutes(), n)); }}>
-              I'm home
-            </button>
-          ) : null}
-          <input
-            type="time"
-            aria-label="Time home from school"
-            value={data.arrivals[day] !== undefined ? minToInput(data.arrivals[day]) : minToInput(Math.round((school.arrive - at(day, 0)) / 60_000))}
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              commit((d, n) => actions.setArrival(d, day, v ? inputToMin(v) : null, n));
-            }}
-          />
-        </div>
-      )}
-
-      {day === today && <Warnings data={data} />}
-
-      {data.blocks.length === 0 && (
-        <div class="card muted small">No repeating times yet. Tap + to add school, practice or work, or import a backup under ⋯.</div>
-      )}
-
       <div class="tl-scroll" ref={gridRef}>
-      <ol class="tl" data-drop-list={entries.length} style={{ height: `${24 * 60 * PX}px` }}>
-        {Array.from({ length: 24 }, (_, h) => (
-          <li class="tl-hour" style={{ top: `${h * 60 * PX}px` }} aria-hidden="true">
-            <span>{h === 0 ? '' : hourLabel((4 + h) % 24)}</span>
-          </li>
-        ))}
-        {placed.map(({ e, lane, lanes }) => {
-          const i = entries.indexOf(e);
-          const top = y(e.start);
-          const h = Math.max(MIN_H, y(e.end) - top - 2);
-          const pos = { top: `${top}px`, height: `${h}px`, left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${lane / lanes})`, width: `calc((100% - ${LABEL_W}px) / ${lanes} - 4px)` };
-          if (e.kind === 'block') {
-            const st = TAG_STYLE[e.tagKey];
-            return (
-              <li class={`tl-ev block ${e.soft ? 'soft' : ''} ${h < 40 ? 'short' : ''}`} style={{ ...pos, '--cat': st.color }} data-drop-at={i} onClick={() => ui.open({ kind: 'block', block: e.block })}>
-                <div class="body">
-                  <div class="title">{e.title}</div>
-                  <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}</div>
-                  {e.sub && h >= 56 && <div class="meta">{e.sub}</div>}
-                </div>
-              </li>
-            );
-          }
-          return <TaskEntry e={e} dnd={dnd} at={i} pos={pos} h={h} />;
-        })}
-        {entries.filter((e): e is Extract<Entry, { kind: 'reminder' }> => e.kind === 'reminder').map((r) => (
-          <li class="tl-reminder" style={{ top: `${y(r.start)}px` }}>
-            <Icon name="bell" size={12} /> {fmtTime(r.start)} {r.title}
-          </li>
-        ))}
-        {nowEntry && (
-          <li class="tl-now" style={{ top: `${y(nowEntry.start)}px` }} aria-label={`Now, ${fmtTime(nowEntry.start)}`} />
-        )}
-        {dropY !== null && dnd.drag && <li class="tl-drop" style={{ top: `${dropY}px` }}><span>{dnd.drag.title}</span></li>}
-      </ol>
+        <ol class="tl" data-drop-grid={gridStart} data-px={PX} style={{ height: `${24 * 60 * PX}px` }}>
+          {Array.from({ length: 24 }, (_, h) => (
+            <li class="tl-hour" style={{ top: `${h * 60 * PX}px` }} aria-hidden="true">
+              <span>{h === 0 ? '' : hourLabel((4 + h) % 24)}</span>
+            </li>
+          ))}
+          {placed.map(({ e, lane, lanes }) => {
+            const top = Math.max(0, y(e.start));
+            const h = Math.max(MIN_H, y(e.end) - top - 2);
+            const pos = {
+              top: `${top}px`,
+              height: `${h}px`,
+              left: `calc(${LABEL_W}px + (100% - ${LABEL_W}px) * ${lane / lanes})`,
+              width: `calc((100% - ${LABEL_W}px) / ${lanes} - 4px)`,
+            };
+            return e.kind === 'event'
+              ? <EventEntry e={e} dnd={dnd} pos={pos} h={h} />
+              : <TaskEntry e={e} dnd={dnd} pos={pos} h={h} />;
+          })}
+          {showNow && <li class="tl-now" style={{ top: `${y(now)}px` }} aria-label={`Now, ${fmtTime(now)}`} />}
+          {dropY !== null && dnd.drag && (
+            <li class="tl-drop" style={{ top: `${dropY}px`, height: `${dnd.drag.h}px` }}>
+              <span>{fmtTime((over as { time: number }).time)} · {dnd.drag.title}</span>
+            </li>
+          )}
+        </ol>
       </div>
       {dnd.ghost}
-      {dnd.drag && <div class="drag-hint">Drop on a date to move it there, or on the day to reorder</div>}
-
-      {day === today && <BehindPrompt data={data} now={now} />}
+      {dnd.drag && <div class="drag-hint">Drop on a time, or on a date to move it to that day</div>}
 
       <button class="plan-fab" aria-label="Add" onClick={() => ui.open({ kind: 'add' })}>
         <Icon name="plus" size={26} />
@@ -300,152 +201,62 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   );
 }
 
-const PX = 1.25; // pixels per minute (75 px an hour)
-const LABEL_W = 48;
-const MIN_H = 24;
-const hourLabel = (h: number) => (h === 0 ? '12 AM' : h === 12 ? 'Noon' : h < 12 ? `${h} AM` : `${h - 12} PM`);
-
-/** Side-by-side lanes for things that overlap (like Google Calendar). */
-function layoutLanes<T extends { start: Ms; end: Ms }>(list: T[]): { e: T; lane: number; lanes: number }[] {
-  const out: { e: T; lane: number; lanes: number }[] = [];
-  let group: { e: T; lane: number; lanes: number }[] = [];
-  let groupEnd = -Infinity;
-  const flush = () => {
-    const n = Math.max(1, ...group.map((g) => g.lane + 1));
-    for (const g of group) g.lanes = n;
-    out.push(...group);
-    group = [];
-  };
-  for (const e of [...list].sort((a, b) => a.start - b.start || b.end - a.end)) {
-    if (e.start >= groupEnd && group.length) flush();
-    const ends: Ms[] = [];
-    for (const g of group) ends[g.lane] = Math.max(ends[g.lane] ?? -Infinity, g.e.end);
-    let lane = 0;
-    while (ends[lane] !== undefined && ends[lane] > e.start) lane++;
-    group.push({ e, lane, lanes: 1 });
-    groupEnd = Math.max(groupEnd, e.end);
-  }
-  if (group.length) flush();
-  return out;
-}
-
-/**
- * 10 minutes after an assignment should have started (and it hasn't): a full-screen question.
- * Yes = "Falling behind" (reschedule the rest; no tick for "Finished today's work" today). No = leave it.
- */
-function BehindPrompt({ data, now }: { data: AppData; now: Ms }) {
-  const tasks = new Map(data.tasks.map((t) => [t.id, t]));
-  const asked = new Set(data.behindAsked ?? []);
-  const today = planDay(now);
-  if ((data.behindDays ?? []).includes(today)) return null;
-  const late = (data.plan?.items ?? []).find((i) => {
-    const t = tasks.get(i.taskId);
-    return t && t.status === 'todo' && planDay(i.start) === today && now >= i.start + 10 * 60_000 && now < i.end + 6 * 60 * 60_000 && !asked.has(`${i.taskId}@${i.start}`);
-  });
-  if (!late) return null;
-  const t = tasks.get(late.taskId)!;
-  const key = `${late.taskId}@${late.start}`;
-  return (
-    <div class="behind-overlay" role="alertdialog" aria-modal="true" aria-label="Falling behind?">
-      <div class="behind-box">
-        <span class="behind-icon"><Icon name="clock" size={30} /></span>
-        <h2>Falling behind?</h2>
-        <p>
-          <b>{t.title}</b> was planned for {fmtTime(late.start)} and hasn't been started.
-        </p>
-        <p class="muted small">Yes reschedules everything you haven't started, beginning in 5 minutes. "Finished today's work" can't tick today.</p>
-        <button class="btn primary wide" onClick={() => commit((d, n) => actions.markBehindAsked(actions.fallingBehind(d, n), key))}>
-          Yes, reschedule
-        </button>
-        <button class="btn wide" onClick={() => commit((d) => actions.markBehindAsked(d, key))}>
-          No, I'm on it
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function TaskEntry({ e, dnd, at, pos, h }: { e: Extract<Entry, { kind: 'task' }>; dnd: ReturnType<typeof useDrag>; at: number; pos: Record<string, string>; h: number }) {
+function EventEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'event' }>; dnd: ReturnType<typeof useDrag>; pos: Record<string, string>; h: number }) {
   const ui = useUI();
-  const t = e.task;
-  const cat = category(t);
-  const drag = t.status === 'todo' ? dnd.bind(t.id, t.title) : null;
-  const open = () => ui.open({ kind: 'detail', id: t.id });
+  const b = e.block;
+  // One-time events can be dragged; repeating ones are changed by tapping them
+  const drag = b.recurrence.kind === 'once' ? dnd.bind(`ev:${b.id}`, b.title) : null;
+  const open = () => ui.open({ kind: 'block', block: b, date: planDay(e.start) });
   return (
     <li
-      class={`tl-ev task ${t.status} ${e.late ? 'late' : ''} ${h < 40 ? 'short' : ''} ${dnd.drag?.id === t.id ? 'dragging' : ''}`}
-      style={{ ...pos, '--cat': e.cls?.color ?? cat.color }}
-      data-drop-at={at}
+      class={`tl-ev event ${h < 40 ? 'short' : ''} ${dnd.drag?.id === `ev:${b.id}` ? 'dragging' : ''}`}
+      style={pos}
       onPointerDown={drag?.onPointerDown}
       onContextMenu={drag?.onContextMenu}
       onClick={drag ? drag.guard(open) : open}
     >
       <div class="body">
-        <div class="title">{t.status === 'done' && <Icon name="check" size={14} />}{t.title}</div>
-        <div class="meta">
-          {fmtTime(e.start)} – {fmtTime(e.end)}
-          {h >= 56 ? ` · ${t.due === null ? 'missing, ASAP' : `due ${fmtDue(t.due)}`}` : ''}
-        </div>
-        {h >= 70 && e.cls && <ClassTag c={e.cls} />}
-        {h >= 110 && t.notes && <p class="note-preview"><span>{t.notes}</span></p>}
-        {e.late && h >= 56 && <div class="warn small">Can't finish before it's due</div>}
-        {e.night && !e.late && h >= 56 && <div class="small night">Past midnight to finish on time</div>}
+        <div class="title">{b.recurrence.kind !== 'once' && <Icon name="repeat" size={12} />}{b.title}</div>
+        <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}</div>
       </div>
-      {t.status !== 'done' && (
-        <button
-          class={`btn small tl-start ${h < 40 ? 'icon-only' : ''}`}
-          aria-label={t.status === 'todo' ? `Start ${t.title}` : `Done with ${t.title}`}
-          onClick={(ev) => {
-            ev.stopPropagation();
-            commit((d, n) => (t.status === 'todo' ? actions.startTask(d, t.id, n) : actions.completeTask(d, t.id, n)));
-          }}
-        >
-          {h < 40 ? <Icon name={t.status === 'todo' ? 'play' : 'check'} size={13} /> : t.status === 'todo' ? 'Start' : 'Done'}
-        </button>
-      )}
     </li>
   );
 }
 
-// "Even working until 2am" only makes sense when there was extra late-night time before the due time
-const lateNightHelps = (data: AppData, due: number) => !!data.night && data.night.end > data.night.start && due > data.night.start;
-
-function Warnings({ data }: { data: AppData }) {
+function TaskEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'task' }>; dnd: ReturnType<typeof useDrag>; pos: Record<string, string>; h: number }) {
   const ui = useUI();
-  const tasks = new Map(data.tasks.map((t) => [t.id, t]));
-  const list = (data.plan?.warnings ?? []).filter((w) => tasks.get(w.taskId)?.status !== 'done');
-  if (!list.length) return null;
+  const t = e.task;
+  const done = t.status === 'done';
+  const drag = done ? null : dnd.bind(t.id, t.title);
+  const open = () => ui.open({ kind: 'detail', id: t.id });
   return (
-    <div class="card overload">
-      <strong><Icon name="alert" size={16} /> Overload</strong>
-      {list.map((w) => {
-        const t = tasks.get(w.taskId)!;
-        return (
-          <button class="link warn-row" onClick={() => ui.open({ kind: 'detail', id: t.id })}>
-            {w.kind === 'late'
-              ? `${t.title}: finishes ${fmtDue(w.end)}, due ${fmtDue(w.due)}${lateNightHelps(data, w.due) ? ' (even working until ' + fmtTime(data.night!.end) + ')' : ''}`
-              : `${t.title}: no time fits in the next ${data.settings.horizonDays} days`}
-          </button>
-        );
-      })}
-    </div>
+    <li
+      class={`tl-ev task ${done ? 'done' : ''} ${e.late ? 'late' : ''} ${h < 40 ? 'short' : ''} ${dnd.drag?.id === t.id ? 'dragging' : ''}`}
+      style={{ ...pos, '--cat': e.cls?.color ?? 'var(--imp-accent)' }}
+      onPointerDown={drag?.onPointerDown}
+      onContextMenu={drag?.onContextMenu}
+      onClick={drag ? drag.guard(open) : open}
+    >
+      <button
+        class={`tl-check ${done ? 'on' : ''}`}
+        aria-label={done ? `Mark "${t.title}" not done` : `Mark "${t.title}" done`}
+        onClick={(ev) => {
+          ev.stopPropagation();
+          commit((d, n) => (done ? actions.reopenTask(d, t.id, n) : actions.completeTask(d, t.id, n)));
+        }}
+      >
+        {done && <Icon name="check" size={12} />}
+      </button>
+      <div class="body">
+        <div class="title">{t.title}</div>
+        <div class="meta">
+          {fmtTime(e.start)} – {fmtTime(e.end)}
+          {h >= 56 && t.due !== null ? ` · due ${fmtDue(t.due)}` : ''}
+        </div>
+        {h >= 70 && e.cls && <ClassTag c={e.cls} />}
+        {h >= 110 && t.notes && <p class="note-preview"><span>{t.notes}</span></p>}
+        {e.late && h >= 56 && <div class="warn small">Ends after it's due</div>}
+      </div>
+    </li>
   );
-}
-
-const hasOpenWork = (d: AppData) => d.tasks.some((t) => t.status === 'todo');
-
-export function behind() {
-  const first = Date.now() + 5 * 60_000;
-  if (!confirm(`Reschedule everything you haven't started, beginning at ${fmtTime(first)}?`)) return;
-  let msg = '';
-  commit((d, n) => {
-    const next = actions.fallingBehind(d, n);
-    const items = next.plan?.items.filter((i) => next.tasks.find((t) => t.id === i.taskId)?.status === 'todo') ?? [];
-    const parts = [items.length ? `Rescheduled. First assignment at ${fmtTime(Math.min(...items.map((i) => i.start)))}.` : 'Nothing left to reschedule.'];
-    if (items.some((i) => i.night)) parts.push('Some work runs past midnight to finish on time.');
-    if (next.plan?.warnings.length) parts.push("Some assignments still can't be done on time. See Overload.");
-    msg = parts.join(' ');
-    return next;
-  });
-  alert(msg);
 }

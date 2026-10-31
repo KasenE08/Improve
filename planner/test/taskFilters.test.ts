@@ -6,11 +6,11 @@ import { BLOCKS, LOCATIONS, MON, TUE, FRI, T, task, PACKED } from './fixtures';
 const NOW = T(MON, '15:00');
 const setup = () => {
   let d = replan({ ...emptyData(), blocks: BLOCKS, locations: LOCATIONS, settings: PACKED }, NOW);
-  d = actions.saveTask(d, task({ id: 'today', estimateMin: 30, formats: ['online'], due: T(TUE, '23:59') }), NOW);
-  d = actions.saveTask(d, task({ id: 'late', estimateMin: 60, formats: ['paper'], due: T(MON, '16:00') }), NOW);
-  d = actions.saveTask(d, task({ id: 'errand', estimateMin: 30, formats: [], due: T(FRI, '23:59') }), NOW);
+  d = actions.saveTask(d, task({ id: 'today', estimateMin: 30, formats: ['online'], due: T(TUE, '23:59'), at: T(MON, '17:00') }), NOW);
+  d = actions.saveTask(d, task({ id: 'late', estimateMin: 60, formats: ['paper'], due: T(MON, '16:00'), at: T(MON, '15:30') }), NOW);
+  d = actions.saveTask(d, task({ id: 'errand', estimateMin: 30, formats: [], due: T(FRI, '23:59'), at: T(TUE, '18:00') }), NOW);
   d = actions.saveTask(d, task({ id: 'missing', estimateMin: 30, formats: ['paper'], missing: true, due: null }), NOW);
-  d = actions.saveTask(d, task({ id: 'far', estimateMin: 30, formats: ['online'], due: T(FRI, '23:59') + 20 * 86_400_000, pinDay: '2026-10-29' }), NOW);
+  d = actions.saveTask(d, task({ id: 'far', estimateMin: 30, formats: ['online'], due: T(FRI, '23:59') + 20 * 86_400_000, at: T('2026-10-29', '16:00') }), NOW);
   d = actions.saveTask(d, task({ id: 'done', estimateMin: 30 }), NOW);
   return actions.completeTask(d, 'done', NOW);
 };

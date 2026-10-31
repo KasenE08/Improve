@@ -1,176 +1,72 @@
 import { useState } from 'preact/hooks';
-import type { BlockTag, FixedBlock, Recurrence, ReminderStep } from '../core/types';
+import type { FixedBlock, Recurrence } from '../core/types';
 import { dateKey } from '../core/time';
 import { actions, type AppData } from './model';
 import { commit } from './store';
 import { Chips, Field, SheetFrame, useUI } from './ui';
-import { fmtDay, inputToMin, minToInput, TAG_LABELS, uid, WEEKDAYS } from './format';
+import { fmtDay, inputToMin, minToInput, uid, WEEKDAYS } from './format';
 
-type Kind = Recurrence['kind'];
-const KINDS: { value: Kind; label: string }[] = [
-  { value: 'once', label: 'One time' },
-  { value: 'daily', label: 'Daily' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'monthlyDate', label: 'Monthly (same date)' },
-  { value: 'monthlyNth', label: 'Monthly (e.g. 2nd Tuesday)' },
+type Repeat = 'never' | 'daily' | 'weekly' | 'monthly';
+const REPEATS: { v: Repeat; label: string }[] = [
+  { v: 'never', label: 'Never' },
+  { v: 'daily', label: 'Daily' },
+  { v: 'weekly', label: 'Weekly' },
+  { v: 'monthly', label: 'Monthly' },
 ];
+const weekdayOf = (k: string) => new Date(`${k}T12:00`).getDay();
 
-export function BlockForm({ data, block, once }: { data: AppData; block?: FixedBlock; once?: boolean }) {
+/** An event on the calendar (archery, work, a game). Repeating is chosen right here. */
+export function BlockForm({ block, date }: { data: AppData; block?: FixedBlock; date?: string }) {
   const ui = useUI();
-  const today = dateKey(Date.now());
   const r = block?.recurrence;
+  const firstDay = r?.kind === 'once' ? r.date : block?.startDate ?? date ?? dateKey(Date.now());
   const [title, setTitle] = useState(block?.title ?? '');
-  const [tag, setTag] = useState<BlockTag>(block?.tag ?? 'other');
-  const [locationId, setLocationId] = useState(block?.locationId ?? 'home');
-  // Place to place: where you come from (Home = leave from home), and how long it takes from there
-  const [fromId, setFromId] = useState(block?.fromLocationId ?? 'home');
-  const [travel, setTravel] = useState<string>(() => {
-    const m = data.locations.find((l) => l.id === (block?.locationId ?? 'home'))?.travelFrom?.[block?.fromLocationId ?? ''];
-    return m != null ? String(m) : '';
-  });
-  // A new place made right here (no settings page)
-  const [newPlace, setNewPlace] = useState<{ name: string; there: string; back: string } | null>(null);
+  const [day, setDay] = useState(firstDay);
   const [start, setStart] = useState(minToInput(block?.startMin ?? 18 * 60));
   const [end, setEnd] = useState(minToInput(block?.endMin ?? 19 * 60));
-  const [kind, setKind] = useState<Kind>(r?.kind ?? (once ? 'once' : 'weekly'));
-  const [date, setDate] = useState(r?.kind === 'once' ? r.date : today);
-  const [weekdays, setWeekdays] = useState<number[]>(r?.kind === 'weekly' ? r.weekdays : []);
-  const [monthDay, setMonthDay] = useState(r?.kind === 'monthlyDate' ? r.day : 1);
-  const [nth, setNth] = useState(r?.kind === 'monthlyNth' ? r.nth : 1);
-  const [nthDay, setNthDay] = useState(r?.kind === 'monthlyNth' ? r.weekday : 1);
-  const [startDate, setStartDate] = useState(block?.startDate ?? '');
-  const [endDate, setEndDate] = useState(block?.endDate ?? '');
-  const [skips, setSkips] = useState<string[]>(block?.skipDates ?? []);
-  const [blocks, setBlocks] = useState(block?.blocksScheduling !== false);
-  // Minutes and before/after are kept apart while editing (the number pad has no minus key); before saves as negative.
-  type StepRow = { mins: number; before: boolean; title: string };
-  const [steps, setSteps] = useState<StepRow[]>(
-    (block?.steps ?? []).map((x) => ({ mins: Math.abs(x.offsetMin), before: x.offsetMin < 0, title: x.title })),
+  const [repeat, setRepeat] = useState<Repeat>(
+    !r || r.kind === 'once' ? 'never' : r.kind === 'daily' ? 'daily' : r.kind === 'weekly' ? 'weekly' : 'monthly',
   );
-  const patchStep = (i: number, patch: Partial<StepRow>) => setSteps(steps.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+  const [weekdays, setWeekdays] = useState<number[]>(r?.kind === 'weekly' ? r.weekdays : [weekdayOf(firstDay)]);
+  const [until, setUntil] = useState(block?.endDate ?? '');
   const [error, setError] = useState('');
 
   const recurrence = (): Recurrence => {
-    switch (kind) {
-      case 'once': return { kind, date };
-      case 'daily': return { kind };
-      case 'weekly': return { kind, weekdays };
-      case 'monthlyDate': return { kind, day: monthDay };
-      case 'monthlyNth': return { kind, weekday: nthDay, nth };
-    }
+    if (repeat === 'never') return { kind: 'once', date: day };
+    if (repeat === 'daily') return { kind: 'daily' };
+    if (repeat === 'weekly') return { kind: 'weekly', weekdays };
+    return { kind: 'monthlyDate', day: Number(day.slice(8, 10)) };
   };
 
   const save = () => {
     if (!title.trim()) return setError('Give it a name.');
-    if (kind === 'weekly' && weekdays.length === 0) return setError('Pick at least one day.');
-    if (newPlace) return setError('Add the new place first (or cancel it).');
-    const fromOther = fromId !== 'home' && fromId !== locationId;
-    if (fromOther && !(Number(travel) >= 0 && travel !== '')) return setError(`How long does it take to get here from ${placeName(fromId)}?`);
+    if (repeat === 'weekly' && !weekdays.length) return setError('Pick at least one day.');
     const s = inputToMin(start);
     let e = inputToMin(end);
     if (e <= s) e += 24 * 60; // ends after midnight
     const next: FixedBlock = {
+      ...(block ?? { tag: 'other', locationId: 'home' }),
       id: block?.id ?? uid(),
       title: title.trim(),
-      tag,
-      locationId,
       startMin: s,
       endMin: e,
       recurrence: recurrence(),
-      startDate: kind !== 'once' && startDate ? startDate : undefined,
-      endDate: kind !== 'once' && endDate ? endDate : undefined,
-      skipDates: kind !== 'once' && skips.length ? skips : undefined,
-      blocksScheduling: blocks ? undefined : false,
-      fromLocationId: fromOther ? fromId : undefined,
-      steps: steps.length
-        ? steps.filter((x) => x.title.trim()).map((x): ReminderStep => ({ offsetMin: x.before ? -x.mins : x.mins, title: x.title }))
-        : undefined,
-    };
-    commit((d, now) => {
-      const withTravel = fromOther ? actions.setTravel(d, fromId, locationId, Math.round(Number(travel)), now) : d;
-      return actions.saveBlock(withTravel, next, now);
-    });
+      startDate: repeat === 'never' ? undefined : day,
+      endDate: repeat !== 'never' && until ? until : undefined,
+      skipDates: repeat === 'never' ? undefined : block?.skipDates,
+    } as FixedBlock;
+    commit((d, now) => actions.saveBlock(d, next, now));
     ui.close();
-  };
-  const placeName = (id: string) => data.locations.find((l) => l.id === id)?.name ?? 'there';
-  const addPlace = () => {
-    if (!newPlace?.name.trim()) return setError('Give the place a name.');
-    const loc = { id: uid(), name: newPlace.name.trim(), fromHomeMin: Math.max(0, Math.round(Number(newPlace.there) || 0)), toHomeMin: Math.max(0, Math.round(Number(newPlace.back) || Number(newPlace.there) || 0)) };
-    commit((d, now) => actions.savePlace(d, loc, now));
-    setLocationId(loc.id);
-    setNewPlace(null);
-    setError('');
   };
 
   return (
-    <SheetFrame title={block ? 'Edit fixed time' : kind === 'once' ? 'New fixed event' : 'New fixed time'} onSave={save}>
+    <SheetFrame title={block ? 'Edit event' : 'New event'} onSave={save}>
       <Field label="Name">
-        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. Dentist" />
+        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. Archery" />
       </Field>
-      <div class="row2">
-        <Field label="Kind" hint="Cutoff rules use this.">
-          <select value={tag} onChange={(e) => setTag(e.currentTarget.value as BlockTag)}>
-            {Object.entries(TAG_LABELS).map(([v, l]) => (
-              <option value={v}>{l}</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Where">
-          <select
-            value={newPlace ? '__new' : locationId}
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              if (v === '__new') return setNewPlace({ name: '', there: '', back: '' });
-              setNewPlace(null);
-              setLocationId(v);
-            }}
-          >
-            {data.locations.map((l) => (
-              <option value={l.id}>{l.name}</option>
-            ))}
-            <option value="__new">+ New place…</option>
-          </select>
-        </Field>
-      </div>
-      {newPlace && (
-        <div class="inline-card">
-          <input placeholder="Place name, e.g. Archery Range" value={newPlace.name} autoFocus onInput={(e) => setNewPlace({ ...newPlace, name: e.currentTarget.value })} />
-          <div class="row2">
-            <Field label="Minutes from home">
-              <input type="number" inputMode="numeric" min={0} value={newPlace.there} onInput={(e) => setNewPlace({ ...newPlace, there: e.currentTarget.value })} />
-            </Field>
-            <Field label="Minutes back home">
-              <input type="number" inputMode="numeric" min={0} placeholder="same" value={newPlace.back} onInput={(e) => setNewPlace({ ...newPlace, back: e.currentTarget.value })} />
-            </Field>
-          </div>
-          <div class="row">
-            <button type="button" class="btn small primary" onClick={addPlace}>Add place</button>
-            <button type="button" class="btn small" onClick={() => setNewPlace(null)}>Cancel</button>
-          </div>
-        </div>
-      )}
-      {!newPlace && locationId !== 'home' && (
-        <div class="row2">
-          <Field label="Coming from" hint={fromId === 'home' ? 'Leaving from home.' : `Straight from your ${placeName(fromId)} event that day.`}>
-            <select value={fromId} onChange={(e) => {
-              const v = e.currentTarget.value;
-              setFromId(v);
-              const m = data.locations.find((l) => l.id === locationId)?.travelFrom?.[v];
-              setTravel(m != null ? String(m) : '');
-            }}>
-              <option value="home">Home</option>
-              {data.locations.filter((l) => l.id !== 'home' && l.id !== locationId).map((l) => (
-                <option value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </Field>
-          {fromId !== 'home' && (
-            <Field label={`Minutes from ${placeName(fromId)}`}>
-              <input type="number" inputMode="numeric" min={0} value={travel} onInput={(e) => setTravel(e.currentTarget.value)} />
-            </Field>
-          )}
-        </div>
-      )}
+      <Field label={repeat === 'never' ? 'Day' : 'Starting'}>
+        <input type="date" value={day} onInput={(e) => setDay(e.currentTarget.value)} />
+      </Field>
       <div class="row2">
         <Field label="Starts">
           <input type="time" value={start} onInput={(e) => setStart(e.currentTarget.value)} />
@@ -179,123 +75,54 @@ export function BlockForm({ data, block, once }: { data: AppData; block?: FixedB
           <input type="time" value={end} onInput={(e) => setEnd(e.currentTarget.value)} />
         </Field>
       </div>
-      <Field label="Repeats">
-        <select value={kind} onChange={(e) => setKind(e.currentTarget.value as Kind)}>
-          {KINDS.map((k) => (
-            <option value={k.value}>{k.label}</option>
+      <div class="field">
+        <span class="field-label">Repeats</span>
+        <div class="segmented" role="radiogroup">
+          {REPEATS.map((o) => (
+            <button type="button" role="radio" aria-checked={repeat === o.v} class={repeat === o.v ? 'on' : ''} onClick={() => setRepeat(o.v)}>
+              {o.label}
+            </button>
           ))}
-        </select>
-      </Field>
-      {kind === 'once' && (
-        <Field label="Date">
-          <input type="date" value={date} onInput={(e) => setDate(e.currentTarget.value)} />
-        </Field>
-      )}
-      {kind === 'weekly' && (
+        </div>
+      </div>
+      {repeat === 'weekly' && (
         <Chips
           options={WEEKDAYS.map((l, i) => ({ value: i, label: l }))}
           selected={weekdays}
-          onToggle={(d) => setWeekdays(weekdays.includes(d) ? weekdays.filter((x) => x !== d) : [...weekdays, d])}
+          onToggle={(d) => setWeekdays(weekdays.includes(d) ? weekdays.filter((x) => x !== d) : [...weekdays, d].sort())}
         />
       )}
-      {kind === 'monthlyDate' && (
-        <Field label="Day of month">
-          <input type="number" min={1} max={31} value={monthDay} onInput={(e) => setMonthDay(Number(e.currentTarget.value))} />
+      {repeat === 'monthly' && <p class="hint">Every month on the {Number(day.slice(8, 10))}{['th', 'st', 'nd', 'rd'][Number(day.slice(8, 10)) % 10 < 4 && Math.floor(Number(day.slice(8, 10)) / 10) !== 1 ? Number(day.slice(8, 10)) % 10 : 0]}.</p>}
+      {repeat !== 'never' && (
+        <Field label="Until (optional)">
+          <input type="date" value={until} onInput={(e) => setUntil(e.currentTarget.value)} />
         </Field>
       )}
-      {kind === 'monthlyNth' && (
-        <div class="row2">
-          <Field label="Which">
-            <select value={nth} onChange={(e) => setNth(Number(e.currentTarget.value))}>
-              {[1, 2, 3, 4, 5].map((n) => (
-                <option value={n}>{['1st', '2nd', '3rd', '4th', '5th'][n - 1]}</option>
-              ))}
-              <option value={-1}>Last</option>
-            </select>
-          </Field>
-          <Field label="Day">
-            <select value={nthDay} onChange={(e) => setNthDay(Number(e.currentTarget.value))}>
-              {WEEKDAYS.map((l, i) => (
-                <option value={i}>{l}</option>
-              ))}
-            </select>
-          </Field>
-        </div>
-      )}
-      {kind !== 'once' && (
-        <>
-          <div class="row2">
-            <Field label="From (optional)">
-              <input type="date" value={startDate} onInput={(e) => setStartDate(e.currentTarget.value)} />
-            </Field>
-            <Field label="Until (optional)">
-              <input type="date" value={endDate} onInput={(e) => setEndDate(e.currentTarget.value)} />
-            </Field>
-          </div>
-          <Field label="Skip dates" hint="Holidays, cancelled shifts.">
-            <input
-              type="date"
-              value=""
-              onChange={(e) => {
-                const v = e.currentTarget.value;
-                if (v && !skips.includes(v)) setSkips([...skips, v].sort());
-                e.currentTarget.value = '';
-              }}
-            />
-          </Field>
-          <div class="chips">
-            {skips.map((k) => (
-              <button type="button" class="chip on" onClick={() => setSkips(skips.filter((x) => x !== k))}>
-                {fmtDay(k)} ✕
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-      <label class="toggle">
-        <input type="checkbox" checked={blocks} onChange={(e) => setBlocks(e.currentTarget.checked)} />
-        No assignments during this
-      </label>
-      <Field label="Reminders" hint="Minutes before or after it starts, e.g. 30 before: leave now; laundry: 0, 60 and 120 after.">
-        {steps.map((st, i) => (
-          <div class="row step">
-            <input
-              type="number"
-              inputMode="numeric"
-              min="0"
-              value={st.mins}
-              onInput={(e) => patchStep(i, { mins: Math.abs(Math.round(Number(e.currentTarget.value) || 0)) })}
-            />
-            <select value={st.before ? 'before' : 'after'} onChange={(e) => patchStep(i, { before: e.currentTarget.value === 'before' })}>
-              <option value="before">min before</option>
-              <option value="after">min after</option>
-            </select>
-            <input
-              value={st.title}
-              placeholder="Reminder"
-              onInput={(e) => patchStep(i, { title: e.currentTarget.value })}
-            />
-            <button type="button" class="link" onClick={() => setSteps(steps.filter((_, j) => j !== i))}>
-              ✕
-            </button>
-          </div>
-        ))}
-        <button type="button" class="link" onClick={() => setSteps([...steps, { mins: 0, before: false, title: '' }])}>
-          + Add reminder
-        </button>
-      </Field>
       {error && <p class="warn">{error}</p>}
       {block && (
-        <button
-          class="btn danger wide"
-          onClick={() => {
-            if (!confirm(`Delete "${block.title}"?`)) return;
-            commit((d, now) => actions.deleteBlock(d, block.id, now));
-            ui.close();
-          }}
-        >
-          Delete
-        </button>
+        <div class="detail-more">
+          {block.recurrence.kind !== 'once' && date && (
+            <button
+              class="btn"
+              onClick={() => {
+                commit((d, now) => actions.saveBlock(d, { ...block, skipDates: [...new Set([...(block.skipDates ?? []), date])].sort() }, now));
+                ui.close();
+              }}
+            >
+              Skip {fmtDay(date, { weekday: 'short', month: 'short', day: 'numeric' })}
+            </button>
+          )}
+          <button
+            class="btn danger"
+            onClick={() => {
+              if (!confirm(block.recurrence.kind === 'once' ? `Delete "${block.title}"?` : `Delete every "${block.title}"?`)) return;
+              commit((d, now) => actions.deleteBlock(d, block.id, now));
+              ui.close();
+            }}
+          >
+            {block.recurrence.kind === 'once' ? 'Delete' : 'Delete all'}
+          </button>
+        </div>
       )}
     </SheetFrame>
   );

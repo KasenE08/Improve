@@ -28,9 +28,8 @@ function AddMenu() {
   return (
     <SheetFrame title="Add">
       <div class="add-list">
-        {item('book', 'Assignment', 'Homework, a project, studying', () => ui.open({ kind: 'task' }))}
-        {item('flag', 'One-time event', 'Dentist, game, a trip', () => ui.open({ kind: 'block', once: true }))}
-        {item('repeat', 'Repeating time', 'School, practice, work shifts', () => ui.open({ kind: 'block' }))}
+        {item('book', 'Assignment', 'Homework, studying: pick when you\'ll do it', () => ui.open({ kind: 'task' }))}
+        {item('calendar', 'Event', 'Archery, work, a game (can repeat)', () => ui.open({ kind: 'block' }))}
       </div>
     </SheetFrame>
   );
@@ -77,7 +76,7 @@ export function App() {
       )}
       {sheet?.kind === 'task' && <TaskForm data={data} task={sheet.task} />}
       {sheet?.kind === 'detail' && <TaskDetail data={data} id={sheet.id} />}
-      {sheet?.kind === 'block' && <BlockForm data={data} block={sheet.block} once={sheet.once} />}
+      {sheet?.kind === 'block' && <BlockForm data={data} block={sheet.block} date={sheet.date} />}
       {sheet?.kind === 'notifyGuide' && <NotifyGuide />}
     </UI.Provider>
   );

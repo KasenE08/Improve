@@ -68,15 +68,6 @@ describe('place to place', () => {
     expect(fmt(occ.find((o) => o.block.id === 'school')!.arrive)).toBe(`${WED} 17:40`);
   });
 
-  it('nothing is scheduled at home while you are out between the two', () => {
-    const blocks = BLOCKS.map((b) => (b.id === 'archery' ? { ...b, fromLocationId: 'school' } : b));
-    let d = replan({ ...emptyData(), blocks, locations: LOCATIONS, settings: PACKED }, T(WED, '8:00'));
-    d = actions.setTravel(d, 'school', 'range', 20, T(WED, '8:00'));
-    d = actions.saveTask(d, task({ id: 'x', estimateMin: 45, due: T(WED, '23:59') }), T(WED, '8:00'));
-    const start = d.plan!.items.find((i) => i.taskId === 'x')!.start;
-    expect(start >= T(WED, '19:00')).toBe(true);
-  });
-
   it('places can be added from an event form', () => {
     const d = actions.savePlace(base(), { id: 'pool', name: 'Pool', fromHomeMin: 10, toHomeMin: 10 }, NOW);
     expect(d.locations.some((l) => l.name === 'Pool')).toBe(true);

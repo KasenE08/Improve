@@ -6,7 +6,7 @@ import { Icon } from './icons';
 export type Sheet =
   | { kind: 'task'; task?: Task }
   | { kind: 'detail'; id: string }
-  | { kind: 'block'; block?: FixedBlock; once?: boolean }
+  | { kind: 'block'; block?: FixedBlock; once?: boolean; date?: string }
   | { kind: 'notifyGuide' }
   | { kind: 'add' }
   | { kind: 'list' }

@@ -35,10 +35,12 @@ function upNext() {
   if (!data) return null;
   const tasks = new Map((data.tasks || []).map((t) => [t.id, t]));
   const now = Date.now();
-  const items = (data.plan?.items || [])
-    .filter((i) => tasks.get(i.taskId) && tasks.get(i.taskId).status !== 'done' && i.end > now)
-    .sort((a, b) => a.start - b.start);
-  return { items, tasks, classes: new Map((data.classes || []).map((c) => [c.id, c])), open: (data.tasks || []).filter((t) => t.status !== 'done').length };
+  // Assignments not done yet and events, whatever comes next (the planner is a calendar)
+  const items = [
+    ...(data.plan?.items || []).filter((i) => tasks.get(i.taskId) && tasks.get(i.taskId).status !== 'done' && i.end > now).map((i) => ({ ...i, task: tasks.get(i.taskId) })),
+    ...(data.plan?.events || []).filter((e) => e.end > now).map((e) => ({ ...e, event: true })),
+  ].sort((a, b) => a.start - b.start);
+  return { items, classes: new Map((data.classes || []).map((c) => [c.id, c])), open: (data.tasks || []).filter((t) => t.status !== 'done').length };
 }
 
 export function render(root, refresh) {
@@ -60,16 +62,19 @@ export function render(root, refresh) {
   const un = upNext();
   let planBody;
   if (!un) planBody = '<p class="hcard__sub">Open to set up your schedule.</p>';
-  else if (!un.items.length) planBody = `<p class="hcard__sub">${un.open ? 'Nothing else planned today.' : 'No assignments. Nice.'}</p>`;
+  else if (!un.items.length) planBody = '<p class="hcard__sub">Nothing on your calendar.</p>';
   else {
     const [first, ...rest] = un.items;
-    const t = un.tasks.get(first.taskId);
+    const title = (i) => i.event ? i.title : i.task.title;
+    const moreToday = (list) => list.slice(1).filter((i) => dayKey(appNow(new Date(i.start))) === today).length;
+    const when = (i) => `${dayKey(appNow(new Date(i.start))) === today ? '' : new Date(i.start).toLocaleDateString('en-US', { weekday: 'short' }) + ' '}${fmtTime(i.start)}`;
     const mins = Math.round((first.end - first.start) / 60000);
-    const cls = un.classes.get(t.classId);
+    const cls = first.task && un.classes.get(first.task.classId);
     const tag = cls ? `<span class="ctag" style="--c:${esc(cls.color)}"><i></i>${esc(cls.name)}</span>` : '';
-    planBody = `<div class="next${first.late ? ' is-late' : ''}"><span class="next__bar"></span><div>${tag}<div class="next__title">${esc(t.title)}</div><div class="hcard__sub">${t.due ? fmtDue(t.due) : 'missing work'}${first.late ? ' · late' : ''}</div></div>
-      <div class="next__time"><b>${fmtTime(first.start)}</b>${mins} min</div></div>
-      ${rest.length ? `<div class="chips">${rest.slice(0, 1).map((i) => `<span>${dayKey(appNow(new Date(i.start))) === today ? '' : new Date(i.start).toLocaleDateString('en-US', { weekday: 'short' }) + ' '}${fmtTime(i.start)} · ${esc(un.tasks.get(i.taskId).title)}</span>`).join('')}${rest.length > 1 ? `<span>${rest.length - 1} more</span>` : ''}</div>` : ''}`;
+    const sub = first.event ? (first.start <= Date.now() ? `Now · until ${fmtTime(first.end)}` : 'Event') : first.task.due ? fmtDue(first.task.due) : 'Assignment';
+    planBody = `<div class="next${first.late ? ' is-late' : ''}${first.event ? ' is-event' : ''}"><span class="next__bar"${cls ? ` style="background:${esc(cls.color)}"` : ''}></span><div>${tag}<div class="next__title">${esc(title(first))}</div><div class="hcard__sub">${sub}${first.late ? ' · ends after it\'s due' : ''}</div></div>
+      <div class="next__time"><b>${when(first)}</b>${mins} min</div></div>
+      ${rest.length ? `<div class="chips">${rest.slice(0, 1).map((i) => `<span>${when(i)} · ${esc(title(i))}</span>`).join('')}${moreToday(rest) ? `<span>${moreToday(rest)} more today</span>` : ''}</div>` : ''}`;
   }
   const plan = card('planner', 'Up next', 'planner', 'Plan', planBody);
 

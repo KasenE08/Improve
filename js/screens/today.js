@@ -21,7 +21,7 @@ const OFF_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
 const AUTO_ICON = { food: 'food', planner: 'planner', money: 'wallet', journal: 'quill' };
 const OFF_WHY = { 'planner:work': 'nothing planned', 'money:save': 'no payday' };
 // Shown under an auto habit so its rule isn't forgotten
-const AUTO_NOTE = { 'planner:work': 'Start each task within 10 min of its time · Falling behind = no tick' };
+const AUTO_NOTE = {}; // a short rule under an auto habit, by its auto id (none right now)
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', planner: 'Planner', money: 'Money' };

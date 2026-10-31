@@ -36,7 +36,7 @@ const rows = [
   ['restock', 'Restock products', 'skin', 'monthly', 1, 45],
 
   ['no-fap', 'No fap', 'mind', 'daily', 1, 60],
-  ['work-on-schedule', "Finished today's work", 'mind', 'daily', 1, 60, 'planner:work'],
+  ['work-on-schedule', "Finished today's work", 'mind', 'daily', 1, 60],
   ['no-phone-am', 'No phone first 30 min of morning', 'mind', 'daily', 1, 20],
   ['journal', 'Journal', 'mind', 'daily', 1, 15, 'journal:words'],
   ['kept-word', 'Kept my word', 'mind', 'daily', 1, 15],
@@ -55,7 +55,7 @@ const rows = [
 ];
 
 // Auto habits that wait until a time of day before ticking (minutes after midnight)
-const AUTO_AFTER = { 'work-on-schedule': 15 * 60 };
+const AUTO_AFTER = {};
 
 export const DEFAULT_HABITS = rows.map(([id, name, category, frequency, target, xp, auto, kind], order) => ({
   id, name, category, frequency, target, xp, order, archived: false, auto: auto || null,

@@ -213,3 +213,4 @@
 .phead__end { justify-self: end; }
 .phead__more { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--imp-text); background: var(--imp-sunken); }
 .phead__more .imp-icon { width: 20px; height: 20px; }
+.next.is-event .next__bar { background: var(--imp-faint); }

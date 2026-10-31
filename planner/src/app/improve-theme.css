@@ -243,3 +243,17 @@ button.g-row:active, label.g-action:active { background: var(--imp-sunken); }
 .add-rule { margin-top: 2px; border-radius: 14px; border: 1px dashed var(--imp-frame); background: none; color: var(--imp-accent); font: 600 15px var(--imp-font-head); text-align: center; text-align-last: center; }
 .set-page .btn.wide { margin-top: 6px; }
 .rule-line .g-title { font-weight: 500; }
+
+/* ===== Calendar style (v3) ===== */
+.tl-ev.event { --cat: var(--imp-faint); background: var(--imp-surface-2); border: 1px solid var(--imp-frame); border-left: 3px solid color-mix(in srgb, var(--imp-text) 35%, transparent); }
+.tl-ev.event .title { color: var(--imp-text); }
+.tl-ev.event .title .icon { color: var(--imp-muted); flex: none; }
+.tl-check { flex: none; width: 20px; height: 20px; margin-top: 1px; display: grid; place-items: center; padding: 0; border-radius: 50%;
+  border: 2px solid var(--cat); background: transparent; color: #fff; }
+.tl-check.on { background: var(--cat); }
+.tl-ev.short .tl-check { width: 16px; height: 16px; margin-top: 0; }
+.tl-drop { height: auto; border: 2px dashed var(--imp-accent); border-radius: 10px; background: var(--imp-accent-dim); left: 50px; right: 2px; }
+.tl-drop span { top: 4px; left: 8px; }
+.len-pick button { font-size: 13px; }
+.done-btn { margin: 4px 0 16px; gap: 8px; }
+.detail-head h2.is-done { text-decoration: line-through; color: var(--imp-muted); }

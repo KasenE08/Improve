@@ -7,6 +7,8 @@ globalThis.localStorage = {
 const J = (p) => new URL('../js/' + p, import.meta.url).href;
 const H = await import(J('habits.js'));
 H.init();
+// The planner rule is off since schema 12 ("Finished today's work" is ticked by hand); these tests turn it on to check it
+const __hs = JSON.parse(mem.imp_habits); for (const h of __hs) if (h.id === 'work-on-schedule') Object.assign(h, { auto: 'planner:work', autoAfter: 900 }); mem.imp_habits = JSON.stringify(__hs);
 const P = await import(J('planner-auto.js'));
 const B = await import(J('backup.js'));
 let fails = 0;
@@ -118,7 +120,8 @@ for (const k of Object.keys(mem)) delete mem[k];
 mem.imp_schema = '4';
 mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', auto: 'planner:work', name: 'Work (mine)' }, { id: 'journal', auto: 'journal:words' }]);
 H.init();
-eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.autoAfter ?? null, h.name ?? null]), [['work-on-schedule', 900, 'Work (mine)'], ['journal', null, null]], 'upgrade: 3 PM on Work done on schedule only, edits kept');
+eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto ?? null, h.autoAfter ?? null, h.name ?? null]), [['work-on-schedule', null, null, 'Work (mine)'], ['journal', 'journal:words', null, null]], 'upgrade to now: edits kept; Work is ticked by hand (schema 12), Journal stays auto');
+{ const hs = JSON.parse(mem.imp_habits); for (const h of hs) if (h.id === 'work-on-schedule') Object.assign(h, { auto: 'planner:work', autoAfter: 900 }); mem.imp_habits = JSON.stringify(hs); } // turn the rule on again for the checks below
 
 // A task finished today counts as a work day even if it was never on today's plan
 {

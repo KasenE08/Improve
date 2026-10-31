@@ -162,6 +162,8 @@ export interface Task {
   notes?: string;
   /** Class tag (SchoolClass id). */
   classId?: string;
+  /** When you'll do it (you pick it, like an event on a calendar). Its length is estimateMin. */
+  at?: Ms;
   status: TaskStatus;
   startedAt?: Ms;
   completedAt?: Ms;
