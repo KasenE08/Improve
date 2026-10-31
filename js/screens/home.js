@@ -88,7 +88,7 @@ export function render(root, refresh) {
      <div class="mini"><div class="mini__top"><span>Protein</span><b>${Math.round(t.protein)}/${g.proteinGoal} g</b></div>${xpbar(pct(t.protein, g.proteinGoal), 'imp-xpbar--sm imp-xpbar--protein')}</div>`);
   const waterCard = card('food', 'Water', 'skin', '',
     `<div class="hcard__big">${water}<small>/ ${g.waterGoal} oz</small></div>
-     <div class="chips"><button class="chip-btn is-water" data-water="8">+8</button><button class="chip-btn is-water" data-water="16">+16</button></div>`, 'hcard--water');
+     ${g.lastWaterOz ? `<div class="chips"><button class="chip-btn is-water" data-water="${g.lastWaterOz}">+${g.lastWaterOz} oz</button></div>` : '<p class="hcard__sub">Tap to log water</p>'}`, 'hcard--water');
 
   // Money
   const ms = Money.getState();

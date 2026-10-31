@@ -9,7 +9,10 @@
 .food-warn { color: var(--imp-warn); font-size: 15px; }
 .food-empty { padding: 14px 0; color: var(--imp-muted); font-size: 15px; }
 .food-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
-.food-nav { display: flex; align-items: center; gap: 12px; }
+.food-nav { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; }
+.food-nav h2 { text-align: center; font: 700 17px var(--imp-font-head); }
+.food-back { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: var(--imp-sunken); color: var(--imp-text); }
+.food-back .imp-icon { width: 20px; height: 20px; }
 
 /* Week strip */
 .wk { display: flex; align-items: center; gap: 4px; padding: 8px 0 4px; touch-action: pan-y; }
@@ -92,3 +95,13 @@
 .imp-xpbar--water .imp-xpbar__fill { background: var(--imp-water); }
 .food-water { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .food-water .imp-btn { flex: 1 1 0; min-width: 0; padding-left: 2px; padding-right: 2px; white-space: nowrap; }
+
+/* One list for the day, a time next to each; water typed in (remembers your last amount) */
+.food-water { display: flex; gap: 8px; margin-top: 10px; }
+.food-water .food-unit { flex: 1; }
+.food-water .imp-input { min-height: 44px; }
+.food-water .imp-btn { flex: none; }
+.food-addbtn { margin-top: 12px; }
+.food-pick-btns .imp-btn { flex: 1 1 auto; }
+.food-menu-row .imp-icon { width: 17px; height: 17px; }
+.food-menu-row > .imp-icon:last-child { color: var(--imp-faint); }

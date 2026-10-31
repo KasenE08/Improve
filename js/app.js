@@ -84,7 +84,8 @@ function boot() {
     else {
       // The planner's settings live behind ⋯ here in the top bar (the planner listens for this event)
       const end = tab === 'planner' ? `<button class="phead__more" data-act="planner-menu" aria-label="Planner settings">${icon('more')}</button>`
-        : tab === 'today' ? `<button class="phead__more" data-act="new-habit" aria-label="New habit">${icon('plus')}</button>` : '';
+        : tab === 'today' ? `<button class="phead__more" data-act="new-habit" aria-label="New habit">${icon('plus')}</button>`
+        : tab === 'food' ? `<button class="phead__more" data-act="food-menu" aria-label="Saved foods, meals and goals">${icon('more')}</button>` : '';
       hud.innerHTML = `<button class="phead__back" data-act="home">${icon('prev')}Home</button><h1 class="phead__title">${PAGES[tab]}</h1><span class="phead__end">${end}</span>`;
     }
   };
@@ -116,6 +117,7 @@ function boot() {
   hud.addEventListener('click', (e) => {
     if (e.target.closest('[data-act="planner-menu"]')) return window.dispatchEvent(new Event('improve:planner-menu'));
     if (e.target.closest('[data-act="new-habit"]')) return Today.openHabitForm(null);
+    if (e.target.closest('[data-act="food-menu"]')) { if (currentTab() === 'food') Food.openMenu(); return; }
     if (!e.target.closest('[data-act="home"]')) return;
     if (openedFromHome) history.back(); else location.replace('#');
   });
