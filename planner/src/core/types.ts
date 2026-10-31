@@ -130,6 +130,11 @@ export interface Task {
   baseMin?: number;
   /** Moved here by hand: schedule on this day (or the next with room), never earlier. */
   pinDay?: DateKey;
+  /**
+   * Set on the other tasks when one is dragged to another day: stay on this day or later, so nothing
+   * slides into the space the moved one left. Can still go earlier if staying would make it late.
+   */
+  holdDay?: DateKey;
   /** Hand-set order among tasks pinned to the same day (0 = first). */
   pinOrder?: number;
   /** Dropped below a fixed time on its pinned day: start no earlier than this (that fixed time's end). */

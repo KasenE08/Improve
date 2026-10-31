@@ -39,6 +39,48 @@ describe('moving assignments by hand', () => {
     expect(d.plan!.warnings).toEqual([]); // the others still fit before they're due
   });
 
+  describe('moving one to another day leaves the rest where they are', () => {
+    const four = (spreadWork: boolean) => {
+      let d = replan({ ...emptyData(), blocks: BLOCKS, locations: LOCATIONS, settings: { ...PACKED, spreadWork } }, NOW);
+      for (const [id, due] of [['a', TUE], ['b', WED], ['c', THU], ['e', FRI]] as const) {
+        d = actions.saveTask(d, task({ id, estimateMin: 90, due: T(due, '23:59') }), NOW);
+      }
+      return d;
+    };
+    const days = (d: ReturnType<typeof setup>) => Object.fromEntries(d.plan!.items.map((i) => [i.taskId, fmt(i.start).slice(0, 10)]));
+
+    it('nothing from a later day slides into the space it left', () => {
+      const d = four(true);
+      expect(days(d)).toEqual({ a: MON, b: TUE, c: WED, e: THU });
+      const m = actions.moveToDay(d, 'a', TUE, NOW);
+      expect(days(m)).toEqual({ a: TUE, b: TUE, c: WED, e: THU });
+      expect(at(m, 'a')).toBe(`${TUE} 16:05`); // the moved one gets first claim on its day
+    });
+
+    it('also when packing days', () => {
+      const d = four(false);
+      const before = days(d);
+      const m = actions.moveToDay(d, 'a', WED, NOW);
+      for (const id of ['b', 'c', 'e']) expect(days(m)[id] >= before[id]).toBe(true);
+      expect(days(m).a).toBe(WED);
+    });
+
+    it('a held one still moves earlier if staying would make it late', () => {
+      let m = actions.moveToDay(four(true), 'a', TUE, NOW);
+      const b = m.tasks.find((t) => t.id === 'b')!;
+      expect(b.holdDay).toBe(TUE);
+      m = actions.saveTask(m, { ...b, due: T(MON, '23:59') }, NOW);
+      expect(days(m).b).toBe(MON);
+      expect(m.plan!.items.find((i) => i.taskId === 'b')!.late).toBe(false);
+    });
+
+    it('a hold ends once its day comes', () => {
+      const m = actions.moveToDay(four(true), 'a', TUE, NOW);
+      const next = replan(m, T(TUE, '15:00'));
+      expect(next.plan!.warnings).toEqual([]);
+    });
+  });
+
   it('reordering a day puts them in the order arranged', () => {
     const d = actions.reorderDay(setup(), MON, ['b', 'a'], NOW);
     expect(at(d, 'b')).toBe(`${MON} 17:45`);

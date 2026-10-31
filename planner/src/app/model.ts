@@ -3,7 +3,7 @@ import type {
 } from '../core/types';
 import { DEFAULT_RULES, DEFAULT_SETTINGS, HOME } from '../core/defaults';
 import { schedule } from '../core/scheduler';
-import { addDays, at, dateKey, MIN, planDay } from '../core/time';
+import { addDays, at, dateKey, DAY_START_MIN, MIN, planDay } from '../core/time';
 import { splitMinutes, type DoneRecord } from '../core/estimate';
 
 export interface Plan {
@@ -220,9 +220,21 @@ export const actions = {
     // Whole minutes: tapping at 6:03:27 starts the first task at 6:08, not 6:10.
     return replan({ ...d, night: nightWindow(d, now) }, now, Math.floor(now / MIN) * MIN + 5 * MIN);
   },
-  /** Dragged onto a day: schedule it that day (or the next with room) and keep it there until undone. */
+  /**
+   * Dragged onto a day: schedule it that day (or the next with room) and keep it there until undone.
+   * Everything else holds its current day or later, so no other task slides into the space it left.
+   */
   moveToDay(d: AppData, id: string, day: DateKey, now: Ms): AppData {
-    return replan(patchTask(d, id, { pinDay: day, pinOrder: undefined, pinAfter: undefined }), now);
+    const shift = Math.min(DAY_START_MIN, d.settings.earliestStartMin);
+    const today = planDay(now, shift);
+    const planned = new Map((d.plan?.items ?? []).map((i) => [i.taskId, planDay(i.start, shift)]));
+    const tasks = d.tasks.map((t) => {
+      if (t.id === id) return { ...t, pinDay: day, pinOrder: undefined, pinAfter: undefined, holdDay: undefined };
+      if (t.status !== 'todo' || t.pinDay) return t;
+      const k = planned.get(t.id);
+      return { ...t, holdDay: k && k > today ? k : undefined };
+    });
+    return replan({ ...d, tasks }, now);
   },
   /**
    * Reordered by hand: every listed task is kept on `day` in this order.
@@ -244,7 +256,7 @@ export const actions = {
   },
   /** "Let the app schedule it": drops a hand move. */
   unpin(d: AppData, id: string, now: Ms): AppData {
-    return replan(patchTask(d, id, { pinDay: undefined, pinOrder: undefined, pinAfter: undefined }), now);
+    return replan(patchTask(d, id, { pinDay: undefined, pinOrder: undefined, pinAfter: undefined, holdDay: undefined }), now);
   },
   /** Replaces a big task with parts spread over several days. */
   splitTask(d: AppData, task: Task, now: Ms): AppData {
