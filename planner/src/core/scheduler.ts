@@ -129,6 +129,8 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
   // Hand moves: a pin to a past day no longer applies.
   const today = dayOf(now);
   const pinOf = (t: Task) => (t.pinDay && t.pinDay >= today ? t.pinDay : undefined);
+  /** Held after another task was dragged away: not before this day (unless that makes it late). */
+  const holdOf = (t: Task) => (!pinOf(t) && t.holdDay && t.holdDay > today ? t.holdDay : undefined);
   const spread = s.spreadWork !== false;
   /** Spreading: the chosen day per task (filled in below, once the priority order is known). */
   let target = new Map<string, string>();
@@ -170,13 +172,18 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
       const until = t.due ?? Infinity;
       const prev = t.group ? partDay.get(t.group) : undefined;
       const first = prev ? addDays(prev, 1) : today;
-      const ok = days.filter((k) => {
+      const fits = days.filter((k) => {
         if (k < first || dayStart(k) >= until) return false;
         const r = room(t, k, until);
         return r.longest >= t.estimateMin && r.total - (load.get(k) ?? 0) >= t.estimateMin;
       });
+      const hold = holdOf(t);
+      const held = hold ? fits.filter((k) => k >= hold) : fits;
+      const ok = held.length ? held : fits;
       if (!ok.length) continue;
-      const k = t.due === null ? ok[0] : ok.reduce((best, d) => ((load.get(d) ?? 0) < (load.get(best) ?? 0) ? d : best));
+      // Held: stays on its day when there's room; otherwise the usual pick.
+      const k = hold && ok.includes(hold) ? hold
+        : t.due === null ? ok[0] : ok.reduce((best, d) => ((load.get(d) ?? 0) < (load.get(best) ?? 0) ? d : best));
       if (t.due !== null) out.set(t.id, k);
       addLoad(k, t.estimateMin);
       if (t.group) partDay.set(t.group, k);
@@ -214,6 +221,12 @@ function run(input: ScheduleInput, allowNight: Set<string>): Run {
     if (day) {
       const s0 = placeFrom(t, st, Math.max(base, dayStart(day)));
       if (s0 !== null && (t.due === null || s0 + dur <= t.due)) return s0;
+    }
+    // Held: its day or later first; earlier only if that would make it late.
+    const hold = holdOf(t);
+    if (hold) {
+      const s1 = placeFrom(t, st, Math.max(base, dayStart(hold)));
+      if (s1 !== null && (t.due === null || s1 + dur <= t.due)) return s1;
     }
     return placeFrom(t, st, base);
   };
