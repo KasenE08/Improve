@@ -101,6 +101,8 @@
 .food-water .food-unit { flex: 1; }
 .food-water .imp-input { min-height: 44px; }
 .food-water .imp-btn { flex: none; }
+.food-water .food-water-plus { width: 44px; min-height: 44px; padding: 0; justify-content: center; }
+.food-water .food-water-plus svg { width: 20px; height: 20px; margin: 0; }
 .food-addbtn { margin-top: 12px; }
 .food-pick-btns .imp-btn { flex: 1 1 auto; }
 .food-menu-row .imp-icon { width: 17px; height: 17px; }

@@ -145,7 +145,7 @@ function hero(day) {
     <div class="food-bar"><div class="food-bar__top"><span class="imp-label food-w">Water</span><span class="food-val" data-testid="water-val">${fmtOz(oz)} <small>/ ${fmt(g.waterGoal)} oz</small></span></div>
       ${xpbar(Math.min(100, Math.round((oz / g.waterGoal) * 100)), 'imp-xpbar--water')}
       <div class="food-water"><span class="food-unit"><input class="imp-input" id="water-oz" type="number" inputmode="decimal" min="1" aria-label="Ounces of water" value="${esc(g.lastWaterOz ?? '')}" placeholder="oz"><span>oz</span></span>
-        <button class="imp-btn imp-btn--secondary" data-f="water-add">${icon('plus')}Add water</button></div></div>
+        <button class="imp-btn imp-btn--secondary food-water-plus" data-f="water-add" aria-label="Add water">${icon('plus')}</button></div></div>
     <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinMin)} g+`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz+`)}</div>
   </div>`;
 }
