@@ -127,7 +127,7 @@ eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
 // ---- auto-checks through storage ----
 H.init();
 const habits = Object.fromEntries(H.getHabits().map((h) => [h.id, h.auto]));
-eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [null, 'money:save', 'money:review'], 'fresh install: save + review auto, log spending manual');
+eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [null, 'money:save', undefined], 'fresh install: save auto, log spending manual, no budget review');
 const M = await import(J('money/store.js'));
 const A = await import(J('money/autocheck.js'));
 const done = (id, key) => !!H.getLog()[key]?.[id];
@@ -151,20 +151,6 @@ const id = M.getState().entries[0].id;
 M.deleteEntry(id);
 { const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
 eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the week');
-{ // Monthly review habit (habit months start Nov 2; Dec 7 – Jan 3 here)
-  const dec = new Date(2026, 11, 10, 12);
-  const putReview = (doneAt) => { const st = JSON.parse(mem.imp_money); st.reviews = doneAt ? { '2026-12': { doneAt } } : {}; mem.imp_money = JSON.stringify(st); };
-  putReview(new Date(2026, 11, 9, 18).toISOString());
-  A.recheckMoney(dec, dec);
-  eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-12') && H.getLog()[k]['budget-review']), true, 'review finished: monthly habit ticked');
-  putReview(null);
-  A.recheckMoney(dec, dec);
-  eq(Object.keys(H.getLog()).some((k) => k.startsWith('2026-12') && H.getLog()[k]['budget-review']), false, 'review undone: unticked');
-  putReview(new Date(2026, 9, 28, 18).toISOString());
-  const oct = new Date(2026, 9, 28, 12);
-  A.recheckMoney(oct, oct);
-  eq(Object.keys(H.getLog()).some((k) => H.getLog()[k]['budget-review']), false, 'no review XP before the first full habit month (Nov 2)');
-}
 // A saving logged later but dated in an earlier payday week ticks that week
 {
   const later = new Date(2026, 10, 2, 12); // the next Monday
@@ -193,6 +179,7 @@ mem.imp_schema = '2';
 mem.imp_habits = JSON.stringify([{ id: 'log-spending', auto: 'money:log', xp: 5 }, { id: 'save-paycheck', auto: null, xp: 25, name: 'My save' }, { id: 'budget-review', auto: null }, { id: 'kept-word', auto: null }]);
 H.init();
 eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto]), [['log-spending', null], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['kept-word', null]], 'upgrade sets autos, keeps the rest');
+eq(JSON.parse(mem.imp_habits).find((h) => h.id === 'budget-review').archived, true, 'schema 14: Budget review put away (kept, hidden)');
 eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
 
 console.log(fails ? `${fails} FAILED` : 'all passed');

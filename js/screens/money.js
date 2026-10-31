@@ -1,4 +1,4 @@
-// Money tab: spending log, per-category monthly budgets, paydays + saving, monthly review.
+// Money: one page (month summary, accounts, budget, history). Budgets and paychecks open from ⋯ in the top bar.
 import * as L from '../money/logic.js';
 import * as M from '../money/store.js';
 import { recheckMoney } from '../money/autocheck.js';
@@ -6,19 +6,19 @@ import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
 import { dayKey, fromDayKey, periodRange } from '../dates.js';
 import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
-import { monthlyOpen } from '../launch.js';
 
-const SUBS = [['overview', 'Overview'], ['history', 'History'], ['budget', 'Budget'], ['settings', 'Settings']];
 const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'To savings', transfer: 'Move' };
 const MONEY_ICONS = ['diet', 'gas', 'car', 'game', 'bag', 'cart', 'keys', 'pill', 'cash', 'bank', 'piggy', 'ticket', 'coffee', 'home', 'heart', 'style', 'people', 'book', 'music', 'star'];
 
-const ui = { sub: 'overview', month: dayKey().slice(0, 7) };
+// page: null = the main page, 'budget' or 'settings' = a page pushed from the ⋯ menu
+const ui = { page: null, month: dayKey().slice(0, 7) };
 let ctx;
 const rerender = () => ctx.refresh();
 const today = () => dayKey();
 const shortDate = (k) => fromDayKey(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+const timeOf = (iso) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase();
 
-// Any data change: re-check the Money habits, then show XP / level moments.
+// Any data change: re-check the Money habits, then show habit moments.
 // `dates` are the entry dates touched, so a saving back-dated into an earlier week counts for that week.
 function changed(fn, dates = []) {
   const before = Stats.compute();
@@ -38,15 +38,15 @@ function changed(fn, dates = []) {
 
 const box = (title, body, meta = '') =>
   `<section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">${title}</h2><span class="imp-panel__meta">${meta}</span></header><div class="imp-panel__body">${body}</div></section>`;
+const nav = (title) => `<div class="food-nav mon-pagenav"><button class="food-back" data-m="back" aria-label="Back">${icon('prev')}</button><h2>${esc(title)}</h2><span></span></div>`;
 
 export function render(root, refresh) {
   ctx = { root, refresh };
   const s = M.getState();
-  const subnav = `<div class="imp-seg food-subnav">${SUBS.map(([id, label]) => `<button data-m="sub" data-sub="${id}" class="${ui.sub === id ? 'is-on' : ''}">${label}</button>`).join('')}</div>`;
-  const body = { overview, history, budget, settings }[ui.sub](s);
-  root.innerHTML = `<div class="screen money">${subnav}${body}</div>`;
+  const body = ui.page === 'budget' ? nav('Budgets') + budget(s) : ui.page === 'settings' ? nav('Paychecks') + settings(s) : main(s);
+  root.innerHTML = `<div class="screen money">${body}</div>`;
   // Settings: put back anything typed before switching pay schedule or saving mode
-  if (ui.sub === 'settings' && ui.typed) {
+  if (ui.page === 'settings' && ui.typed) {
     for (const [id, v] of Object.entries(ui.typed)) { const el = root.querySelector('#' + id); if (el) el.value = v; }
   }
 }
@@ -54,11 +54,41 @@ function keepTyped() {
   ui.typed = { ...(ui.typed || {}) };
   for (const el of ctx.root.querySelectorAll('.money input[id]')) ui.typed[el.id] = el.value;
 }
+/** Leaving Money: start on the main page next time. */
+export const reset = () => { ui.page = null; ui.month = today().slice(0, 7); };
+
+function openPage(page) {
+  ui.page = page; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null;
+  rerender();
+  window.scrollTo(0, 0);
+}
+
+/** ⋯ in the top bar: budgets and paychecks (they used to be tabs). */
+export function openMenu() {
+  const s = M.getState();
+  const total = s.categories.reduce((t, c) => t + (c.budget || 0), 0);
+  const row = (page, ic, title, sub) => `<button class="g-row food-menu-row" data-page="${page}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span><span class="g-sub">${esc(sub)}</span></span>${icon('next')}</button>`;
+  sheet.open({
+    title: 'Money',
+    body: `<div class="group">
+      ${row('budget', 'wallet', 'Budgets', total ? `${money(s, total)} a month · ${s.categories.length} categories` : `${s.categories.length} categories · no budgets yet`)}
+      ${row('settings', 'piggy', 'Paychecks', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${splitText(s, s.settings.split)}` : 'Pay schedule and paycheck split')}
+    </div>`,
+    onMount(b) {
+      b.onclick = (e) => {
+        const p = e.target.closest('[data-page]')?.dataset.page;
+        if (!p) return;
+        sheet.close();
+        openPage(p);
+      };
+    },
+  });
+}
 
 const money = (s, c) => L.fmtMoney(c, s.settings.currency);
-const monthNav = () => `<div class="mon-nav"><button class="imp-btn imp-btn--sm imp-btn--secondary" data-m="month" data-dir="-1" aria-label="Previous month">◂</button>
-  <span class="imp-title">${esc(L.monthLabel(ui.month))}</span>
-  <button class="imp-btn imp-btn--sm imp-btn--secondary" data-m="month" data-dir="1" aria-label="Next month" ${ui.month >= today().slice(0, 7) ? 'disabled' : ''}>▸</button></div>`;
+const monthNav = () => `<div class="mon-nav"><button class="food-back" data-m="month" data-dir="-1" aria-label="Previous month">${icon('prev')}</button>
+  <span class="mon-nav__title">${esc(L.monthLabel(ui.month))}</span>
+  <button class="food-back" data-m="month" data-dir="1" aria-label="Next month" ${ui.month >= today().slice(0, 7) ? 'disabled' : ''}>${icon('next')}</button></div>`;
 
 function catRow(s, c, spent) {
   const has = c.budget > 0;
@@ -67,62 +97,56 @@ function catRow(s, c, spent) {
   return `<div class="mon-cat${over ? ' is-over' : ''}">${icon(c.icon, 'mon-cat__icon')}
     <div class="mon-cat__top"><span class="mon-cat__name">${esc(c.name)}</span>
       <span class="mon-cat__val">${money(s, spent)}${has ? ` <small>/ ${money(s, c.budget)}</small>` : ''}</span></div>
-    ${has ? xpbar(p, `imp-xpbar--sm${over ? ' imp-xpbar--over' : ''}`) : '<p class="mon-nobudget">No budget set</p>'}
+    ${has ? xpbar(p, `imp-xpbar--sm mon-bar${over ? ' imp-xpbar--over' : ''}`) : ''}
   </div>`;
 }
 
-function overview(s) {
+function main(s) {
   const sum = L.monthSummary(s, ui.month);
   const current = ui.month === today().slice(0, 7);
   const left = sum.budget - sum.spent;
   const over = sum.budget > 0 && left < 0;
-  const head = `${monthNav()}
-    <div class="mon-hero${over ? ' is-over' : ''}">
-      <div class="mon-big">${money(s, sum.spent)}</div>
-      <div class="mon-cap">spent${sum.budget ? ` of ${money(s, sum.budget)} budget` : ''}</div>
-      ${sum.budget ? `${xpbar(Math.min(100, Math.round((sum.spent / sum.budget) * 100)), over ? 'imp-xpbar--over' : '')}
-        <p class="mon-left">${over ? `${money(s, -left)} over budget` : `${money(s, left)} left`}</p>` : ''}
-      <div class="mon-mini"><span>Paychecks <b class="mon-in">${money(s, sum.income)}</b></span>${savingsMini(s, current)}</div>
-    </div>
-    ${current ? `<div class="imp-btn-row mon-add">
-      <button class="imp-btn imp-btn--primary" data-m="add" data-kind="expense">${icon('plus')}Expense</button>
-      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="income">Paycheck</button>
-      <button class="imp-btn imp-btn--secondary" data-m="add" data-kind="${s.accounts?.length ? 'transfer' : 'saving'}">${s.accounts?.length ? 'Move money' : 'Saving'}</button></div>` : ''}`;
+  const big = sum.budget
+    ? `<div class="mon-big">${money(s, Math.abs(left))}</div>
+       <div class="mon-cap">${over ? 'over budget' : 'left'} · ${money(s, sum.spent)} of ${money(s, sum.budget)} spent</div>
+       ${xpbar(Math.min(100, Math.round((sum.spent / sum.budget) * 100)), `mon-bar${over ? ' imp-xpbar--over' : ''}`)}`
+    : `<div class="mon-big">${money(s, sum.spent)}</div><div class="mon-cap">spent</div>`;
+  const top = `<section class="imp-panel"><div class="imp-panel__body">${monthNav()}
+    <div class="mon-hero${over ? ' is-over' : ''}">${big}
+      <div class="mon-mini"><span>Paychecks <b class="mon-in">+${money(s, sum.income)}</b></span>${savedMini(s)}</div></div>
+    ${current ? `<button class="imp-btn imp-btn--primary imp-btn--block mon-addbtn" data-m="add" data-kind="expense">${icon('plus')}Add</button>` : ''}
+  </div></section>`;
 
-  const cats = s.categories.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('');
+  // Categories with a budget or spending this month (empty, unbudgeted ones stay out of the way)
+  const shown = s.categories.filter((c) => c.budget > 0 || sum.byCat[c.id]);
   const orphan = Object.keys(sum.byCat).filter((id) => !s.categories.some((c) => c.id === id)).reduce((t, id) => t + sum.byCat[id], 0);
+  const cats = shown.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('') + (orphan ? catRow(s, { name: 'Deleted categories', icon: 'scroll', budget: 0 }, orphan) : '');
 
-  return `${current ? accountsPanel(s) : ''}
-    ${box('Spending', head, icon('wallet'))}
-    ${current ? paydayPanel(s) : ''}
-    ${box('By category', cats + (orphan ? catRow(s, { name: 'Deleted categories', icon: 'scroll', budget: 0 }, orphan) : ''), `<button class="imp-btn imp-btn--sm imp-btn--ghost" data-m="sub" data-sub="budget">Edit</button>`)}
-    ${current ? reviewPanel(s) : ''}`;
+  return `${top}
+    ${current ? accountsPanel(s) : ''}
+    ${box('Budget', cats || '<p class="mon-empty">No budgets yet.</p>', '<button class="mon-link" data-m="page" data-page="budget">Edit</button>')}
+    ${history(s)}`;
 }
 
-// Savings = the Savings account (one number). Before accounts are set up, it's the month's savings logged.
-function savingsMini(s, current) {
-  const sav = s.accounts?.find((a) => a.id === 'savings');
-  if (!sav) return `<span>Saved <b class="imp-accent">${money(s, L.monthSummary(s, ui.month).saved)}</b></span>`;
-  const ch = L.accountChange(s, 'savings', ui.month);
-  const change = `${ch >= 0 ? '+' : '−'}${money(s, Math.abs(ch))}`;
-  return current
-    ? `<span>Savings <b class="imp-accent">${money(s, L.balances(s).savings)}</b><small class="imp-muted">${change} this month</small></span>`
-    : `<span>Savings <b class="imp-accent">${change}</b></span>`;
+// Savings: how much the Savings account changed this month (before accounts: savings logged)
+function savedMini(s) {
+  const has = s.accounts?.some((a) => a.id === 'savings');
+  const ch = has ? L.accountChange(s, 'savings', ui.month) : L.monthSummary(s, ui.month).saved;
+  return `<span>Saved <b>${ch >= 0 ? '+' : '−'}${money(s, Math.abs(ch))}</b></span>`;
 }
 
 // ---- Accounts ----
 const acctName = (s, id) => s.accounts.find((a) => a.id === id)?.name || 'Deleted account';
 function accountsPanel(s) {
   if (!s.accounts?.length) {
-    return box('Accounts', `<div class="mon-stack"><p class="mon-note">Track your checking and savings balances. Enter what each has right now; everything you log after that moves the money.</p>
-      <button class="imp-btn imp-btn--primary imp-btn--block" data-m="acct-setup">Set up accounts</button></div>`, icon('bank'));
+    return box('Accounts', `<button class="mon-row" data-m="acct-setup">${icon('bank', 'mon-row__icon')}
+      <span class="mon-row__mid"><span class="mon-row__name">Set up accounts</span><span class="mon-row__sub">Track your checking and savings balances</span></span>${icon('next', 'mon-row__go')}</button>`);
   }
   const bal = L.balances(s);
   const rows = s.accounts.map((a) => `<button class="mon-row" data-m="acct" data-id="${esc(a.id)}">${icon(a.icon || 'cash', 'mon-row__icon')}
-      <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span><span class="mon-row__sub">Tap to match your bank</span></span>
+      <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span></span>
       <span class="mon-row__amt${bal[a.id] < 0 ? ' mon-over' : ''}">${money(s, bal[a.id])}</span></button>`).join('');
-  return box('Accounts', `${rows}
-    <button class="imp-btn imp-btn--ghost imp-btn--sm mon-acct-add" data-m="acct-add">${icon('plus')}Add account</button>`, icon('bank'));
+  return box('Accounts', `${rows}${paydayRow(s)}`, `<button class="mon-link" data-m="acct-add" aria-label="Add account">${icon('plus')}Add</button>`);
 }
 
 function openAccountSetup() {
@@ -219,56 +243,43 @@ function splitText(s, sp) {
   return [...parts, `rest → ${acctName(s, sp?.rest || 'checking')}`].join(' · ');
 }
 
-function paydayPanel(s) {
+// One line under the accounts: next payday and how it splits. "Log" shows on payday weeks.
+function paydayRow(s) {
   if (!s.settings.setup) {
-    return box('Paydays', `<div class="mon-stack"><p class="mon-note">Set your pay schedule and how each paycheck is split, and your paycheck-saving habit will tick itself on the Today tab.</p>
-      <button class="imp-btn imp-btn--primary imp-btn--block" data-m="sub" data-sub="settings">Set up paydays</button></div>`, icon('piggy'));
+    return `<button class="mon-row" data-m="page" data-page="settings">${icon('calendar', 'mon-row__icon')}
+      <span class="mon-row__mid"><span class="mon-row__name">Set up paydays</span><span class="mon-row__sub">Pay schedule and paycheck split</span></span>${icon('next', 'mon-row__go')}</button>`;
   }
   const st = L.saveStatus(s);
   const next = L.nextPayday(s.settings.pay, today());
-  let status;
-  if (st.offWeek) status = `<p class="mon-status">No payday this week: a week off for your saving habit (streak safe).</p>`;
-  else if (st.pending) status = `<p class="mon-status">Payday ${st.expected.map(shortDate).join(', ')}: log the paycheck and it splits itself.</p>`;
-  else status = `<p class="mon-status${st.hit ? ' is-on' : ''}">${st.hit ? icon('check') : ''} This week: set aside ${money(s, st.saved)} of ${money(s, st.required)}</p>`;
-  return box('Paydays', `<div class="mon-stack">
-      <div class="mon-pay"><span class="imp-label">Next payday</span><b>${next === today() ? 'Today' : next ? shortDate(next) : '—'}</b></div>
-      <div class="mon-pay"><span class="imp-label">Split</span><b>${esc(splitText(s, s.settings.split))}</b></div>
-      ${status}
-      <button class="imp-btn imp-btn--primary imp-btn--block" data-m="add" data-kind="income">Log paycheck</button></div>`, icon('piggy'));
+  const when = next === today() ? 'today' : next ? shortDate(next) : '—';
+  const sub = st.pending ? 'Payday: log the paycheck and it splits itself' : splitText(s, s.settings.split);
+  return `<div class="mon-row mon-payrow">${icon('calendar', 'mon-row__icon')}
+    <span class="mon-row__mid"><span class="mon-row__name">Next payday ${esc(when)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
+    ${st.pending ? `<button class="imp-btn imp-btn--sm imp-btn--primary" data-m="add" data-kind="income">Log</button>` : ''}</div>`;
 }
 
-function reviewPanel(s) {
-  if (!monthlyOpen()) {
-    return box('Monthly review', `<p class="mon-note">Your first review is for the first full habit month (Mon Nov 2 – Sun Dec 6). It opens Nov 2.</p>`, icon('scroll'));
-  }
-  const mk = L.reviewMonth();
-  const done = s.reviews?.[mk];
-  return box(`${L.monthLabel(mk).split(' ')[0]} review`, `<div class="mon-stack">
-    ${done ? `<p class="mon-status is-on">${icon('check')} Done ${new Date(done.doneAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>`
-      : '<p class="mon-note">A quick look at this month: spending vs. budget, biggest categories, paychecks and savings.</p>'}
-    <button class="imp-btn ${done ? 'imp-btn--secondary' : 'imp-btn--primary'} imp-btn--block" data-m="review">${done ? 'Open review' : 'Start review'}</button></div>`, icon('scroll'));
-}
-
+// History: everything logged this month, newest first, with the time it was logged
 function history(s) {
   const [start, end] = L.monthRange(ui.month);
   const list = L.inRange(s.entries, start, end).sort((a, b) => (b.date + b.at).localeCompare(a.date + a.at));
   const cat = (id) => s.categories.find((c) => c.id === id);
   const days = [...new Set(list.map((e) => e.date))];
-  const rows = days.map((d) => `<div class="imp-panel__sub">${shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
+  const rows = days.map((d) => `<div class="mon-day">${d === today() ? 'Today' : shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll' }[e.kind] || c?.icon || 'cash';
     const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
-    const sub = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money'
-      : L.beforeTracking(s, e) ? 'Before tracking · already in balance' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : 'Expense')
-      : e.kind === 'income' && e.splits?.length > 1 ? e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ') : KIND[e.kind];
+    const what = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money'
+      : L.beforeTracking(s, e) ? 'Before tracking' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : '')
+      : e.kind === 'income' && e.splits?.length > 1 ? e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ') : e.note ? KIND[e.kind] : '';
+    const time = e.at && dayKey(new Date(e.at)) === e.date ? timeOf(e.at) : '';
+    const sub = [time, what].filter(Boolean).join(' · ');
     return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon(ic, `mon-row__icon mon-k-${e.kind}`)}
-      <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
+      <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span>${sub ? `<span class="mon-row__sub">${esc(sub)}</span>` : ''}</span>
       <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' || e.kind === 'transfer' || e.amount < 0 ? '' : '+'}${money(s, e.amount)}</span></button>`;
   }).join('')).join('');
-  return box('History', `${monthNav()}<div class="mon-stack">
-    ${ui.month === today().slice(0, 7) ? `<button class="imp-btn imp-btn--primary imp-btn--block" data-m="add" data-kind="expense">${icon('plus')}Expense</button>` : ''}
-    <div>${rows || '<p class="mon-note">Nothing logged this month.</p>'}</div></div>`);
+  return box('History', rows || '<p class="mon-empty">Nothing logged this month.</p>', list.length ? `${list.length} ${list.length === 1 ? 'entry' : 'entries'}` : '');
 }
+
 
 function budget(s) {
   const rows = s.categories.map((c, i) => `
@@ -280,11 +291,11 @@ function budget(s) {
     </div>
     ${ui.picking === i ? `<div class="imp-icon-grid">${MONEY_ICONS.concat(PICKER_ICONS.filter((k) => !MONEY_ICONS.includes(k))).map((k) => `<button data-m="set-icon" data-i="${i}" data-icon="${k}" class="${k === c.icon ? 'is-on' : ''}">${icon(k)}</button>`).join('')}</div>` : ''}`).join('');
   const total = s.categories.reduce((t, c) => t + (c.budget || 0), 0);
-  return box('Monthly budgets', `<div class="mon-stack">
-    <p class="mon-note">Set a monthly limit per category. Leave blank for no limit. Total: <span class="imp-accent">${money(s, total)}</span></p>
+  return box('Categories', `<div class="mon-stack">
+    <p class="mon-note">A monthly limit for each category. Leave it blank for no limit.</p>
     ${rows}
     <button class="imp-btn imp-btn--secondary imp-btn--block" data-m="add-cat">${icon('plus')}Add category</button>
-    <button class="imp-btn imp-btn--primary imp-btn--block" data-m="save-budget">Save budgets</button></div>`);
+    <button class="imp-btn imp-btn--primary imp-btn--block" data-m="save-budget">Save budgets</button></div>`, `${money(s, total)} a month`);
 }
 
 function settings(s) {
@@ -300,13 +311,13 @@ function settings(s) {
   }[f];
   return `${box('Pay schedule', `<div class="mon-stack">
       <div class="imp-seg mon-seg">${Object.entries(L.FREQS).map(([k, v]) => `<button data-m="freq" data-freq="${k}" class="${f === k ? 'is-on' : ''}">${v}</button>`).join('')}</div>
-      ${fields}</div>`, icon('bank'))}
+      ${fields}</div>`)}
     ${splitBox(s)}
     ${box('Other', `<div class="mon-stack">
       <label class="imp-field"><span class="imp-label">Currency symbol</span><input class="imp-input" id="s-cur" maxlength="3" value="${esc(s.settings.currency)}"></label>
       <p class="food-err" id="s-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-m="save-settings">Save settings</button>
-      <p class="mon-note">Money data is included in Improve's backup on the Profile tab.</p></div>`)}`;
+      <p class="mon-note">Money is included in the backup on the You page.</p></div>`)}`;
 }
 
 // Paycheck split editor (works on a draft until Save settings)
@@ -314,7 +325,7 @@ const splitDraft = (s) => (ui.split ||= structuredClone(s.settings.split));
 function splitBox(s) {
   const accts = s.accounts || [];
   if (!accts.length) {
-    return box('Paycheck split', `<div class="mon-stack"><p class="mon-note">Set up your accounts on Overview first. Then choose how each paycheck is divided: a % or a fixed amount into any account, the rest into your spending account.</p></div>`, icon('piggy'));
+    return box('Paycheck split', `<div class="mon-stack"><p class="mon-note">Set up your accounts on the Money page first. Then choose how each paycheck is divided: a % or a fixed amount into any account, the rest into your spending account.</p></div>`);
   }
   const sp = splitDraft(s);
   const rows = accts.filter((a) => a.id !== sp.rest).map((a) => {
@@ -330,7 +341,7 @@ function splitBox(s) {
     ${rows}
     <div class="imp-field"><span class="imp-label">Rest goes to</span><div class="mon-chips">${accts.map((a) => `<button type="button" data-m="split-rest" data-id="${esc(a.id)}" class="mon-chip${sp.rest === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>
     <p class="mon-note" id="split-ex">Example: a $1,000 paycheck → ${esc(ex)}</p>
-    <p class="mon-note">Your paycheck-saving habit ticks in payday weeks once the paycheck is logged with at least this much set aside (everything not going to "${esc(acctName(s, sp.rest))}").</p></div>`, icon('piggy'));
+    <p class="mon-note">Your saving habit ticks in payday weeks once the paycheck is logged with this much set aside.</p></div>`);
 }
 
 // ---------- Sheets ----------
@@ -441,45 +452,6 @@ function openEntry(kind, e = null) {
   });
 }
 
-function openReview() {
-  const s = M.getState();
-  const mk = L.reviewMonth();
-  const sum = L.monthSummary(s, mk);
-  const prev = L.monthSummary(s, L.shiftMonth(mk, -1));
-  const done = s.reviews?.[mk];
-  const cats = s.categories.map((c) => ({ c, spent: sum.byCat[c.id] || 0 })).sort((a, b) => b.spent - a.spent);
-  const overs = cats.filter((x) => x.c.budget > 0 && x.spent > x.c.budget);
-  const top = cats.filter((x) => x.spent > 0).slice(0, 3);
-  const line = (label, val, cls = '') => `<div class="mon-pay"><span class="imp-label">${label}</span><b class="${cls}">${val}</b></div>`;
-  const diff = sum.spent - prev.spent;
-  sheet.open({
-    title: `${L.monthLabel(mk)} review`,
-    body: `
-      ${line('Spent', money(s, sum.spent))}
-      ${sum.budget ? line('Budget', `${money(s, sum.budget)} · ${sum.spent > sum.budget ? `${money(s, sum.spent - sum.budget)} over` : `${money(s, sum.budget - sum.spent)} left`}`, sum.spent > sum.budget ? 'mon-over' : 'imp-accent') : ''}
-      ${line('Vs. last month', prev.spent ? `${diff > 0 ? '+' : ''}${money(s, diff)}` : '—', diff > 0 ? 'mon-over' : 'imp-accent')}
-      ${line('Paychecks', money(s, sum.income), 'mon-in')}
-      ${s.accounts?.some((a) => a.id === 'savings')
-        ? line('Savings', `${money(s, L.balances(s).savings)} (${L.accountChange(s, 'savings', mk) >= 0 ? '+' : '−'}${money(s, Math.abs(L.accountChange(s, 'savings', mk)))} this month)`, 'imp-accent')
-        : line('Saved', money(s, sum.saved), 'imp-accent')}
-      <div class="imp-panel__sub">Biggest categories</div>
-      ${top.length ? top.map((x) => line(esc(x.c.name), money(s, x.spent))).join('') : '<p class="mon-note">No spending logged yet.</p>'}
-      <div class="imp-panel__sub">Over budget</div>
-      ${overs.length ? overs.map((x) => line(esc(x.c.name), `${money(s, x.spent - x.c.budget)} over`, 'mon-over')).join('') : '<p class="mon-note">Nothing over budget.</p>'}
-      <button class="imp-btn imp-btn--secondary imp-btn--block" id="r-budget">Adjust budgets</button>
-      ${done ? '<button class="imp-btn imp-btn--ghost imp-btn--block" id="r-undo">Mark not done</button>' : '<button class="imp-btn imp-btn--primary imp-btn--block" id="r-done">Finish review</button>'}`,
-    onMount(b) {
-      b.onclick = (ev) => {
-        const t = ev.target.closest('button');
-        if (!t) return;
-        if (t.id === 'r-budget') { sheet.close(); ui.sub = 'budget'; rerender(); }
-        if (t.id === 'r-done') { sheet.close(); changed(() => M.setReview(mk, true)); toast('Review done'); }
-        if (t.id === 'r-undo') { sheet.close(); changed(() => M.setReview(mk, false)); }
-      };
-    },
-  });
-}
-
 // ---------- Events ----------
 export function bind(root) {
   const mine = () => root.dataset.tab === 'money';
@@ -487,7 +459,7 @@ export function bind(root) {
   root.addEventListener('input', (ev) => {
     if (!mine()) return;
     const t = ev.target;
-    if (ui.sub === 'settings' && t.dataset.split != null) {
+    if (ui.page === 'settings' && t.dataset.split != null) {
       const sp = splitDraft(M.getState());
       const part = sp.parts.find((x) => x.account === t.dataset.split) || sp.parts[sp.parts.push({ account: t.dataset.split, mode: 'percent', value: 0 }) - 1];
       const raw = t.value.trim();
@@ -496,7 +468,7 @@ export function bind(root) {
       if (ex && !Number.isNaN(part.value)) ex.textContent = `Example: a $1,000 paycheck → ${L.splitPaycheck(sp, 100000).map((x) => `${acctName(M.getState(), x.account)} ${money(M.getState(), x.amount)}`).join(' · ')}`;
       return;
     }
-    if (ui.sub !== 'budget') return;
+    if (ui.page !== 'budget') return;
     const d = draft(M.getState());
     if (t.dataset.name != null) d[+t.dataset.name].name = t.value;
     if (t.dataset.budget != null) d[+t.dataset.budget].budget = t.value.trim() ? L.toCents(t.value) : 0;
@@ -508,7 +480,8 @@ export function bind(root) {
     if (!el) return;
     const s = M.getState();
     switch (el.dataset.m) {
-      case 'sub': ui.sub = el.dataset.sub; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null; rerender(); break;
+      case 'page': openPage(el.dataset.page); break;
+      case 'back': openPage(null); break;
       case 'month': ui.month = L.shiftMonth(ui.month, Number(el.dataset.dir)); rerender(); break;
       case 'add': openEntry(el.dataset.kind); break;
       case 'edit': {
@@ -521,7 +494,6 @@ export function bind(root) {
       case 'acct-setup': openAccountSetup(); break;
       case 'acct': openAccount(el.dataset.id); break;
       case 'acct-add': openAddAccount(); break;
-      case 'review': openReview(); break;
 
       // Budget editing works on a draft until Save
       case 'pick-icon': draft(s); ui.picking = ui.picking === +el.dataset.i ? null : +el.dataset.i; renderDraft(); break;
@@ -540,8 +512,7 @@ export function bind(root) {
         const d = draft(s);
         if (d.some((c) => Number.isNaN(c.budget) || c.budget < 0)) { toast('Check the budget amounts'); break; }
         M.saveCategories(d.map((c) => ({ ...c, name: c.name.trim() || 'Untitled' })));
-        ui.draft = null;
-        rerender();
+        openPage(null);
         toast('Budgets saved');
         break;
       }
@@ -569,7 +540,7 @@ function draft(s) {
 function renderDraft() {
   const real = M.getState();
   const s = { ...real, categories: ui.draft };
-  ctx.root.innerHTML = `<div class="screen money"><div class="imp-seg food-subnav">${SUBS.map(([id, label]) => `<button data-m="sub" data-sub="${id}" class="${ui.sub === id ? 'is-on' : ''}">${label}</button>`).join('')}</div>${budget(s)}</div>`;
+  ctx.root.innerHTML = `<div class="screen money">${nav('Budgets')}${budget(s)}</div>`;
 }
 
 function saveSettings(s) {
@@ -602,7 +573,9 @@ function saveSettings(s) {
   ui.payFreq = null;
   ui.split = null;
   ui.typed = null;
+  ui.page = null;
   changed(() => M.saveSettings({ pay, split, currency, setup: true }));
+  window.scrollTo(0, 0);
   toast('Settings saved');
 }
 

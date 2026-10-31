@@ -14,7 +14,7 @@ eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnig
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
 const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 31, '31 preloaded habits');
+eq(H.getHabits().length, 30, '30 preloaded habits (Budget review put away)');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');

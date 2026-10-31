@@ -1,17 +1,31 @@
 /* Money tab */
 .mon-stack { display: grid; gap: 12px; padding: 6px 0 4px; }
 .mon-note { font-size: 14px; color: var(--imp-muted); line-height: 1.4; }
-.mon-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0 4px; }
-.mon-nav .imp-title { font-size: 13px; text-align: center; }
-.mon-nav .imp-btn::before { content: none; }
+.mon-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 0; }
+.mon-nav__title { font: 600 16px var(--imp-font-head); }
+.mon-nav .food-back:disabled { opacity: .35; }
 .mon-hero { display: grid; gap: 8px; padding: 10px 0 6px; text-align: center; }
-.mon-big { font: 800 46px/1 var(--imp-font-body); color: var(--imp-accent); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.mon-big { font: 800 46px/1 var(--imp-font-body); color: var(--imp-text); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .mon-cap { margin-top: -2px; font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); }
-.mon-hero.is-over .mon-big { color: var(--imp-danger); }
+.mon-hero.is-over .mon-big, .mon-hero.is-over .mon-cap { color: var(--imp-danger); }
+.mon-bar .imp-xpbar__fill { background: var(--imp-text); }
+.mon-bar.imp-xpbar--over .imp-xpbar__fill { background: var(--imp-danger); }
+.mon-hero .imp-xpbar { margin-top: 4px; }
 .mon-left { font-size: 15px; color: var(--imp-muted); }
 .mon-hero.is-over .mon-left, .mon-over { color: var(--imp-danger); }
-.mon-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px; color: var(--imp-muted); text-align: center; }
-.mon-mini > span { display: flex; flex-direction: column; align-items: center; line-height: 1.4; }
+.mon-mini { display: flex; justify-content: center; gap: 22px; margin-top: 6px; font-size: 14px; color: var(--imp-muted); }
+.mon-mini > span { display: flex; gap: 6px; align-items: baseline; }
+.mon-mini b { color: var(--imp-text); }
+.mon-mini b.mon-in { color: var(--imp-good); }
+.mon-addbtn { margin-top: 12px; }
+.mon-link { display: inline-flex; align-items: center; gap: 4px; font: 600 14px var(--imp-font-head); color: var(--imp-accent); text-transform: none; letter-spacing: 0; }
+.mon-link .imp-icon { width: 16px; height: 16px; }
+.mon-empty { padding: 10px 0; color: var(--imp-muted); font-size: 15px; }
+.mon-day { padding: 14px 0 2px; font: 600 12.5px var(--imp-font-head); color: var(--imp-muted); }
+.mon-day:first-child { padding-top: 4px; }
+.mon-row__go { width: 18px; height: 18px; flex: none; color: var(--imp-faint); }
+.mon-payrow .imp-btn { flex: none; }
+.mon-pagenav { margin: 0 0 4px; }
 .mon-mini small { font-size: 13px; }
 .mon-mini b, .mon-pay b { font-weight: 600; }
 .mon-in, .mon-k-income { color: var(--imp-good); }
@@ -21,11 +35,12 @@
 .mon-add .imp-btn--primary { grid-column: 1 / -1; }
 .mon-add .imp-btn { min-width: 0; padding-left: 4px; padding-right: 4px; white-space: nowrap; letter-spacing: 0; }
 
-.mon-cat { display: grid; grid-template-columns: 26px 1fr; gap: 4px 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--imp-divider); }
+.mon-cat { display: grid; grid-template-columns: 22px 1fr; gap: 6px 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--imp-divider); }
 .mon-cat:last-child { border-bottom: 0; }
-.mon-cat__icon { grid-row: span 2; width: 24px; height: 24px; color: var(--imp-accent); }
+.mon-cat__icon { grid-row: span 2; width: 20px; height: 20px; color: var(--imp-muted); }
+.mon-cat:not(:has(.imp-xpbar)) .mon-cat__icon { grid-row: auto; }
 .mon-cat__top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
-.mon-cat__name { font: 400 var(--imp-fs-xs) var(--imp-font-head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mon-cat__name { font: 500 15px var(--imp-font-head); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mon-cat__val { font-size: 15px; white-space: nowrap; }
 .mon-cat__val small { font-size: 13px; color: var(--imp-muted); }
 .mon-cat.is-over .mon-cat__val, .mon-cat.is-over .mon-cat__icon { color: var(--imp-danger); }
@@ -38,13 +53,16 @@
 
 .mon-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 0; min-height: 50px; border-bottom: 1px solid var(--imp-divider); }
 .mon-row:active { background: var(--imp-sunken); }
-.mon-row__icon { width: 24px; height: 24px; flex: none; color: var(--imp-muted); }
+.mon-row__icon { width: 20px; height: 20px; flex: none; color: var(--imp-muted); }
+.mon-row:last-child { border-bottom: 0; }
 .mon-row__mid { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
 .mon-row__name { font-size: 16px; overflow-wrap: anywhere; }
-.mon-row__sub { font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); }
+.mon-row__sub { font: 400 13px var(--imp-font-head); color: var(--imp-muted); }
 .mon-row__amt { flex: none; font-size: 16px; }
 
-.mon-bud { display: grid; grid-template-columns: 44px 1fr 96px auto; gap: 8px; align-items: center; }
+.mon-bud { display: grid; grid-template-columns: 40px minmax(0, 1fr) 84px 30px; gap: 6px; align-items: center; }
+.mon-bud .cat-icon { width: 40px; height: 40px; }
+.mon-bud .mon-del { width: 30px; padding: 0; justify-content: center; }
 .mon-bud__amt .imp-input { padding-right: 40px; }
 .mon-del::before { content: none; }
 .mon-seg { flex-wrap: wrap; }
