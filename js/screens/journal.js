@@ -5,8 +5,8 @@ import * as J from '../journal/store.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
-import { dayKey, fromDayKey, prettyDate } from '../dates.js';
-import { esc, icon, xpbar, pct, sheet, toast, confirmBox } from '../ui.js';
+import { dayKey, fromDayKey } from '../dates.js';
+import { esc, icon, pct, sheet, toast } from '../ui.js';
 
 const SHOW = 30; // past days shown before "Show older"
 const ui = { showAll: false };
@@ -15,7 +15,7 @@ const timers = new Map(); // pending saves per day
 
 function label(key) {
   const d = fromDayKey(key);
-  const base = prettyDate(d);
+  const base = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
   return d.getFullYear() === new Date().getFullYear() ? base : `${base}, ${d.getFullYear()}`;
 }
 
@@ -48,8 +48,7 @@ function todayStatus(text, min) {
   const done = n >= min;
   return {
     n, done,
-    html: `<span id="jr-count">${n}</span> / ${min} words`,
-    status: done ? `${icon('check')} Journal ticked for today` : `${min - n} more word${min - n === 1 ? '' : 's'} to tick Journal`,
+    html: `${done ? icon('check') : `<span class="jr-ring" style="--p:${pct(n, min)}%"></span>`}<span>${n} / ${min} words</span>`,
   };
 }
 
@@ -66,25 +65,17 @@ export function render(root, _refresh, hud) {
   const days = shown.map((k) => `
     <div class="jr-day" data-day="${k}">
       <div class="jr-date"><span>${esc(label(k))}</span><span class="jr-wc">${J.wordCount(j.days[k])} words</span></div>
-      <button class="jr-text" data-j="edit-past" data-day="${k}" aria-label="Edit ${esc(label(k))}">${esc(j.days[k])}</button>
+      <button class="jr-text" data-day="${k}" aria-label="${esc(label(k))}, hold to edit">${esc(j.days[k])}</button>
     </div>`).join('');
 
   root.innerHTML = `<div class="screen journal">
-    <section class="imp-panel">
-      <header class="imp-panel__head"><h2 class="imp-panel__title">Journal</h2>
-        <button class="imp-btn imp-btn--sm imp-btn--ghost jr-gear" data-j="settings" aria-label="Journal settings">${icon('cog')}</button></header>
-      <div class="imp-panel__body jr-meter">
-        <div class="imp-meter"><span class="imp-meter__label">Today</span>${xpbar(pct(t.n, min), 'imp-xpbar--sm')}<span class="imp-meter__val">${t.html}</span></div>
-        <p class="jr-status${t.done ? ' is-on' : ''}">${t.status}</p>
-      </div>
-    </section>
     <section class="imp-panel jr-note">
       <div class="imp-panel__body">
         ${past.length > shown.length ? `<button class="imp-btn imp-btn--secondary imp-btn--block jr-older" data-j="older">Show ${past.length - shown.length} older day${past.length - shown.length === 1 ? '' : 's'}</button>` : ''}
-        ${days || '<p class="jr-hint">Each day gets its own section here. Yesterday and earlier stay above; today is always at the bottom.</p>'}
+        ${days ? `${days}<p class="jr-hint jr-holdhint">Hold a past day to edit it</p>` : ''}
         <div class="jr-day is-today">
-          <div class="jr-date"><span>Today · ${esc(label(today))}</span></div>
-          <textarea class="jr-input" data-day="${today}" placeholder="Write about your day…" rows="6">${esc(j.days[today] || '')}</textarea>
+          <div class="jr-date"><span>Today · ${esc(label(today))}</span><span class="jr-count${t.done ? ' is-on' : ''}">${t.html}</span></div>
+          <textarea class="jr-input" data-day="${today}" placeholder="Write about your day…" rows="2">${esc(j.days[today] || '')}</textarea>
         </div>
       </div>
     </section>
@@ -96,25 +87,16 @@ export function render(root, _refresh, hud) {
 }
 
 function updateMeter(text) {
-  const min = J.getJournal().settings.minWords;
-  const t = todayStatus(text, min);
-  const m = ctx.root.querySelector('.jr-meter');
-  if (!m) return;
-  m.querySelector('.imp-meter__val').innerHTML = t.html;
-  m.querySelector('.imp-xpbar').style.setProperty('--p', `${pct(t.n, min)}%`);
-  const st = m.querySelector('.jr-status');
-  st.innerHTML = t.status;
-  st.classList.toggle('is-on', t.done);
+  const t = todayStatus(text, J.getJournal().settings.minWords);
+  const c = ctx.root.querySelector('.jr-count');
+  if (!c) return;
+  c.innerHTML = t.html;
+  c.classList.toggle('is-on', t.done);
 }
 
-async function editPast(key) {
-  const ok = await confirmBox({
-    title: `Edit ${label(key)}?`,
-    text: 'This day is over. Are you sure you want to change it? Edits save as you type.',
-    ok: 'Edit',
-    icon: 'edit',
-  });
-  if (!ok) return;
+// Hold a past day to edit it (same as holding a habit)
+function editPast(key) {
+  navigator.vibrate?.(10);
   const btn = ctx.root.querySelector(`.jr-text[data-day="${key}"]`);
   if (!btn) return;
   const ta = document.createElement('textarea');
@@ -152,7 +134,22 @@ function openSettings() {
   });
 }
 
+/** ⋯ in the top bar */
+export const openMenu = () => openSettings();
+
 export function bind(root) {
+  let hold = null;
+  const endHold = () => { clearTimeout(hold); hold = null; };
+  root.addEventListener('pointerdown', (e) => {
+    if (root.dataset.tab !== 'journal') return;
+    const el = e.target.closest('.jr-text[data-day]');
+    if (!el) return;
+    endHold();
+    hold = setTimeout(() => { hold = null; editPast(el.dataset.day); }, 450);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave', 'scroll']) root.addEventListener(ev, endHold, true);
+  root.addEventListener('contextmenu', (e) => { if (e.target.closest('.jr-text')) e.preventDefault(); });
+
   const mine = () => root.dataset.tab === 'journal';
   root.addEventListener('input', (e) => {
     if (!mine()) return;
@@ -178,7 +175,6 @@ export function bind(root) {
       if (!text) { ta.closest('.jr-day')?.remove(); return; }
       const btn = document.createElement('button');
       btn.className = 'jr-text';
-      btn.dataset.j = 'edit-past';
       btn.dataset.day = key;
       btn.textContent = text;
       ta.replaceWith(btn);
@@ -188,7 +184,6 @@ export function bind(root) {
     if (!mine()) return;
     const el = e.target.closest('[data-j]');
     if (!el) return;
-    if (el.dataset.j === 'edit-past') editPast(el.dataset.day);
     if (el.dataset.j === 'older') { ui.showAll = true; render(ctx.root, null, ctx.hud); }
     if (el.dataset.j === 'settings') openSettings();
   });

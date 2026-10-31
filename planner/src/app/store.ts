@@ -3,7 +3,8 @@ import type { Ms } from '../core/types';
 import { emptyData, normalize, refreshIfStale, type AppData } from './model';
 
 // Improve keeps every key under the imp_ prefix. The old app used 'planner-data-v1'.
-const KEY = 'imp_planner';
+// The dev preview (/Improve/dev/) keeps its own copy (see js/devmode.js).
+const KEY = /\/dev\//.test(location.pathname) ? 'imp_dev_planner' : 'imp_planner';
 export const OLD_APP_KEY = 'planner-data-v1';
 
 function load(): AppData {

@@ -21,6 +21,7 @@ async function api(url: string, method: string, path: string, body?: unknown) {
 }
 
 export function pushSupported(): string | null {
+  if (/\/dev\//.test(location.pathname)) return 'Notifications are off in the dev preview, so you don\'t get doubles.';
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     return 'Notifications only work in the app opened from your home screen (iOS 16.4 or newer).';
   }

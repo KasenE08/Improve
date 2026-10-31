@@ -13,27 +13,6 @@ const base = (now: number) => replan({ ...emptyData(), blocks: BLOCKS, locations
 const NIGHT = { start: T(MON, '00:00') + 86_400_000, end: T(TUE, '02:00') }; // Mon 12am–Tue 2am
 
 describe('falling behind', () => {
-  it('the first assignment starts exactly 5 minutes after tapping (6:03 → 6:08)', () => {
-    let d = actions.saveTask(base(T(MON, '15:00')), task({ id: 'a', estimateMin: 45 }), T(MON, '15:00'));
-    d = actions.saveTask(d, task({ id: 'b', estimateMin: 30 }), T(MON, '15:00'));
-    d = actions.fallingBehind(d, T(MON, '18:03'));
-    expect(startOf(d.plan!, 'a')).toBe(`${MON} 18:08`);
-    expect(startOf(d.plan!, 'b')).toBe(`${MON} 19:25`); // 18:53 + 30 min break, then the 5-minute grid
-  });
-
-  it('seconds on the clock are ignored (6:03:27 → 6:08)', () => {
-    const d = actions.fallingBehind(actions.saveTask(base(T(MON, '15:00')), task({ id: 'a', estimateMin: 30 }), T(MON, '15:00')), T(MON, '18:03') + 27_000);
-    expect(startOf(d.plan!, 'a')).toBe(`${MON} 18:08`);
-  });
-
-  it('what no longer fits today moves to the next free time, by priority', () => {
-    let d = base(T(MON, '15:00'));
-    d = actions.saveTask(d, task({ id: 'soon', estimateMin: 60, due: T(TUE, '23:59') }), T(MON, '15:00'));
-    d = actions.saveTask(d, task({ id: 'later', estimateMin: 60, due: T(FRI, '23:59') }), T(MON, '15:00'));
-    d = actions.fallingBehind(d, T(MON, '22:30'));
-    expect(startOf(d.plan!, 'soon')).toBe(`${MON} 22:35`);
-    expect(startOf(d.plan!, 'later')).toBe(`${TUE} 16:05`);
-  });
 
   it('goes past 12am only for a task that would otherwise be late', () => {
     const tasks = [
@@ -98,22 +77,6 @@ describe('falling behind', () => {
     expect(nightWindow(d, T(MON, '21:00'))).toEqual({ start: T(TUE, '00:00'), end: T(TUE, '02:00') });
     expect(nightWindow(d, T(TUE, '00:30'))).toEqual({ start: T(TUE, '00:00'), end: T(TUE, '02:00') });
   });
-
-  it('the extension expires: replanning after 2am no longer uses it', () => {
-    let d = actions.fallingBehind(base(T(MON, '21:00')), T(MON, '21:00'));
-    expect(d.night).not.toBeNull();
-    d = replan(d, T(TUE, '07:00'));
-    expect(d.night).toBeNull();
-  });
-
-  it('a started task keeps its slot when falling behind', () => {
-    let d = actions.saveTask(base(T(MON, '15:00')), task({ id: 'a', estimateMin: 45 }), T(MON, '15:00'));
-    d = actions.saveTask(d, task({ id: 'b', estimateMin: 30 }), T(MON, '15:00'));
-    d = actions.startTask(d, 'a', T(MON, '17:50'));
-    d = actions.fallingBehind(d, T(MON, '18:03'));
-    expect(startOf(d.plan!, 'a')).toBe(`${MON} 17:50`);
-    expect(startOf(d.plan!, 'b')).toBe(`${MON} 19:05`); // after a ends 18:35 + 30 min break (first start 18:08 is too soon)
-  });
 });
 
 describe('big tasks', () => {
@@ -121,22 +84,6 @@ describe('big tasks', () => {
     expect(splitMinutes(150)).toEqual([50, 50, 50]);
     expect(splitMinutes(95)).toEqual([50, 50]);
     expect(splitMinutes(240)).toEqual([60, 60, 60, 60]);
-  });
-
-  it('parts are scheduled in order, one per day', () => {
-    const big = task({ id: 'essay', title: 'Essay', type: 'essay', estimateMin: 150, due: T(FRI, '23:59') });
-    const d = actions.splitTask(base(T(MON, '15:00')), big, T(MON, '15:00'));
-    expect(d.tasks.map((t) => t.title)).toEqual(['Essay (part 1 of 3)', 'Essay (part 2 of 3)', 'Essay (part 3 of 3)']);
-    const days = d.tasks.map((t) => fmt(d.plan!.items.find((i) => i.taskId === t.id)!.start).slice(0, 10));
-    expect(days).toEqual([MON, TUE, WED]);
-  });
-
-  it('parts share a day only when spreading them out would make them late', () => {
-    const big = task({ id: 'p', estimateMin: 120, due: T(MON, '23:59') });
-    const d = actions.splitTask(base(T(MON, '15:00')), big, T(MON, '15:00'));
-    const starts = d.tasks.map((t) => fmt(d.plan!.items.find((i) => i.taskId === t.id)!.start));
-    expect(starts).toEqual([`${MON} 17:45`, `${MON} 21:30`]);
-    expect(d.plan!.warnings).toEqual([]);
   });
 
   it('a later part never goes before an earlier one', () => {

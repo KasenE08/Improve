@@ -14,10 +14,12 @@ export interface Note {
   tag: string;
 }
 
+/** Reminders go out this long before each event and assignment. */
+export const LEAD_MIN = 5;
+
 /**
- * Notifications for every unfinished planned task (at its start time) and each step reminder,
- * from the start of today through `notifyDays`. Deterministic, so it doubles as the
- * "does the server need an update" fingerprint.
+ * A reminder 5 minutes before every unfinished assignment and every event, from the start of today
+ * through `notifyDays`. Deterministic, so it doubles as the "does the server need an update" fingerprint.
  */
 export function notifications(d: AppData, now: Ms): Note[] {
   if (!d.plan) return [];
@@ -25,30 +27,28 @@ export function notifications(d: AppData, now: Ms): Note[] {
   const from = at(today, 0);
   const to = at(addDays(today, d.settings.notifyDays), 0);
   const tasks = new Map(d.tasks.map((t) => [t.id, t]));
+  const lead = LEAD_MIN * 60_000;
   const out: Note[] = [];
   for (const i of d.plan.items) {
     const t = tasks.get(i.taskId);
-    if (!t || t.status !== 'todo' || i.start < from || i.start >= to) continue;
+    const when = i.start - lead;
+    if (!t || t.status === 'done' || when < from || when >= to) continue;
     out.push({
-      at: i.start,
+      at: when,
       title: t.title,
-      body: [
-        `Start now · ${fmtTime(i.start)}–${fmtTime(i.end)} (${fmtDur(t.estimateMin)})`,
-        t.due === null ? 'Missing: as soon as possible' : `Due ${fmtDue(t.due)}`,
-        i.late ? "Can't finish before it's due" : null,
-      ]
+      body: [`In ${LEAD_MIN} min · ${fmtTime(i.start)}–${fmtTime(i.end)} (${fmtDur(t.estimateMin)})`, t.due === null ? null : `Due ${fmtDue(t.due)}`]
         .filter(Boolean)
         .join('\n'),
       taskId: t.id,
       tag: `task-${t.id}`,
     });
   }
-  for (const r of d.plan.blockReminders) {
-    if (r.at < from || r.at >= to) continue;
-    const block = d.blocks.find((b) => b.id === r.blockId);
-    out.push({ at: r.at, title: r.title, body: block?.title ?? '', tag: `step-${r.blockId}-${r.at}` });
+  for (const e of d.plan.events ?? []) {
+    const when = e.start - lead;
+    if (when < from || when >= to) continue;
+    out.push({ at: when, title: e.title, body: `In ${LEAD_MIN} min · ${fmtTime(e.start)}–${fmtTime(e.end)}`, tag: `event-${e.blockId}-${e.start}` });
   }
-  return out.sort((a, b) => a.at - b.at);
+  return out.sort((a, b) => a.at - b.at || a.tag.localeCompare(b.tag));
 }
 
 export const fingerprint = (notes: Note[]) => JSON.stringify(notes);

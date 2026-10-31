@@ -1,94 +1,67 @@
-import type { Task } from '../core/types';
 import { actions, type AppData } from './model';
 import { commit } from './store';
-import { Field, SheetFrame, useUI } from './ui';
-import { category, fmtDay, fmtDue, fmtDur, fmtTime, TYPE_LABELS } from './format';
-import { CATEGORY_ICONS, Icon } from './icons';
-import { categoryRank } from '../core/priority';
+import { SheetFrame, useUI } from './ui';
+import { fmtDue, fmtDur, fmtTime } from './format';
+import { Icon } from './icons';
+import { ClassTag } from './ClassPicker';
 
+/** An assignment on its own page: when, due, notes, and Done. */
 export function TaskDetail({ data, id }: { data: AppData; id: string }) {
   const ui = useUI();
   const t = data.tasks.find((x) => x.id === id);
   if (!t) return null;
-  const slot = data.plan?.items.find((i) => i.taskId === id);
-  const warning = data.plan?.warnings.find((w) => w.taskId === id);
-  const cat = category(t);
-  const act = (fn: (d: AppData, id: string, now: number) => AppData) => commit((d, now) => fn(d, id, now));
+  const cls = data.classes.find((c) => c.id === t.classId);
+  const end = t.at != null ? t.at + t.estimateMin * 60_000 : null;
+  const late = t.status !== 'done' && t.due !== null && end !== null && end > t.due;
+  const done = t.status === 'done';
+  const lines = (t.notes ?? '').split('\n').length;
 
   return (
-    <SheetFrame title="Assignment">
-      <div class="detail-head" style={{ '--cat': cat.color }}>
-        <span class="chip-icon lg"><Icon name={CATEGORY_ICONS[categoryRank(t)]} size={26} /></span>
-        <h2>{t.title}</h2>
-        <div class="meta">
-          {cat.label} · {TYPE_LABELS[t.type]} · {fmtDur(t.estimateMin)}
-        </div>
+    <SheetFrame title="Assignment" full>
+      <div class="detail-head" style={{ '--cat': cls?.color ?? 'var(--imp-accent)' }}>
+        {cls && <ClassTag c={cls} />}
+        <h2 class={done ? 'is-done' : ''}>{t.title}</h2>
       </div>
-      <div class="info-list">
-        <div class="info-row">
-          <Icon name="flag" />
-          <span class="info-label">Due</span>
-          <span>{t.due === null ? 'Missing: as soon as possible' : fmtDue(t.due)}</span>
+
+      <button
+        class={`btn ${done ? '' : 'primary'} wide done-btn`}
+        onClick={() => commit((d, n) => (done ? actions.reopenTask(d, id, n) : actions.completeTask(d, id, n)))}
+      >
+        <Icon name="check" size={18} /> {done ? 'Done · tap to undo' : 'Mark done'}
+      </button>
+
+      <div class="group">
+        <div class="g-row">
+          <span class="g-label">When</span>
+          <span class="g-value">{t.at != null ? `${fmtDue(t.at)} – ${fmtTime(end!)} (${fmtDur(t.estimateMin)})` : 'Not on the calendar'}</span>
         </div>
-        <div class="info-row">
-          <Icon name="clock" />
-          <span class="info-label">Do it</span>
-          <span>{slot ? `${fmtDue(slot.start)} – ${fmtTime(slot.end)}` : 'Not scheduled'}</span>
+        <div class="g-row">
+          <span class="g-label">Due</span>
+          <span class={`g-value ${late ? 'warn' : ''}`}>{t.due === null ? 'No due date' : fmtDue(t.due)}{late ? ' · ends after' : ''}</span>
         </div>
-        <div class="info-row">
-          <Icon name="play" />
-          <span class="info-label">Status</span>
-          <span>{statusText(t)}</span>
-        </div>
+        {done && t.completedAt && (
+          <div class="g-row">
+            <span class="g-label">Finished</span>
+            <span class="g-value">{fmtDue(t.completedAt)}</span>
+          </div>
+        )}
       </div>
-      {t.noBreakBefore && (
-        <p class="small">
-          Starts right after the one before it (break skipped).{' '}
-          <button class="link" onClick={() => commit((d, now) => actions.setNoBreak(d, [id], false, now))}>
-            Restore break
-          </button>
-        </p>
-      )}
-      {t.pinDay && (
-        <p class="small">
-          Moved by hand to {fmtDay(t.pinDay)}.{' '}
-          <button class="link" onClick={() => act(actions.unpin)}>
-            Let the app schedule it
-          </button>
-        </p>
-      )}
-      {warning && (
-        <p class="callout warn">
-          <Icon name="alert" size={16} />
-          {warning.kind === 'late' ? "This can't be finished before it's due." : 'No free time fits this yet.'}
-        </p>
-      )}
-      <Field label="Notes">
+
+      <label class="field">
+        <span class="field-label">Notes</span>
         <textarea
-          rows={4}
+          class="notes-full"
+          rows={Math.max(4, lines + 1)}
+          placeholder="Add notes…"
           value={t.notes ?? ''}
           onChange={(e) => {
             const v = e.currentTarget.value;
             commit((d) => actions.setNotes(d, id, v));
           }}
         />
-      </Field>
-      <div class="actions">
-        {t.status === 'todo' && (
-          <button class="btn primary" onClick={() => act(actions.startTask)}>
-            Start
-          </button>
-        )}
-        {t.status !== 'done' && (
-          <button class="btn primary" onClick={() => act(actions.completeTask)}>
-            Done
-          </button>
-        )}
-        {t.status !== 'todo' && (
-          <button class="btn" onClick={() => act(actions.reopenTask)}>
-            {t.status === 'done' ? 'Not done yet' : 'Stop (not started)'}
-          </button>
-        )}
+      </label>
+
+      <div class="detail-more">
         <button class="btn" onClick={() => ui.open({ kind: 'task', task: t })}>
           <Icon name="edit" size={16} /> Edit
         </button>
@@ -96,7 +69,7 @@ export function TaskDetail({ data, id }: { data: AppData; id: string }) {
           class="btn danger"
           onClick={() => {
             if (!confirm(`Delete "${t.title}"?`)) return;
-            act(actions.deleteTask);
+            commit((d, n) => actions.deleteTask(d, id, n));
             ui.close();
           }}
         >
@@ -105,10 +78,4 @@ export function TaskDetail({ data, id }: { data: AppData; id: string }) {
       </div>
     </SheetFrame>
   );
-}
-
-function statusText(t: Task): string {
-  if (t.status === 'done') return `Done ${t.completedAt ? fmtDue(t.completedAt) : ''}`;
-  if (t.status === 'inProgress') return `Started ${t.startedAt ? fmtTime(t.startedAt) : ''}`;
-  return 'Not started';
 }

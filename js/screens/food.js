@@ -15,8 +15,6 @@ const today = () => L.appDateFor(now());
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const shortDate = (iso) => L.fromISODate(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const SUBS = [['today', 'Today'], ['foods', 'Foods'], ['meals', 'Meals'], ['goals', 'Goals']];
-const WATER_STEPS = [8, 16, 32];
 const fmtOz = (n) => (Math.round(n * 10) / 10).toLocaleString('en-US');
 
 // UI state. `stack` holds pages opened on top of the current sub-tab.
@@ -55,16 +53,40 @@ export function render(root, refresh) {
   if (p) {
     root.innerHTML = `<div class="screen food">${PAGES[p.view](p)}</div>`;
     if (p.view === 'pick') fillPickList(p);
+    if (p.view === 'foods') fillFoodsList();
     return;
   }
-  const subnav = `<div class="imp-seg food-subnav">${SUBS.map(([id, label]) => `<button data-f="sub" data-sub="${id}" class="${ui.sub === id ? 'is-on' : ''}">${label}</button>`).join('')}</div>`;
-  root.innerHTML = `<div class="screen food">${subnav}${SUB_TABS[ui.sub]()}</div>`;
-  if (ui.sub === 'foods') fillFoodsList();
+  root.innerHTML = `<div class="screen food">${renderDay()}</div>`;
   ui.slide = '';
 }
 
-const PAGES = { pick: renderPick, log: renderLog, quick: renderQuick, 'food-form': renderFoodForm, 'meal-form': renderMealForm, repeat: renderRepeat, 'import-confirm': renderImportConfirm };
-const SUB_TABS = { today: renderDay, foods: renderFoods, meals: renderMeals, goals: renderGoals };
+const PAGES = {
+  pick: renderPick, log: renderLog, quick: renderQuick, 'food-form': renderFoodForm, 'meal-form': renderMealForm, repeat: renderRepeat, 'import-confirm': renderImportConfirm,
+  foods: () => nav('Saved foods') + renderFoods(), meals: () => nav('Saved meals') + renderMeals(), goals: () => nav('Goals') + renderGoals(),
+};
+
+/** ⋯ in the top bar: the things that used to be sub-tabs. */
+export function openMenu() {
+  const row = (view, ic, title, sub) => `<button class="g-row food-menu-row" data-view="${view}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span><span class="g-sub">${sub}</span></span>${icon('next')}</button>`;
+  const st = F.getState();
+  sheet.open({
+    title: 'Food',
+    body: `<div class="group">
+      ${row('foods', 'food', 'Saved foods', plural(st.foods.length, 'food'))}
+      ${row('meals', 'bag', 'Saved meals', plural(st.savedMeals.length, 'meal'))}
+      ${row('goals', 'cog', 'Goals', `${fmt(F.getGoals().calGoal)} cal · ${fmt(F.getGoals().proteinGoal)} g · ${fmt(F.getGoals().waterGoal)} oz`)}
+    </div>`,
+    onMount(b) {
+      b.onclick = (e) => {
+        const v = e.target.closest('[data-view]')?.dataset.view;
+        if (!v) return;
+        sheet.close();
+        ui.stack = [];
+        push({ view: v });
+      };
+    },
+  });
+}
 
 const box = (title, body, meta = '') => `<section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">${title}</h2><span class="imp-panel__meta">${meta}</span></header><div class="imp-panel__body">${body}</div></section>`;
 
@@ -82,7 +104,7 @@ function entryDetail(e) {
   return `${plural(e.amount, 'serving')} · ${fmt(Math.round(e.amount * e.snapshot.servingGrams))} g`;
 }
 
-const avatar = (e) => `<span class="food-av${e.kind === 'quick' ? ' is-quick' : ''}">${e.kind === 'quick' ? '+' : esc(e.name.charAt(0).toUpperCase())}</span>`;
+const loggedTime = (e) => (e.loggedAt ? new Date(e.loggedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').toLowerCase() : '');
 const calPro = (cal, pro) => `<span class="food-c">${fmt(cal)} cal</span> · <span class="food-p">${fmt(pro)} g</span>`;
 
 // Week strip: Mon–Sun, a pixel bar per day (cyan, red when over the calorie goal).
@@ -122,9 +144,8 @@ function hero(day) {
       ${xpbar(Math.round(pro.pct * 100), 'imp-xpbar--protein')}</div>
     <div class="food-bar"><div class="food-bar__top"><span class="imp-label food-w">Water</span><span class="food-val" data-testid="water-val">${fmtOz(oz)} <small>/ ${fmt(g.waterGoal)} oz</small></span></div>
       ${xpbar(Math.min(100, Math.round((oz / g.waterGoal) * 100)), 'imp-xpbar--water')}
-      <div class="food-water">${WATER_STEPS.map((n) => `<button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="water" data-oz="${n}">+${n}</button>`).join('')}
-        <button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="water-custom" aria-label="Add a custom amount of water">+?</button>
-        <button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="water" data-oz="-8" aria-label="Remove 8 oz" ${oz > 0 ? '' : 'disabled'}>−8</button></div></div>
+      <div class="food-water"><span class="food-unit"><input class="imp-input" id="water-oz" type="number" inputmode="decimal" min="1" aria-label="Ounces of water" value="${esc(g.lastWaterOz ?? '')}" placeholder="oz"><span>oz</span></span>
+        <button class="imp-btn imp-btn--secondary food-water-plus" data-f="water-add" aria-label="Add water">${icon('plus')}</button></div></div>
     <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinMin)} g+`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz+`)}</div>
   </div>`;
 }
@@ -132,33 +153,23 @@ function hero(day) {
 function renderDay() {
   const entries = F.entriesFor(ui.date);
   const day = L.totals(entries);
-  const meal = ui.mealTab;
-  const list = entries.filter((e) => e.meal === meal);
-  const sub = L.totals(list);
-  const tabs = L.MEALS.map((m) => {
-    const t = L.totals(entries.filter((e) => e.meal === m));
-    return `<button class="${m === meal ? 'is-on' : ''}" data-f="meal-tab" data-meal="${m}"><span>${L.MEAL_LABELS[m]}</span><b>${fmt(t.cal)}</b></button>`;
-  }).join('');
+  // One list for the whole day, in the order you logged it, with the time next to each
+  const order = (e) => (e.loggedAt ? new Date(e.loggedAt).getTime() : L.MEALS.indexOf(e.meal));
+  const list = [...entries].sort((a, b) => order(a) - order(b));
   const rows = list.length ? list.map((e) => `
-    <button class="food-row" data-f="edit-entry" data-id="${e.id}">${avatar(e)}
-      <span class="food-row__mid"><span class="food-row__name">${esc(e.name)}</span><span class="food-row__sub">${entryDetail(e)}</span></span>
+    <button class="food-row" data-f="edit-entry" data-id="${e.id}">
+      <span class="food-row__mid"><span class="food-row__name">${esc(e.name)}</span><span class="food-row__sub">${[loggedTime(e), e.kind === 'quick' ? '' : entryDetail(e)].filter(Boolean).join(' · ')}</span></span>
       <span class="food-row__val"><span class="food-c">${fmt(e.cal)}</span><span class="food-p">${fmt(e.protein)} g</span></span>
     </button>`).join('')
-    : `<p class="food-empty">Nothing logged for ${L.MEAL_LABELS[meal]} yet.</p>`;
+    : `<p class="food-empty">Nothing logged ${ui.date === today() ? 'today' : 'this day'} yet.</p>`;
   const date = L.fromISODate(ui.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return `${box(`${dayTitle(ui.date)} · ${date}`, `${weekStrip()}${hero(day)}`, ui.date === today() ? '' : '<button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="go-today">Today</button>')}
     <section class="imp-panel">
-      <div class="food-mealtabs">${tabs}</div>
+      <header class="imp-panel__head"><h2 class="imp-panel__title">Food</h2><span class="imp-panel__meta">${calPro(day.cal, day.protein)}</span></header>
       <div class="imp-panel__body">
         ${rows}
-        <div class="food-subtotal"><span class="imp-label">${L.MEAL_LABELS[meal]} total</span><span>${calPro(sub.cal, sub.protein)}</span></div>
-        <div class="imp-btn-row food-add">
-          <button class="imp-btn imp-btn--primary" data-f="open-pick">${icon('plus')}Add food</button>
-          <button class="imp-btn imp-btn--secondary" data-f="open-quick">Quick</button>
-          <button class="imp-btn imp-btn--secondary" data-f="open-repeat">Repeat</button>
-        </div>
-        ${list.length ? `<button class="imp-btn imp-btn--ghost imp-btn--sm" data-f="save-as-meal">Save ${L.MEAL_LABELS[meal]} as a meal</button>` : ''}
+        <button class="imp-btn imp-btn--primary imp-btn--block food-addbtn" data-f="open-pick">${icon('plus')}Add food</button>
       </div>
     </section>`;
 }
@@ -212,14 +223,11 @@ function savedMealRow(m, { editable = false } = {}) {
 
 function renderMeals() {
   const meals = F.getState().savedMeals;
-  const groups = L.MEALS.map((cat) => {
-    const list = L.searchFoods(meals.filter((m) => m.category === cat), '');
-    return list.length ? `<div class="imp-panel__sub">${L.MEAL_LABELS[cat]}</div>${list.map((m) => savedMealRow(m, { editable: true })).join('')}` : '';
-  }).join('');
+  const groups = L.searchFoods(meals, '').map((m) => savedMealRow(m, { editable: true })).join('');
   return box('Saved meals', `<div class="food-stack">
     <button class="imp-btn imp-btn--primary imp-btn--block" data-f="new-meal">${icon('plus')}New meal</button>
-    ${groups || '<p class="food-empty">No saved meals yet. Build one with New meal, or open a meal on Today and tap Save as a meal.</p>'}
-    ${meals.length ? `<p class="food-note">Add puts the meal on ${ui.date === today() ? 'today' : shortDate(ui.date)}, in the meal for the current time.</p>` : ''}</div>`);
+    ${groups || '<p class="food-empty">No saved meals yet. Tap New meal to build one.</p>'}
+    ${meals.length ? `<p class="food-note">Add puts the whole meal on ${ui.date === today() ? 'today' : shortDate(ui.date)}.</p>` : ''}</div>`);
 }
 
 const field = (id, label, value, unit, mode = 'numeric', cls = '') =>
@@ -233,7 +241,7 @@ function renderGoals() {
       <div class="imp-field-row">${field('g-water', 'Water goal', g.waterGoal, 'oz', 'numeric', 'food-w')}</div>
       <p class="food-err" id="g-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-f="save-goals">Save goals</button>
-      <p class="food-note">"Hit calories" ticks when you're within the range of your goal. "Hit protein" ticks at the minimum. Your water habit ticks at the water goal. All update on the Today tab as you log.</p></div>`)}
+      <p class="food-note">"Hit calories" ticks when you're within the range of your goal. "Hit protein" ticks at the minimum. Your water habit ticks at the water goal. They update as you log.</p></div>`)}
     ${box('Copy from Calorie Tracker', `<div class="food-stack">
       <p class="food-note">One-time copy of your old app's foods, meals and log. The old app is only read, never changed.</p>
       <p class="food-note">On iPhone: open Calorie Tracker → Settings → Export backup → Save to Files. Then pick that file here.</p>
@@ -241,7 +249,7 @@ function renderGoals() {
       <button class="imp-btn imp-btn--secondary imp-btn--block" data-f="import-direct">Copy directly (same browser only)</button>
       <p class="food-err" id="import-err"></p>
       <input type="file" id="food-import" accept="application/json,.json" hidden></div>`)}
-    ${box('Backup', '<p class="food-note">Food data is included in Improve\'s backup on the Profile tab.</p>')}`;
+    ${box('Backup', '<p class="food-note">Food data is included in Improve\'s backup on the You page.</p>')}`;
 }
 
 const longDate = (iso) => L.fromISODate(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -257,24 +265,22 @@ function renderImportConfirm(p) {
         <li>${plural(s.savedMeals, 'saved meal')}</li>
         ${p.data.settings.calGoal ? `<li>Calorie goal ${fmt(p.data.settings.calGoal)} (your protein goal + hit rules stay as set here)</li>` : ''}
       </ul>
-      <p class="food-warn">This replaces Improve's food data (now ${plural(cur.entries.length, 'entry').replace('entrys', 'entries')}, ${plural(cur.foods.length, 'food')}). Past days won't award habit XP; today's food day is checked.</p>
+      <p class="food-warn">This replaces Improve's food data (now ${plural(cur.entries.length, 'entry').replace('entrys', 'entries')}, ${plural(cur.foods.length, 'food')}). Past days aren't re-checked for habits; today's food day is.</p>
       <button class="imp-btn imp-btn--danger imp-btn--block" data-f="import-confirm">Copy into Improve</button>
       <button class="imp-btn imp-btn--ghost imp-btn--block" data-f="back">Cancel</button></div>`)}`;
 }
 
-const nav = (title) => `<div class="food-nav"><button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="back">◂ Back</button><span class="imp-panel__title">${esc(title)}</span></div>`;
+const nav = (title) => `<div class="food-nav"><button class="food-back" data-f="back" aria-label="Back">${icon('prev')}</button><h2>${esc(title)}</h2><span></span></div>`;
 
 function renderPick(p) {
   return `${nav(p.toDraft ? 'Add to meal' : 'Add food')}
     ${box('Pick', `<div class="food-stack">
-      <div class="imp-btn-row"><button class="imp-btn imp-btn--secondary imp-btn--sm" data-f="new-food-then-log">${icon('plus')}New food</button>
-        <button class="imp-btn imp-btn--secondary imp-btn--sm" data-f="open-quick">${p.toDraft ? 'Quick item' : 'Quick add'}</button></div>
+      <div class="imp-btn-row food-pick-btns"><button class="imp-btn imp-btn--secondary imp-btn--sm" data-f="new-food-then-log">${icon('plus')}New food</button>
+        <button class="imp-btn imp-btn--secondary imp-btn--sm" data-f="open-quick">${p.toDraft ? 'Quick item' : 'Quick add'}</button>
+        ${p.toDraft ? '' : '<button class="imp-btn imp-btn--secondary imp-btn--sm" data-f="open-repeat">Repeat a day</button>'}</div>
       ${searchBox('pick-search', '', p.toDraft ? 'Search saved foods' : 'Search foods and meals')}
       <div id="pick-list"></div></div>`)}`;
 }
-
-const mealSelector = (selected, act = 'pick-meal') =>
-  `<div class="imp-seg">${L.MEALS.map((m) => `<button class="${m === selected ? 'is-on' : ''}" data-f="${act}" data-meal="${m}">${L.MEAL_LABELS[m]}</button>`).join('')}</div>`;
 
 function renderLog(p) {
   const amount = parseFloat(p.amountStr) || 0;
@@ -282,7 +288,7 @@ function renderLog(p) {
   const unitLabel = p.unit === 'grams' ? 'grams' : amount === 1 ? 'serving' : 'servings';
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
   const editing = p.entryId || p.itemIndex != null;
-  const cta = editing ? 'Save changes' : p.toDraft ? 'Add to meal' : `Add to ${L.MEAL_LABELS[p.meal]}`;
+  const cta = editing ? 'Save changes' : p.toDraft ? 'Add to meal' : 'Add';
   const title = p.toDraft ? (editing ? 'Edit item' : 'Add item') : editing ? 'Edit entry' : 'Log food';
   return `${nav(title)}
     ${box(esc(p.name), `<div class="food-stack">
@@ -291,7 +297,6 @@ function renderLog(p) {
         <button class="${p.unit === 'grams' ? 'is-on' : ''}" data-f="unit" data-unit="grams">Grams</button></div>
       <div class="food-amt"><span class="food-amt__n" data-testid="amount">${esc(p.amountStr)}</span><span class="imp-label">${unitLabel}</span></div>
       <div class="food-res"><div><b class="food-c">${fmt(r.cal)}</b><span class="imp-label">Calories</span></div><div><b class="food-p">${fmt(r.protein)} g</b><span class="imp-label">Protein</span></div></div>
-      ${p.toDraft ? '' : mealSelector(p.meal)}
       <div class="food-pad">${keys.map((k) => `<button data-f="key" data-key="${k}">${k}</button>`).join('')}</div>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-f="save-log" ${amount > 0 ? '' : 'disabled'}>${cta}</button>
       ${editing ? `<button class="imp-btn imp-btn--danger imp-btn--block" data-f="delete-entry">${icon('trash')}${p.toDraft ? 'Remove item' : 'Delete entry'}</button>` : ''}
@@ -302,12 +307,11 @@ function renderQuick(p) {
   const src = p.entryId ? F.getEntry(p.entryId) : p.itemIndex != null ? draftPage().draft.items[p.itemIndex] : null;
   const val = (k) => (src ? (k === 'label' ? (src.name === 'Quick add' ? '' : src.name) : src[k]) : '');
   const title = p.toDraft ? (src ? 'Edit quick item' : 'Quick item') : src ? 'Edit quick add' : 'Quick add';
-  const cta = src ? 'Save changes' : p.toDraft ? 'Add to meal' : `Add to <span id="q-meal">${L.MEAL_LABELS[p.meal]}</span>`;
+  const cta = src ? 'Save changes' : p.toDraft ? 'Add to meal' : 'Add';
   return `${nav(title)}
     ${box(title, `<div class="food-stack">
       <label class="imp-field"><span class="imp-label">Label (optional)</span><input class="imp-input" id="q-label" placeholder="e.g. Coffee with milk" value="${esc(val('label'))}" autocomplete="off"></label>
       <div class="imp-field-row">${field('q-cal', 'Calories', val('cal'), 'cal', 'numeric', 'food-c')}${field('q-pro', 'Protein', val('protein'), 'g', 'numeric', 'food-p')}</div>
-      ${p.toDraft ? '' : mealSelector(p.meal)}
       <p class="food-err" id="q-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-f="save-quick">${cta}</button>
       ${src ? `<button class="imp-btn imp-btn--danger imp-btn--block" data-f="delete-entry">${icon('trash')}${p.toDraft ? 'Remove item' : 'Delete entry'}</button>` : ''}
@@ -334,7 +338,7 @@ function renderMealForm(p) {
   const items = d.items.length ? d.items.map((it, i) => {
     const e = L.entryFieldsFromItem(it);
     return `<div class="food-mealrow">
-      <button class="food-row" data-f="edit-item" data-i="${i}">${avatar(it)}
+      <button class="food-row" data-f="edit-item" data-i="${i}">
         <span class="food-row__mid"><span class="food-row__name">${esc(it.name)}</span><span class="food-row__sub">${entryDetail({ ...it, ...e })}</span></span>
         <span class="food-row__val"><span class="food-c">${fmt(e.cal)}</span><span class="food-p">${fmt(e.protein)} g</span></span></button>
       <button class="imp-btn imp-btn--sm imp-btn--ghost food-x" data-f="remove-item" data-i="${i}" aria-label="Remove ${esc(it.name)}">${icon('close')}</button>
@@ -343,7 +347,6 @@ function renderMealForm(p) {
   return `${nav(d.id ? 'Edit meal' : 'New meal')}
     ${box(d.id ? 'Edit meal' : 'New meal', `<div class="food-stack">
       <label class="imp-field"><span class="imp-label">Meal name</span><input class="imp-input" id="m-name" placeholder="e.g. Usual breakfast" value="${esc(d.name)}" autocomplete="off"></label>
-      <div class="imp-field"><span class="imp-label">Category</span>${mealSelector(d.category, 'pick-cat')}</div>
       <div class="imp-panel__sub">Items</div>
       <div>${items}</div>
       <div class="food-subtotal"><span class="imp-label">Total</span><span>${calPro(t.cal, t.protein)}</span></div>
@@ -356,24 +359,20 @@ function renderMealForm(p) {
 }
 
 function renderRepeat(p) {
-  const blocks = [];
+  const rows = [];
   for (let i = 1; i <= p.days; i++) {
     const date = L.addDays(ui.date, -i);
     const entries = F.entriesFor(date);
-    const rows = L.MEALS.map((m) => {
-      const list = entries.filter((e) => e.meal === m);
-      if (!list.length) return '';
-      const t = L.totals(list);
-      return `<button class="food-row" data-f="repeat-meal" data-date="${date}" data-meal="${m}">
-        <span class="food-row__mid"><span class="food-row__name">${L.MEAL_LABELS[m]}</span><span class="food-row__sub food-row__sub--wrap">${esc(list.map((e) => e.name).join(', '))}</span></span>
-        <span class="food-row__val"><span class="food-c">${fmt(t.cal)}</span><span class="food-p">${fmt(t.protein)} g</span></span></button>`;
-    }).join('');
-    if (rows) blocks.push(`<div class="imp-panel__sub">${dayTitle(date) === 'Yesterday' ? 'Yesterday' : shortDate(date)}</div>${rows}`);
+    if (!entries.length) continue;
+    const t = L.totals(entries);
+    rows.push(`<button class="food-row" data-f="repeat-day" data-date="${date}">
+      <span class="food-row__mid"><span class="food-row__name">${dayTitle(date) === 'Yesterday' ? 'Yesterday' : shortDate(date)}</span><span class="food-row__sub food-row__sub--wrap">${esc(entries.map((e) => e.name).join(', '))}</span></span>
+      <span class="food-row__val"><span class="food-c">${fmt(t.cal)}</span><span class="food-p">${fmt(t.protein)} g</span></span></button>`);
   }
-  return `${nav('Repeat a meal')}
+  return `${nav('Repeat a day')}
     ${box('Repeat', `<div class="food-stack">
-      <p class="food-note">Copies into ${ui.date === today() ? 'today' : shortDate(ui.date)}, in the meal for the current time (${L.MEAL_LABELS[L.mealForTime(now())]}). You can edit or move items afterward.</p>
-      <div>${blocks.join('') || `<p class="food-empty">Nothing logged in the ${p.days} days before ${shortDate(ui.date)}.</p>`}</div>
+      <p class="food-note">Copies everything from that day into ${ui.date === today() ? 'today' : shortDate(ui.date)}. You can edit or delete items afterward.</p>
+      <div>${rows.join('') || `<p class="food-empty">Nothing logged in the ${p.days} days before ${shortDate(ui.date)}.</p>`}</div>
       <button class="imp-btn imp-btn--secondary imp-btn--block" data-f="repeat-more">Show older days</button></div>`)}`;
 }
 
@@ -417,14 +416,12 @@ const num = (id) => {
 };
 
 // Back to the day view after adding, then show any XP / level moments.
-function finish(meal, msg, after) {
-  ui.sub = 'today';
-  ui.mealTab = meal;
+function finish(_meal, msg, after) {
   popAll();
   toast(msg);
   after && after();
 }
-const addedMsg = (what, meal) => `${what} ${L.MEAL_LABELS[meal]}${ui.date === today() ? '' : ` · ${shortDate(ui.date)}`}`;
+const addedMsg = (what) => `${what}${ui.date === today() ? '' : ` · ${shortDate(ui.date)}`}`;
 
 // ---------- Events ----------
 let suppressClick = false;
@@ -442,22 +439,22 @@ export function bind(root) {
     const act = el.dataset.f;
 
     switch (act) {
-      case 'sub': ui.sub = el.dataset.sub; rerender(); break;
-      case 'meal-tab': ui.mealTab = el.dataset.meal; rerender(); break;
       case 'back': pop(); break;
       case 'pick-day': selectDate(el.dataset.date); rerender(); break;
       case 'week': changeWeek(Number(el.dataset.dir)); break;
       case 'go-today': selectDate(today()); rerender(); break;
 
-      case 'water': {
-        const oz = Number(el.dataset.oz);
+      case 'water-add': {
+        const input = document.getElementById('water-oz');
+        const oz = Number(input?.value);
+        if (!(oz > 0) || oz > 400) { toast('Type how many oz'); input?.focus(); break; }
+        F.saveGoals({ lastWaterOz: oz }); // next time the box starts at this amount
         const after = changed(ui.date, () => F.addWater(ui.date, oz));
         rerender();
-        toast(oz > 0 ? `+${oz} oz water` : `${oz} oz water`);
+        toast(`+${fmtOz(oz)} oz water`);
         after();
         break;
       }
-      case 'water-custom': openWaterSheet(); break;
       case 'open-pick': push({ view: 'pick' }); break;
       case 'open-quick': push({ view: 'quick', toDraft: p?.toDraft, meal: L.mealForTime(now()) }); break;
       case 'open-repeat': push({ view: 'repeat', days: 14 }); break;
@@ -497,7 +494,7 @@ export function bind(root) {
           const date = F.getEntry(p.entryId).date;
           finish(p.meal, 'Saved', changed(date, () => F.updateEntry(p.entryId, { unit: p.unit, amount, meal: p.meal })));
         } else {
-          finish(p.meal, addedMsg('Added to', p.meal), changed(ui.date, () => F.logFood(F.getFood(p.foodId), { date: ui.date, meal: p.meal, unit: p.unit, amount })));
+          finish(p.meal, addedMsg('Added'), changed(ui.date, () => F.logFood(F.getFood(p.foodId), { date: ui.date, meal: p.meal, unit: p.unit, amount })));
         }
         break;
       }
@@ -515,7 +512,7 @@ export function bind(root) {
           const date = F.getEntry(p.entryId).date;
           finish(p.meal, 'Saved', changed(date, () => F.updateEntry(p.entryId, { name: label || 'Quick add', ...data, meal: p.meal })));
         } else {
-          finish(p.meal, addedMsg('Added to', p.meal), changed(ui.date, () => F.quickAdd({ label, ...data, meal: p.meal, date: ui.date })));
+          finish(p.meal, addedMsg('Added'), changed(ui.date, () => F.quickAdd({ label, ...data, meal: p.meal, date: ui.date })));
         }
         break;
       }
@@ -585,9 +582,7 @@ export function bind(root) {
       }
 
       case 'new-meal': push({ view: 'meal-form', draft: { name: '', category: L.mealForTime(now()), items: [] } }); break;
-      case 'save-as-meal': push({ view: 'meal-form', draft: { name: '', category: ui.mealTab, items: F.entriesFor(ui.date).filter((e) => e.meal === ui.mealTab).map(itemFromEntry) } }); break;
       case 'edit-meal': push({ view: 'meal-form', draft: structuredClone(F.getMeal(el.dataset.id)) }); break;
-      case 'pick-cat': p.draft.category = el.dataset.meal; rerender(); break;
       case 'draft-add-food': push({ view: 'pick', toDraft: true }); break;
       case 'draft-add-quick': push({ view: 'quick', toDraft: true }); break;
       case 'edit-item': openEditItem(Number(el.dataset.i)); break;
@@ -598,8 +593,8 @@ export function bind(root) {
         if (!d.name.trim()) { err.textContent = 'Give the meal a name.'; break; }
         if (!d.items.length) { err.textContent = 'Add at least one item.'; break; }
         F.saveMeal(d);
-        ui.sub = 'meals';
-        popAll();
+        while (page() && page().view !== 'meals') ui.stack.pop();
+        rerender();
         toast(d.id ? 'Meal saved' : `Saved "${d.name.trim()}"`);
         break;
       }
@@ -609,14 +604,14 @@ export function bind(root) {
       case 'add-meal': {
         const m = F.getMeal(el.dataset.id);
         const meal = L.mealForTime(now());
-        finish(meal, addedMsg(`Added ${m.name} to`, meal), changed(ui.date, () => F.addEntries(F.mealItemsForAdding(m), { date: ui.date, meal })));
+        finish(meal, addedMsg(`Added ${m.name}`), changed(ui.date, () => F.addEntries(F.mealItemsForAdding(m), { date: ui.date, meal })));
         break;
       }
-      case 'repeat-meal': {
-        const { date, meal: from } = el.dataset;
+      case 'repeat-day': {
+        const { date } = el.dataset;
         const meal = L.mealForTime(now());
-        const items = F.entriesFor(date).filter((e) => e.meal === from).map(itemFromEntry);
-        finish(meal, addedMsg(`Copied ${shortDate(date)} ${L.MEAL_LABELS[from]} to`, meal), changed(ui.date, () => F.addEntries(items, { date: ui.date, meal })));
+        const items = F.entriesFor(date).map(itemFromEntry);
+        finish(meal, addedMsg(`Copied ${shortDate(date)}`), changed(ui.date, () => F.addEntries(items, { date: ui.date, meal })));
         break;
       }
     }
@@ -653,29 +648,6 @@ export function bind(root) {
     }
   });
   root.addEventListener('pointercancel', () => { swipe = null; });
-}
-
-function openWaterSheet() {
-  const date = ui.date;
-  sheet.open({
-    title: 'Add water',
-    body: `<label class="imp-field"><span class="imp-label">Ounces (negative to remove)</span><span class="food-unit"><input class="imp-input" id="w-oz" type="number" inputmode="decimal" placeholder="e.g. 20"><span>oz</span></span></label>
-      <p class="food-note">Common sizes: cup 8 · bottle 16.9 · big bottle 24–32 · 1 L ≈ 33.8</p>
-      <button class="imp-btn imp-btn--primary imp-btn--block" id="w-save">Add</button>`,
-    onMount(b) {
-      setTimeout(() => b.querySelector('#w-oz')?.focus(), 50);
-      b.onclick = (ev) => {
-        if (!ev.target.closest('#w-save')) return;
-        const oz = Number(b.querySelector('#w-oz').value);
-        if (!oz || !Number.isFinite(oz) || Math.abs(oz) > 400) return toast('Enter an amount in oz');
-        sheet.close();
-        const after = changed(date, () => F.addWater(date, oz));
-        rerender();
-        toast(`${oz > 0 ? '+' : ''}${fmtOz(oz)} oz water`);
-        after();
-      };
-    },
-  });
 }
 
 function changeWeek(dir) {

@@ -3,9 +3,9 @@
 Everything used is free. Licenses:
 
 ## In the app
-- **game-icons.net** icons by Lorc, Delapouite and contributors. CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). https://game-icons.net. Credited in the app on the Profile tab.
-- **Tabler Icons** "bolt" icon (XP). MIT License, © Paweł Kuna. https://tabler.io/icons
-- **Silkscreen** and **VT323** fonts (via Fontsource). SIL Open Font License 1.1.
+- **Lucide** icons (v0.460.0). ISC License, © Lucide Contributors. https://lucide.dev. Credited in the app on the Profile tab.
+- **Inter** font by Rasmus Andersson. SIL Open Font License 1.1. https://rsms.me/inter/
+- Old theme (still used by `styleguide.html` and `/design/`): game-icons.net icons (CC BY 3.0), Silkscreen and VT323 fonts (SIL OFL 1.1).
 
 ## Code
 - Food tab logic and screens are adapted from KasenE08/calorie-tracker (same author).

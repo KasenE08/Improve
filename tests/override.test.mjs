@@ -7,6 +7,8 @@ globalThis.localStorage = {
 const J = (p) => new URL('../js/' + p, import.meta.url).href;
 const H = await import(J('habits.js'));
 H.init();
+// The planner rule is off since schema 12 ("Finished today's work" is ticked by hand); these tests turn it on to check it
+const __hs = JSON.parse(mem.imp_habits); for (const h of __hs) if (h.id === 'work-on-schedule') Object.assign(h, { auto: 'planner:work', autoAfter: 900 }); mem.imp_habits = JSON.stringify(__hs);
 const P = await import(J('planner-auto.js'));
 let fails = 0;
 const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++; console.log('FAIL', m, a, b); } else console.log('ok', m); };
@@ -40,7 +42,7 @@ eq(!!entry(), true, 'unfinished task: override still stands');
 H.setOverride(work, false, noon);
 P.recheckPlanner(late);
 eq([!!entry(), H.isOverridden(work, noon)], [false, false], 'back to auto: unfinished task = not done');
-plan({ tasks: [{ id: 'a', status: 'done', completedAt: t(14) }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
+plan({ tasks: [{ id: 'a', status: 'done', startedAt: t(13), completedAt: t(14) }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
 P.recheckPlanner(late);
 eq(!!entry(), true, 'back to auto: finished task ticks it again');
 

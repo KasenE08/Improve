@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 11;
+export const SCHEMA = 14;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -151,6 +151,23 @@ export function init() {
       const goal = food.settings?.waterGoal || 100;
       store.set('food', { ...food, water: { ...(food.water || {}), [today]: Math.max(goal, food.water?.[today] || 0) } });
     }
+  }
+  // Schema 12: the planner is a plain calendar now (no Start button to measure), so "Finished today's work"
+  // is a habit you tick yourself. Today's "day off" for it (from the old auto check) is cleared.
+  if (found > 0 && found < 12) {
+    store.set('habits', store.get('habits', []).map((h) => (h.auto === 'planner:work' ? { ...h, auto: null, autoAfter: null } : h)));
+    const ex = store.get('excused', {});
+    const today = dayKey(appNow());
+    if (ex[today]?.['work-on-schedule']) { delete ex[today]['work-on-schedule']; if (!Object.keys(ex[today]).length) delete ex[today]; store.set('excused', ex); }
+  }
+  // Schema 13: old names brought up to date ("3L water (100oz)" → "100 oz water", the goal is in oz now)
+  if (found > 0 && found < 13) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'water' && /3\s*L/i.test(h.name) ? { ...h, name: '100 oz water' } : h)));
+  }
+  // Schema 14: the Money page has no monthly review any more, so the "Budget review" habit is put away
+  // (archived: its past check-ins are kept, it just stops showing).
+  if (found < 14) {
+    store.set('habits', store.get('habits', []).map((h) => (h.auto === 'money:review' ? { ...h, archived: true } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

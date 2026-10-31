@@ -1,85 +1,47 @@
-// Profile tab: character sheet, streaks, ranks, backup, credits.
+// Profile tab: name, streaks, backup, credits. (Ranks editor kept but not shown while levels are hidden.)
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
 import * as Backup from '../backup.js';
-import { getRanks, saveRanks, DEFAULT_RANKS, xpToReach } from '../levels.js';
-import { esc, icon, panel, lvl, xpbar, attrRow, streakTag, sheet, toast } from '../ui.js';
+import * as store from '../store.js';
+import { dayKey, appNow } from '../dates.js';
+import { getRanks, saveRanks, DEFAULT_RANKS } from '../levels.js';
+import { esc, icon, panel, streakTag, sheet, toast } from '../ui.js';
 
 const fmt = (n) => Math.floor(n).toLocaleString('en-US');
 
 export function render(root) {
   const p = H.getProfile();
   const st = Stats.compute();
-  const o = st.overall;
   const streaks = R.allStreaks();
   const last = Backup.lastBackup();
   const daysSince = last ? Math.floor((Date.now() - new Date(last)) / 86400000) : null;
-
-  const nextRank = st.next
-    ? `<p class="prof-note">Next rank: <span class="imp-accent">${esc(st.next.name)}</span> at LV ${st.next.min} · ${fmt(Math.max(0, xpToReach(st.next.min) - st.total))} XP to go</p>`
-    : `<p class="prof-note">Top rank reached.</p>`;
 
   const streakList = streaks.length
     ? streaks.slice(0, 10).map((s) => `<div class="prof-streak"><span>${esc(s.h.name)}</span>${streakTag(s.count, s.current, R.UNIT[s.h.frequency][s.count === 1 ? 0 : 1])}</div>`).join('')
     : `<p class="imp-muted prof-note">Complete a habit in back-to-back periods to start a streak.</p>`;
 
-  const ladder = st.ranks.map((r) => `<div class="prof-rank${r.name === st.rank.name && r.min === st.rank.min ? ' is-current' : ''}${o.level >= r.min ? ' is-reached' : ''}">
-      <span class="prof-rank__lv">LV ${r.min}</span><span>${esc(r.name)}</span></div>`).join('');
-
+  const lastTxt = last ? (daysSince ? `${daysSince} day${daysSince === 1 ? '' : 's'} ago` : 'today') : 'never';
+  const row = (act, ic, title, sub) => `<button class="g-row" data-act="${act}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span>${sub ? `<span class="g-sub">${sub}</span>` : ''}</span>${icon('next', 'prof-go')}</button>`;
   root.innerHTML = `<div class="screen">
-    ${panel({
-      title: 'Player',
-      body: `<div class="prof-player">${lvl(o.level)}
-          <div class="prof-player__main">
-            <div class="prof-player__top"><span class="imp-title">${esc(p.name)}</span>
-              <button class="imp-btn imp-btn--secondary imp-btn--sm" data-act="edit-name">${icon('edit')}Rename</button></div>
-            <p class="imp-accent prof-rankname">${esc(st.rank.name)}</p>
-          </div></div>
-        ${xpbar(o.pct)}
-        <p class="prof-note">${fmt(o.into)} / ${fmt(o.need)} XP to LV ${o.level + 1}</p>
-        ${nextRank}
-        <div class="prof-totals">
-          <div><b>${fmt(st.total)}</b><span>Total XP</span></div>
-          <div><b>${fmt(st.perfectDays)}</b><span>Perfect days</span></div>
-          <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
-        </div>`,
-    })}
-    ${panel({ title: 'Attributes', meta: icon('trophy'), body: st.categories.map(attrRow).join('') })}
-    ${panel({ title: 'Streaks', meta: icon('flame'), body: streakList })}
-    ${panel({
-      title: 'Bonus XP',
-      body: `<div class="prof-bonus"><span>Perfect Day (all dailies)</span><span class="imp-accent">+${R.PERFECT_DAY_XP}</span></div>
-        ${R.MILESTONES.map(([n, xp]) => `<div class="prof-bonus"><span>${n}-period streak</span><span class="imp-accent">+${xp}</span></div>`).join('')}
-        <div class="prof-bonus"><span>Every 100 after that</span><span class="imp-accent">+${R.MILESTONES[2][1]}</span></div>
-        <p class="prof-note">A period is a day, week or month depending on the habit. Missing one resets the streak; you never lose XP.</p>`,
-    })}
-    ${panel({
-      title: 'Ranks',
-      body: `${ladder}<div class="imp-btn-row prof-actions"><button class="imp-btn imp-btn--secondary imp-btn--sm" data-act="edit-ranks">${icon('edit')}Edit ranks</button></div>`,
-    })}
-    ${panel({
-      title: 'Backup',
-      meta: icon('scroll'),
-      body: `<p class="prof-text">Last backup: <span class="${daysSince == null || daysSince > 7 ? 'prof-warn' : 'imp-accent'}">${last ? new Date(last).toLocaleDateString() + (daysSince ? ` (${daysSince}d ago)` : ' (today)') : 'never'}</span></p>
-        <p class="prof-note">Export saves a file you can keep in Files or iCloud. Import replaces everything in Improve with that file.</p>
-        <div class="imp-btn-row prof-actions">
-          <button class="imp-btn imp-btn--primary" data-act="export">Export backup</button>
-          <button class="imp-btn imp-btn--secondary" data-act="import">Import</button>
-        </div>
-        <input type="file" id="importFile" accept="application/json,.json" hidden>`,
-    })}
-    ${panel({
-      title: 'Data',
-      body: `<p class="prof-text">Everything is saved only on this phone, in this app's own storage (keys starting with <span class="imp-accent">imp_</span>). Nothing is sent anywhere.</p>`,
-    })}
-    ${panel({
-      title: 'Credits',
-      body: `<p class="prof-text">Icons by <a class="imp-accent" href="https://game-icons.net" target="_blank" rel="noopener">game-icons.net</a> (Lorc, Delapouite &amp; contributors), licensed
-        <a class="imp-accent" href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noopener">CC BY 3.0</a>.
-        XP bolt icon by <a class="imp-accent" href="https://tabler.io/icons" target="_blank" rel="noopener">Tabler Icons</a> (MIT).
-        Fonts: Silkscreen and VT323 (SIL Open Font License).</p>`,
-    })}
+    <section class="imp-panel"><div class="imp-panel__body">
+      <button class="prof-me" data-act="edit-name" aria-label="Rename"><span class="prof-avatar">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span>
+        <span class="prof-me__name">${esc(p.name)}</span>${icon('edit', 'prof-go')}</button>
+      <div class="prof-totals">
+        <div><b>${fmt(st.perfectDays)}</b><span>Perfect days</span></div>
+        <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
+        <div><b>${fmt(streaks.length)}</b><span>Streaks</span></div>
+      </div>
+    </div></section>
+    ${streaks.length ? panel({ title: 'Streaks', body: streakList }) : ''}
+    ${plannerStats()}
+    <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Backup</h2><span class="imp-panel__meta ${daysSince == null || daysSince > 7 ? 'prof-warn' : ''}">Last: ${lastTxt}</span></header>
+      <div class="imp-panel__body"><div class="group prof-group">
+        ${row('export', 'scroll', 'Export backup', 'Save a file to Files or iCloud')}
+        ${row('import', 'bank', 'Import', 'Replaces everything with a backup')}
+      </div><input type="file" id="importFile" accept="application/json,.json" hidden></div></section>
+    <p class="prof-foot">Everything stays on this phone (keys start with imp_). Nothing is sent anywhere.<br>
+      Icons by <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC). Font: <a href="https://rsms.me/inter/" target="_blank" rel="noopener">Inter</a> (SIL OFL).</p>
   </div>`;
 }
 
@@ -115,7 +77,7 @@ export function bind(root, refresh) {
 export function openNameSheet(refresh) {
   const p = H.getProfile();
   sheet.open({
-    title: 'Player name',
+    title: 'Your name',
     body: `<label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" id="n-name" maxlength="16" value="${esc(p.name)}" autocomplete="off"></label>
       <button class="imp-btn imp-btn--primary imp-btn--block" id="n-save">Save</button>`,
     onMount(b) {
@@ -176,4 +138,28 @@ function openRanks(refresh) {
       };
     },
   });
+}
+
+// Planner numbers (moved here from the planner's old Stats tab)
+function plannerStats() {
+  const d = store.get('planner', null);
+  if (!d || !(d.tasks || []).length) return '';
+  const day = (ms) => dayKey(appNow(new Date(ms)));
+  const today = dayKey();
+  const weekAgo = dayKey(appNow(new Date(Date.now() - 7 * 86400000)));
+  const tasks = new Map(d.tasks.map((t) => [t.id, t]));
+  const done = d.tasks.filter((t) => t.status === 'done');
+  const inWeek = (ms) => day(ms) >= today && day(ms) < dayKey(appNow(new Date(Date.now() + 7 * 86400000)));
+  const planned = (d.plan?.items || []).filter((i) => tasks.get(i.taskId)?.status !== 'done' && inWeek(i.start)).reduce((m, i) => m + (i.end - i.start) / 60000, 0);
+  const tracked = (d.history || []).reduce((m, h) => m + h.actualMin, 0);
+  const hrs = (m) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}h` : `${Math.round(m)}m`);
+  const cells = [
+    [done.length, 'Done'],
+    [done.filter((t) => t.completedAt && day(t.completedAt) > weekAgo).length, 'This week'],
+    [d.tasks.length - done.length, 'To do'],
+    [hrs(planned), 'Next 7 days'],
+    [hrs(tracked), 'Timed'],
+    [(d.classes || []).length, 'Classes'],
+  ];
+  return panel({ title: 'Planner', meta: icon('planner'), body: `<div class="prof-totals">${cells.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>` });
 }

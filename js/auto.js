@@ -3,7 +3,6 @@ export const AUTO = {
   'food:calories': 'Food: hit calories',
   'food:protein': 'Food: hit protein',
   'food:water': 'Food: hit water goal',
-  'planner:work': "Planner: all of today's tasks done",
   'money:save': 'Money: saved from this week\'s paycheck',
   'money:review': 'Money: monthly budget review done',
   'journal:words': 'Journal: wrote enough words today',

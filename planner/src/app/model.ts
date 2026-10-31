@@ -1,8 +1,8 @@
 import type {
-  BlockReminder, CutoffRule, DateKey, FixedBlock, Location, Ms, ScheduledItem, Settings, Task, Warning,
+  BlockReminder, CutoffRule, DateKey, FixedBlock, Location, Ms, SchoolClass, ScheduledItem, Settings, Task, Warning,
 } from '../core/types';
 import { DEFAULT_RULES, DEFAULT_SETTINGS, HOME } from '../core/defaults';
-import { schedule } from '../core/scheduler';
+import { occurrencesOn } from '../core/availability';
 import { addDays, at, dateKey, DAY_START_MIN, MIN, planDay } from '../core/time';
 import { splitMinutes, type DoneRecord } from '../core/estimate';
 
@@ -11,6 +11,8 @@ export interface Plan {
   items: ScheduledItem[];
   warnings: Warning[];
   blockReminders: BlockReminder[];
+  /** Fixed events in the next two weeks (for Improve's Home "Up next" and notifications). */
+  events?: { blockId: string; title: string; start: Ms; end: Ms }[];
 }
 
 export interface AppData {
@@ -30,6 +32,14 @@ export interface AppData {
   history: DoneRecord[];
   /** Late-night time unlocked by "Falling behind" for tonight. */
   night: { start: Ms; end: Ms } | null;
+  /** Classes to tag assignments with. */
+  classes: SchoolClass[];
+  /** Days "Falling behind" was used (Improve's "Finished today's work" doesn't tick those days). Last 60 kept. */
+  behindDays: DateKey[];
+  /** Last time an assignment was dragged to a new time or day (its new time is the one that counts). */
+  dragAt: Ms | null;
+  /** Late starts already asked about ("taskId@plannedStart"), so the Falling behind pop-up asks once each. */
+  behindAsked?: string[];
 }
 
 export interface PushState {
@@ -59,6 +69,9 @@ export function emptyData(): AppData {
     push: null,
     history: [],
     night: null,
+    classes: [],
+    behindDays: [],
+    dragAt: null,
   };
 }
 
@@ -72,6 +85,7 @@ export function endOfDayMin(min: number, earliestStartMin: number): number {
 export function normalize(raw: Partial<AppData>): AppData {
   const base = emptyData();
   const { sync: _oldReminderSync, ...rest } = raw as Partial<AppData> & { sync?: unknown };
+  const planned = new Map((raw.plan?.items ?? []).map((i) => [i.taskId, i.start]));
   return {
     ...base,
     ...rest,
@@ -83,6 +97,11 @@ export function normalize(raw: Partial<AppData>): AppData {
     push: raw.push ?? null,
     history: raw.history ?? [],
     night: raw.night ?? null,
+    // Calendar style: every assignment has a time. Older saves keep the time the old planner gave it.
+    tasks: (raw.tasks ?? []).map((t) => (t.at != null ? t : { ...t, at: defaultAt(t, planned, Date.now()) })),
+    classes: raw.classes ?? [],
+    behindDays: raw.behindDays ?? [],
+    dragAt: raw.dragAt ?? null,
   };
 }
 
@@ -91,20 +110,35 @@ function healSettings(s: AppData['settings']): AppData['settings'] {
   return { ...s, dayEndMin: endOfDayMin(s.dayEndMin, s.earliestStartMin) };
 }
 
-export function replan(d: AppData, now: Ms, exactStart?: Ms): AppData {
-  const night = d.night && d.night.end > now ? d.night : null;
-  const r = schedule({
-    exactStart,
-    nightExtension: night ?? undefined,
-    now,
-    tasks: d.tasks,
-    blocks: d.blocks,
-    locations: d.locations,
-    rules: d.rules,
-    settings: d.settings,
-    arrivals: d.arrivals,
-  });
-  return { ...d, night, plan: { at: now, ...r } };
+/**
+ * Calendar style: nothing is scheduled automatically. Each assignment sits where you put it (task.at, for
+ * estimateMin minutes) and events repeat as you set them. The "plan" just lists them for the screens,
+ * notifications and Improve.
+ */
+export function replan(d: AppData, now: Ms, _exactStart?: Ms): AppData {
+  const items: ScheduledItem[] = d.tasks
+    .filter((t) => t.at != null)
+    .map((t) => {
+      const end = t.at! + t.estimateMin * MIN;
+      return { taskId: t.id, start: t.at!, end, late: t.status !== 'done' && t.due !== null && end > t.due };
+    })
+    .sort((a, b) => a.start - b.start);
+  const today = planDay(now);
+  const events: NonNullable<Plan['events']> = [];
+  for (let i = -1; i < 14; i++) {
+    for (const o of occurrencesOn(addDays(today, i), d.blocks, d.locations)) {
+      events.push({ blockId: o.block.id, title: o.block.title, start: o.start, end: o.end });
+    }
+  }
+  return { ...d, night: null, plan: { at: now, items, warnings: [], blockReminders: [], events } };
+}
+
+/** Where an assignment without a chosen time goes: where the old planner had it, else before it's due. */
+function defaultAt(t: Task, planned: Map<string, Ms>, now: Ms): Ms {
+  const p = planned.get(t.id);
+  if (p !== undefined) return p;
+  if (t.due !== null) return t.due - t.estimateMin * MIN;
+  return Math.ceil(now / (30 * MIN)) * 30 * MIN;
 }
 
 const lateSet = (d: AppData) => {
@@ -210,7 +244,7 @@ export const actions = {
     if (t?.status === 'inProgress' && t.startedAt !== undefined && t.baseMin && !t.estimateManual) {
       history = [...history, { type: t.type, baseMin: t.baseMin, actualMin: Math.round((now - t.startedAt) / MIN), at: now }].slice(-200);
     }
-    return { ...patchTask(d, id, { status: 'done', completedAt: now }), history };
+    return replan({ ...patchTask(d, id, { status: 'done', completedAt: now }), history }, now);
   },
   /**
    * Falling behind: reschedules everything not started so the first one begins exactly 5 minutes
@@ -218,7 +252,8 @@ export const actions = {
    */
   fallingBehind(d: AppData, now: Ms): AppData {
     // Whole minutes: tapping at 6:03:27 starts the first task at 6:08, not 6:10.
-    return replan({ ...d, night: nightWindow(d, now) }, now, Math.floor(now / MIN) * MIN + 5 * MIN);
+    const behindDays = [...new Set([...(d.behindDays ?? []), planDay(now)])].slice(-60);
+    return replan({ ...d, night: nightWindow(d, now), behindDays }, now, Math.floor(now / MIN) * MIN + 5 * MIN);
   },
   /**
    * Dragged onto a day: schedule it that day (or the next with room) and keep it there until undone.
@@ -234,7 +269,7 @@ export const actions = {
       const k = planned.get(t.id);
       return { ...t, holdDay: k && k > today ? k : undefined };
     });
-    return replan({ ...d, tasks }, now);
+    return replan({ ...d, tasks, dragAt: now }, now);
   },
   /**
    * Reordered by hand: every listed task is kept on `day` in this order.
@@ -247,7 +282,7 @@ export const actions = {
       const next = { ...t, pinDay: day, pinOrder: pos.get(t.id) };
       return t.id === moved?.id ? { ...next, pinAfter: moved.after } : next;
     });
-    return replan({ ...d, tasks }, now);
+    return replan({ ...d, tasks, dragAt: now }, now);
   },
   /** Skip (or restore) the break before these tasks. */
   setNoBreak(d: AppData, ids: string[], on: boolean, now: Ms): AppData {
@@ -303,6 +338,41 @@ export const actions = {
   },
   setSettings(d: AppData, settings: Settings, now: Ms): AppData {
     return replan({ ...d, settings }, now);
+  },
+  /** Dragged to a new time (and maybe day). */
+  moveTask(d: AppData, id: string, start: Ms, now: Ms): AppData {
+    return replan(patchTask(d, id, { at: start }), now);
+  },
+  /** A one-time event dragged to a new time or day (repeating ones are edited instead). */
+  moveEvent(d: AppData, blockId: string, date: DateKey, startMin: number, now: Ms): AppData {
+    return replan({
+      ...d,
+      blocks: d.blocks.map((b) => (b.id === blockId && b.recurrence.kind === 'once'
+        ? { ...b, recurrence: { kind: 'once', date }, startMin, endMin: startMin + (b.endMin - b.startMin) }
+        : b)),
+    }, now);
+  },
+  /** The Falling behind pop-up was answered for this late start. */
+  markBehindAsked(d: AppData, key: string): AppData {
+    return { ...d, behindAsked: [...(d.behindAsked ?? []).filter((k) => k !== key), key].slice(-50) };
+  },
+  /** Add or edit a class. Tags only: nothing is rescheduled. */
+  saveClass(d: AppData, c: SchoolClass): AppData {
+    const exists = d.classes.some((x) => x.id === c.id);
+    return { ...d, classes: exists ? d.classes.map((x) => (x.id === c.id ? c : x)) : [...d.classes, c] };
+  },
+  /** Delete a class; its assignments just lose the tag. */
+  deleteClass(d: AppData, id: string): AppData {
+    return { ...d, classes: d.classes.filter((x) => x.id !== id), tasks: d.tasks.map((t) => (t.classId === id ? { ...t, classId: undefined } : t)) };
+  },
+  /** Add a place (or update one), e.g. created from an event's place dropdown. */
+  savePlace(d: AppData, loc: Location, now: Ms): AppData {
+    const exists = d.locations.some((l) => l.id === loc.id);
+    return replan({ ...d, locations: exists ? d.locations.map((l) => (l.id === loc.id ? loc : l)) : [...d.locations, loc] }, now);
+  },
+  /** Travel time straight from one place to another (used by events "coming from" another place). */
+  setTravel(d: AppData, from: string, to: string, min: number, now: Ms): AppData {
+    return replan({ ...d, locations: d.locations.map((l) => (l.id === to ? { ...l, travelFrom: { ...l.travelFrom, [from]: min } } : l)) }, now);
   },
 };
 

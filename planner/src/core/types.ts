@@ -26,6 +26,18 @@ export interface Location {
   name: string;
   fromHomeMin: number;
   toHomeMin: number;
+  /** Minutes to get here straight from another place (by that place's id), set when an event says "Coming from" it. */
+  travelFrom?: Record<string, number>;
+}
+
+/** A class to tag assignments with (shown as a colored tag; not used for ordering). */
+export interface SchoolClass {
+  id: string;
+  name: string;
+  /** Tag color, e.g. #3b82f6 */
+  color: string;
+  /** Usual type, filled in when the class is picked (still changeable). null = Other. */
+  format: Format | null;
 }
 
 /** A reminder fired at an offset from a block's start (e.g. laundry: dryer at +60). */
@@ -50,6 +62,8 @@ export interface FixedBlock {
   /** Default true. False = reminders only, tasks may run during it. */
   blocksScheduling?: boolean;
   steps?: ReminderStep[];
+  /** Where you come from (a place id). Unset or Home = leave from home. Another place = go straight there after the event at that place. */
+  fromLocationId?: string;
 }
 
 /** Which tasks a cutoff applies to: schoolwork only, or every task including Other. */
@@ -146,6 +160,10 @@ export interface Task {
   part?: number;
   parts?: number;
   notes?: string;
+  /** Class tag (SchoolClass id). */
+  classId?: string;
+  /** When you'll do it (you pick it, like an event on a calendar). Its length is estimateMin. */
+  at?: Ms;
   status: TaskStatus;
   startedAt?: Ms;
   completedAt?: Ms;

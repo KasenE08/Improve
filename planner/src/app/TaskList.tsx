@@ -3,14 +3,15 @@ import type { Ms, Task } from '../core/types';
 import { actions, type AppData } from './model';
 import { commit } from './store';
 import { useUI } from './ui';
-import { category, fmtDue, fmtDur } from './format';
+import { fmtDue, fmtDur } from './format';
 import { Icon } from './icons';
-import { CATS, filterTasks, VIEWS, type Cat, type View } from './taskFilters';
+import { ClassTag } from './ClassPicker';
+import { filterTasks, VIEWS, type Cat, type View } from './taskFilters';
 
 export function TaskList({ data, now }: { data: AppData; now: Ms }) {
   const ui = useUI();
   const [view, setView] = useState<View>('all');
-  const [cats, setCats] = useState<Cat[]>([]);
+  const cats: Cat[] = [];
   const slots = new Map((data.plan?.items ?? []).map((i) => [i.taskId, i]));
   const open = data.tasks.filter((t) => t.status !== 'done');
   const list = filterTasks(data, view, cats, now);
@@ -23,7 +24,7 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
   return (
     <div>
       <header class="top">
-        <h1>Tasks</h1>
+        <h1>Assignments</h1>
         <span class="count-pill">{open.length} to do</span>
       </header>
       <div class="filter-row" role="tablist" aria-label="Show">
@@ -31,18 +32,6 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
           <button role="tab" aria-selected={view === v.id} class={`filter ${view === v.id ? 'on' : ''} ${v.id === 'late' && counts.late ? 'alert' : ''}`} onClick={() => setView(v.id)}>
             {v.label}
             <span class="n">{counts[v.id]}</span>
-          </button>
-        ))}
-      </div>
-      <div class="filter-row cats" aria-label="Category">
-        {CATS.map((c) => (
-          <button
-            class={`cat-chip ${c.id} ${cats.includes(c.id) ? 'on' : ''}`}
-            aria-pressed={cats.includes(c.id)}
-            onClick={() => setCats(cats.includes(c.id) ? cats.filter((x) => x !== c.id) : [...cats, c.id])}
-          >
-            <span class="dot" />
-            {c.label}
           </button>
         ))}
       </div>
@@ -54,9 +43,8 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
       <ul class="task-rows">
         {list.map((t) => {
           const slot = slots.get(t.id);
-          const cat = category(t);
           return (
-            <li class={`task-row ${t.status}`} style={{ '--cat': cat.color }}>
+            <li class={`task-row ${t.status}`} style={{ '--cat': data.classes.find((c) => c.id === t.classId)?.color ?? 'var(--imp-accent)' }}>
               <button
                 class={`check ${t.status === 'done' ? 'on' : ''}`}
                 aria-label={t.status === 'done' ? `Mark "${t.title}" not done` : `Mark "${t.title}" done`}
@@ -69,13 +57,12 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
                   {t.status === 'inProgress' && <span class="badge">In progress</span>}
                   {t.title}
                 </span>
-                <span class="meta">
-                  <span class="dot" />
-                  {cat.label} · {fmtDur(t.estimateMin)} · {t.due === null ? 'missing, ASAP' : `due ${fmtDue(t.due)}`}
+                <ClassTag c={data.classes.find((c) => c.id === t.classId)} />
+                <span class={`meta ${slot?.late ? 'warn' : ''}`}>
+                  {slot ? `${fmtDue(slot.start)} · ${fmtDur(t.estimateMin)}` : 'Not on the calendar'}
+                  {t.due !== null ? ` · due ${fmtDue(t.due)}` : ''}
                 </span>
-                {t.status !== 'done' && (
-                  <span class={`meta ${slot?.late ? 'warn' : ''}`}>{slot ? `Do: ${fmtDue(slot.start)}` : 'Not scheduled'}</span>
-                )}
+                {t.notes && <span class="note-preview"><span>{t.notes}</span></span>}
               </button>
             </li>
           );

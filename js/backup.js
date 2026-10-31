@@ -1,6 +1,7 @@
 // Backup export / import. Only keys starting with "imp_" are ever read or written.
 import * as store from './store.js';
 import { dayKey } from './dates.js';
+import { isAppKey, toReal } from './devmode.js';
 
 const SKIP = ['imp_design_']; // preview-only settings from the design samples
 
@@ -8,7 +9,7 @@ function appKeys() {
   const keys = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k && k.startsWith('imp_') && !SKIP.some((p) => k.startsWith(p))) keys.push(k);
+    if (isAppKey(k) && !SKIP.some((p) => toReal(k).startsWith(p))) keys.push(k);
   }
   return keys;
 }
@@ -16,8 +17,9 @@ function appKeys() {
 export function buildBackup() {
   const data = {};
   for (const k of appKeys()) {
-    if (k === 'imp_last_backup' || k.startsWith('imp_planner-unreadable')) continue;
-    data[k] = store.get(k);
+    const name = toReal(k);
+    if (name === 'imp_last_backup' || name === 'imp_seeded' || name.startsWith('imp_planner-unreadable')) continue;
+    data[name] = store.get(name);
   }
   // Notification keys belong to this phone only (same rule as the old planner app)
   if (data.imp_planner) data.imp_planner = { ...data.imp_planner, push: null };
@@ -64,7 +66,7 @@ export function parseBackup(text) {
 // Replaces all Improve data with the backup. Other apps' data is untouched.
 export function restoreBackup(backup) {
   const push = store.get('planner', null)?.push ?? null; // keep this phone's notification setup
-  for (const k of appKeys()) if (k !== 'imp_last_backup') localStorage.removeItem(k);
+  for (const k of appKeys()) if (toReal(k) !== 'imp_last_backup' && toReal(k) !== 'imp_seeded') localStorage.removeItem(k);
   for (const [k, v] of Object.entries(backup.data)) store.set(k, v);
   const planner = store.get('planner', null);
   if (planner) store.set('planner', { ...planner, push });

@@ -1,123 +1,89 @@
 import { useState } from 'preact/hooks';
-import type { AssignmentType, Format, Task } from '../core/types';
-import { BASE_ESTIMATES, estimateMinutes, learnedRatio } from '../core/estimate';
-import { dateKey } from '../core/time';
+import type { Task } from '../core/types';
+import { at, dateKey } from '../core/time';
 import { actions, type AppData } from './model';
 import { commit } from './store';
-import { Chips, Field, SheetFrame, useUI } from './ui';
-import { fmtDur, TYPE_LABELS, uid } from './format';
-import { splitMinutes } from '../core/estimate';
+import { Field, SheetFrame, useUI } from './ui';
+import { inputToMin, minToInput, uid } from './format';
+import { ClassPicker } from './ClassPicker';
 
-const TYPES = Object.keys(TYPE_LABELS) as AssignmentType[];
+const LENGTHS = [15, 30, 45, 60, 90, 120];
 
+/** An assignment goes on the calendar at the time you pick, like an event, with a class, due date and notes. */
 export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
   const ui = useUI();
+  const now = Date.now();
+  const start = task?.at ?? Math.ceil(now / (30 * 60_000)) * 30 * 60_000;
   const due = task?.due ? new Date(task.due) : null;
   const [title, setTitle] = useState(task?.title ?? '');
-  const [type, setType] = useState<AssignmentType>(task?.type ?? 'worksheet');
-  const [formats, setFormats] = useState<Format[]>(task?.formats ?? ['online']);
-  const [missing, setMissing] = useState(task?.missing ?? false);
+  const [classId, setClassId] = useState<string | undefined>(task?.classId);
+  const [day, setDay] = useState(dateKey(start));
+  const [time, setTime] = useState(minToInput(Math.round((start - at(dateKey(start), 0)) / 60_000)));
+  const [length, setLength] = useState(task?.estimateMin ?? 30);
   const [dueDate, setDueDate] = useState(due ? dateKey(due) : '');
   const [dueTime, setDueTime] = useState(due ? due.toTimeString().slice(0, 5) : '23:59');
-  const [manual, setManual] = useState<number | null>(task?.estimateManual ? task.estimateMin : null);
   const [notes, setNotes] = useState(task?.notes ?? '');
   const [error, setError] = useState('');
 
-  const learned = learnedRatio(data.history, type);
-  const auto = estimateMinutes(type, { paddingPct: data.settings.paddingPct, learnedRatio: learned.ratio });
-  const estimate = manual ?? auto;
-
   const save = () => {
-    if (!title.trim()) return setError('Give it a title.');
-    if (!missing && !dueDate) return setError('Enter the actual due date.');
-    if (!(estimate > 0)) return setError('Estimate must be at least 1 minute.');
-    const [y, m, d] = dueDate.split('-').map(Number);
-    const [hh, mm] = dueTime.split(':').map(Number);
+    if (!title.trim()) return setError('Give it a name.');
+    if (!day || !time) return setError('Pick when you’ll do it.');
+    if (!(length > 0)) return setError('How long will it take?');
+    const cls = data.classes.find((c) => c.id === classId);
     const next: Task = {
+      ...(task ?? { type: 'other', missing: false, createdAt: Date.now(), status: 'todo' }),
       id: task?.id ?? uid(),
       title: title.trim(),
-      type,
-      formats,
-      missing,
-      due: missing ? null : new Date(y, m - 1, d, hh, mm).getTime(),
-      estimateMin: estimate,
-      estimateManual: manual !== null,
-      baseMin: manual !== null ? task?.baseMin : task?.group ? task.baseMin : BASE_ESTIMATES[type],
+      classId,
+      formats: cls?.format ? [cls.format] : task?.formats ?? [],
+      at: at(day, inputToMin(time)),
+      estimateMin: Math.round(length),
+      estimateManual: true,
+      due: dueDate ? at(dueDate, inputToMin(dueTime)) : null,
       notes: notes.trim() || undefined,
-      status: task?.status ?? 'todo',
-      startedAt: task?.startedAt,
-      completedAt: task?.completedAt,
-      createdAt: task?.createdAt ?? Date.now(),
-    };
-    const big = estimate > data.settings.bigTaskMin && !next.group;
-    const split =
-      big && confirm(`This will take about ${fmtDur(estimate)}. Split it into ${splitMinutes(estimate).length} parts on different days?`);
-    commit((d0, now) => (split ? actions.splitTask(d0, next, now) : actions.saveTask(d0, next, now)));
+    } as Task;
+    commit((d0, n) => actions.saveTask(d0, next, n));
     ui.close();
   };
 
   return (
     <SheetFrame title={task ? 'Edit assignment' : 'New assignment'} onSave={save}>
-      <Field label="What do you have to do?">
-        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. Chem worksheet 4.2" />
+      <Field label="Name">
+        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. 2.6 worksheet" />
       </Field>
-      <Field label="Type">
-        <select value={type} onChange={(e) => setType(e.currentTarget.value as AssignmentType)}>
-          {TYPES.map((t) => (
-            <option value={t}>{TYPE_LABELS[t]}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Category" hint={formats.length === 0 ? 'No format selected = Other (errands, chores).' : undefined}>
-        <Chips
-          options={[
-            { value: 'online' as Format, label: 'Online' },
-            { value: 'paper' as Format, label: 'Paper' },
-          ]}
-          selected={formats}
-          onToggle={(f) => setFormats(formats.includes(f) ? formats.filter((x) => x !== f) : [...formats, f])}
-        />
-      </Field>
-      {formats.length > 0 && (
-        <label class="toggle">
-          <input type="checkbox" checked={missing} onChange={(e) => setMissing(e.currentTarget.checked)} />
-          Missing assignment (do as soon as possible)
-        </label>
-      )}
-      {!missing && (
-        <div class="row2">
-          <Field label="Actual due date">
-            <input type="date" value={dueDate} onInput={(e) => setDueDate(e.currentTarget.value)} />
-          </Field>
-          <Field label="Due time">
-            <input type="time" value={dueTime} onInput={(e) => setDueTime(e.currentTarget.value)} />
-          </Field>
-        </div>
-      )}
-      <Field label="Time estimate (minutes)" hint={
-          manual !== null
-            ? 'Your own estimate.'
-            : learned.samples >= 3
-              ? `Automatic, adjusted from your last ${learned.samples} ${TYPE_LABELS[type].toLowerCase()} times, includes padding.`
-              : `Automatic for ${TYPE_LABELS[type].toLowerCase()}, includes padding.`
-        }>
-        <div class="row">
-          <input
-            type="number"
-            inputMode="numeric"
-            min={1}
-            value={estimate}
-            onInput={(e) => setManual(Number(e.currentTarget.value))}
-          />
-          {manual !== null && (
-            <button type="button" class="link" onClick={() => setManual(null)}>
-              Use automatic ({auto})
+      <div class="field">
+        <span class="field-label">Class</span>
+        <ClassPicker data={data} value={classId} onChange={(id) => setClassId(id)} />
+      </div>
+      <div class="row2">
+        <Field label="Day">
+          <input type="date" value={day} onInput={(e) => setDay(e.currentTarget.value)} />
+        </Field>
+        <Field label="Starts">
+          <input type="time" value={time} onInput={(e) => setTime(e.currentTarget.value)} />
+        </Field>
+      </div>
+      <div class="field">
+        <span class="field-label">How long</span>
+        <div class="segmented len-pick" role="radiogroup">
+          {LENGTHS.map((m) => (
+            <button type="button" role="radio" aria-checked={length === m} class={length === m ? 'on' : ''} onClick={() => setLength(m)}>
+              {m < 60 ? `${m}m` : `${m / 60}h`.replace('.5h', '½h')}
             </button>
-          )}
+          ))}
         </div>
-      </Field>
+        {!LENGTHS.includes(length) && <span class="hint">{length} min</span>}
+      </div>
+      <div class="row2">
+        <Field label="Due (optional)">
+          <input type="date" value={dueDate} onInput={(e) => setDueDate(e.currentTarget.value)} />
+        </Field>
+        <Field label="Due time">
+          <input type="time" value={dueTime} disabled={!dueDate} onInput={(e) => setDueTime(e.currentTarget.value)} />
+        </Field>
+      </div>
       <Field label="Notes">
-        <textarea rows={3} value={notes} onInput={(e) => setNotes(e.currentTarget.value)} />
+        <textarea rows={4} placeholder="Pages, links, what the teacher said…" value={notes} onInput={(e) => setNotes(e.currentTarget.value)} />
       </Field>
       {error && <p class="warn">{error}</p>}
     </SheetFrame>

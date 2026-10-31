@@ -14,7 +14,7 @@ eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnig
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
 const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 31, '31 preloaded habits');
+eq(H.getHabits().length, 30, '30 preloaded habits (Budget review put away)');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');
@@ -139,7 +139,7 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', name: 'Work done on schedule', category: 'mind', frequency: 'daily', target: 1, xp: 60, order: 0, auto: 'planner:work', autoAfter: 900 }]);
   H.init();
   const w = H.getHabits()[0];
-  eq([w.name, w.xp, w.auto, w.autoAfter], ["Finished today's work", 60, 'planner:work', 900], 'schema 9: renamed, everything else kept');
+  eq([w.name, w.xp, w.auto, w.autoAfter], ["Finished today's work", 60, null, null], 'schema 9: renamed, XP kept; schema 12: now ticked by hand (the planner is a calendar)');
   for (const k of Object.keys(mem)) delete mem[k];
   mem.imp_schema = '8';
   mem.imp_habits = JSON.stringify([{ id: 'work-on-schedule', name: 'My work', category: 'mind', frequency: 'daily', target: 1, xp: 60, order: 0 }]);
