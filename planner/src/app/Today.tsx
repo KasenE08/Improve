@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import type { BlockTag, DateKey, Ms, Task } from '../core/types';
+import type { BlockTag, DateKey, FixedBlock, Ms, SchoolClass, Task } from '../core/types';
 import { addDays, at, DAY_START_MIN, planDay } from '../core/time';
 import { occurrencesOn } from '../core/availability';
 import type { AppData } from './model';
@@ -12,11 +12,12 @@ import { CATEGORY_ICONS, Icon, TAG_STYLE } from './icons';
 import { categoryRank } from '../core/priority';
 import { choose } from './dialog';
 import { useUI } from './ui';
+import { ClassTag } from './ClassPicker';
 import { category, fmtDay, fmtDue, fmtDur, fmtTime, inputToMin, minToInput, TAG_LABELS } from './format';
 
 type Entry =
-  | { kind: 'block'; start: Ms; end: Ms; title: string; sub: string; soft: boolean; tag: string; tagKey: BlockTag }
-  | { kind: 'task'; start: Ms; end: Ms; task: Task; late: boolean; night?: boolean }
+  | { kind: 'block'; start: Ms; end: Ms; title: string; sub: string; soft: boolean; tag: string; tagKey: BlockTag; block: FixedBlock }
+  | { kind: 'task'; start: Ms; end: Ms; task: Task; late: boolean; night?: boolean; cls?: SchoolClass }
   | { kind: 'reminder'; start: Ms; title: string }
   | { kind: 'now'; start: Ms };
 
@@ -32,14 +33,16 @@ function entriesFor(d: AppData, key: DateKey, now: Ms): Entry[] {
   for (const o of occurrencesOn(key, d.blocks, d.locations, d.arrivals)) {
     const loc = locs.get(o.block.locationId);
     const away = o.leave !== o.start || o.arrive !== o.end;
+    const travel = o.fromTitle || o.toTitle
+      ? [o.fromTitle ? `from ${o.fromTitle} · leave ${fmtTime(o.leave)}` : away ? `leave ${fmtTime(o.leave)}` : null, o.toTitle ? `then ${o.toTitle}` : `home ${fmtTime(o.arrive)}`].filter(Boolean).join(' · ')
+      : away ? `leave ${fmtTime(o.leave)} · home ${fmtTime(o.arrive)}` : null;
     out.push({
       kind: 'block',
+      block: o.block,
       start: o.start,
       end: o.end,
       title: o.block.title,
-      sub: [loc && loc.id !== 'home' ? loc.name : null, away ? `leave ${fmtTime(o.leave)} · home ${fmtTime(o.arrive)}` : null]
-        .filter(Boolean)
-        .join(' · '),
+      sub: [loc && loc.id !== 'home' ? loc.name : null, travel].filter(Boolean).join(' · '),
       soft: o.block.blocksScheduling === false,
       tag: TAG_LABELS[o.block.tag],
       tagKey: o.block.tag,
@@ -47,7 +50,7 @@ function entriesFor(d: AppData, key: DateKey, now: Ms): Entry[] {
   }
   for (const i of d.plan?.items ?? []) {
     const task = tasks.get(i.taskId);
-    if (task && inDay(i.start)) out.push({ kind: 'task', start: i.start, end: i.end, task, late: i.late, night: i.night });
+    if (task && inDay(i.start)) out.push({ kind: 'task', start: i.start, end: i.end, task, late: i.late, night: i.night, cls: d.classes.find((c) => c.id === task.classId) });
   }
   for (const r of d.plan?.blockReminders ?? []) {
     if (inDay(r.at)) out.push({ kind: 'reminder', start: r.at, title: r.title });
@@ -165,9 +168,6 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
               Falling behind
             </button>
           )}
-          <button class="btn small" onClick={() => ui.open({ kind: 'block', once: true })}>
-            <Icon name="plus" size={16} /> Event
-          </button>
         </div>
       </header>
 
@@ -264,7 +264,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
             return (
               <>
               {dropAt === i && outline}
-              <li class={`entry block ${e.soft ? 'soft' : ''}`} style={{ '--cat': st.color }} data-drop-at={i}>
+              <li class={`entry block ${e.soft ? 'soft' : ''}`} style={{ '--cat': st.color }} data-drop-at={i} onClick={() => ui.open({ kind: 'block', block: e.block })}>
                 <span class="chip-icon"><Icon name={st.icon} /></span>
                 <div class="body">
                   <div class="title">{e.title}</div>
@@ -315,6 +315,7 @@ function TaskEntry({ e, dnd, at }: { e: Extract<Entry, { kind: 'task' }>; dnd: R
       </span>
       <div class="body">
         <div class="title">{t.title}</div>
+        {e.cls && <ClassTag c={e.cls} />}
         <div class="meta">
           {fmtTime(e.start)} – {fmtTime(e.end)} · {cat.label} · {fmtDur(t.estimateMin)}
         </div>
@@ -323,6 +324,7 @@ function TaskEntry({ e, dnd, at }: { e: Extract<Entry, { kind: 'task' }>; dnd: R
           {t.pinDay ? ' · moved' : ''}
           {t.noBreakBefore ? ' · no break' : ''}
         </div>
+        {t.notes && <p class="note-preview"><span>{t.notes}</span></p>}
         {e.late && <div class="warn small">Can't finish before it's due</div>}
         {e.night && !e.late && <div class="small night">Past midnight to finish on time</div>}
       </div>

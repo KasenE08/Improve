@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { getData, useData, useNow } from './store';
 import { OPEN_TASK_EVENT, takePendingTask } from './openTask';
-import { UI, type Sheet } from './ui';
+import { SheetFrame, UI, useUI, type Sheet } from './ui';
 import { Today } from './Today';
 import { TaskList } from './TaskList';
 import { Settings } from './Settings';
@@ -9,17 +9,35 @@ import { TaskForm } from './TaskForm';
 import { TaskDetail } from './TaskDetail';
 import { BlockForm } from './BlockForm';
 import { NotifyGuide } from './NotifyGuide';
-import { Profile } from './Profile';
 import { useEffect } from 'preact/hooks';
 import { Icon } from './icons';
 
-type Tab = 'today' | 'tasks' | 'settings' | 'profile';
+// Two views. Adding things is under +, rarely used settings under ⋯ (stats live on Improve's You page).
+type Tab = 'today' | 'tasks';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'today', label: 'Schedule' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'profile', label: 'Stats' },
+  { id: 'tasks', label: 'Assignments' },
 ];
+
+function AddMenu() {
+  const ui = useUI();
+  const item = (icon: string, title: string, sub: string, open: () => void) => (
+    <button class="add-item" onClick={open}>
+      <span class="add-item__icon"><Icon name={icon} size={22} /></span>
+      <span class="add-item__text"><b>{title}</b><small>{sub}</small></span>
+      <Icon name="chevronRight" size={18} />
+    </button>
+  );
+  return (
+    <SheetFrame title="Add">
+      <div class="add-list">
+        {item('book', 'Assignment', 'Homework, a project, studying', () => ui.open({ kind: 'task' }))}
+        {item('flag', 'One-time event', 'Dentist, game, a trip', () => ui.open({ kind: 'block', once: true }))}
+        {item('repeat', 'Repeating time', 'School, practice, work shifts', () => ui.open({ kind: 'block' }))}
+      </div>
+    </SheetFrame>
+  );
+}
 
 export function App() {
   const data = useData();
@@ -51,16 +69,23 @@ export function App() {
             </button>
           ))}
         </div>
-        <button class="pl-add" aria-label="Add assignment" onClick={() => setSheet({ kind: 'task' })}>
+        <button class="pl-more" aria-label="Planner settings" onClick={() => setSheet({ kind: 'settings' })}>
+          <Icon name="more" size={22} />
+        </button>
+        <button class="pl-add" aria-label="Add" onClick={() => setSheet({ kind: 'add' })}>
           <Icon name="plus" size={24} />
         </button>
       </div>
       <main class="screen">
         {tab === 'today' && <Today data={data} now={now} />}
         {tab === 'tasks' && <TaskList data={data} now={now} />}
-        {tab === 'settings' && <Settings data={data} />}
-        {tab === 'profile' && <Profile data={data} now={now} />}
       </main>
+      {sheet?.kind === 'add' && <AddMenu />}
+      {sheet?.kind === 'settings' && (
+        <SheetFrame title="Planner settings" full>
+          <Settings data={data} />
+        </SheetFrame>
+      )}
       {sheet?.kind === 'task' && <TaskForm data={data} task={sheet.task} />}
       {sheet?.kind === 'detail' && <TaskDetail data={data} id={sheet.id} />}
       {sheet?.kind === 'block' && <BlockForm data={data} block={sheet.block} once={sheet.once} />}

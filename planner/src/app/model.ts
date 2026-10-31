@@ -1,5 +1,5 @@
 import type {
-  BlockReminder, CutoffRule, DateKey, FixedBlock, Location, Ms, ScheduledItem, Settings, Task, Warning,
+  BlockReminder, CutoffRule, DateKey, FixedBlock, Location, Ms, SchoolClass, ScheduledItem, Settings, Task, Warning,
 } from '../core/types';
 import { DEFAULT_RULES, DEFAULT_SETTINGS, HOME } from '../core/defaults';
 import { schedule } from '../core/scheduler';
@@ -30,6 +30,12 @@ export interface AppData {
   history: DoneRecord[];
   /** Late-night time unlocked by "Falling behind" for tonight. */
   night: { start: Ms; end: Ms } | null;
+  /** Classes to tag assignments with. */
+  classes: SchoolClass[];
+  /** Days "Falling behind" was used (Improve's "Finished today's work" doesn't tick those days). Last 60 kept. */
+  behindDays: DateKey[];
+  /** Last time an assignment was dragged to a new time or day (its new time is the one that counts). */
+  dragAt: Ms | null;
 }
 
 export interface PushState {
@@ -59,6 +65,9 @@ export function emptyData(): AppData {
     push: null,
     history: [],
     night: null,
+    classes: [],
+    behindDays: [],
+    dragAt: null,
   };
 }
 
@@ -83,6 +92,9 @@ export function normalize(raw: Partial<AppData>): AppData {
     push: raw.push ?? null,
     history: raw.history ?? [],
     night: raw.night ?? null,
+    classes: raw.classes ?? [],
+    behindDays: raw.behindDays ?? [],
+    dragAt: raw.dragAt ?? null,
   };
 }
 
@@ -218,7 +230,8 @@ export const actions = {
    */
   fallingBehind(d: AppData, now: Ms): AppData {
     // Whole minutes: tapping at 6:03:27 starts the first task at 6:08, not 6:10.
-    return replan({ ...d, night: nightWindow(d, now) }, now, Math.floor(now / MIN) * MIN + 5 * MIN);
+    const behindDays = [...new Set([...(d.behindDays ?? []), planDay(now)])].slice(-60);
+    return replan({ ...d, night: nightWindow(d, now), behindDays }, now, Math.floor(now / MIN) * MIN + 5 * MIN);
   },
   /**
    * Dragged onto a day: schedule it that day (or the next with room) and keep it there until undone.
@@ -234,7 +247,7 @@ export const actions = {
       const k = planned.get(t.id);
       return { ...t, holdDay: k && k > today ? k : undefined };
     });
-    return replan({ ...d, tasks }, now);
+    return replan({ ...d, tasks, dragAt: now }, now);
   },
   /**
    * Reordered by hand: every listed task is kept on `day` in this order.
@@ -247,7 +260,7 @@ export const actions = {
       const next = { ...t, pinDay: day, pinOrder: pos.get(t.id) };
       return t.id === moved?.id ? { ...next, pinAfter: moved.after } : next;
     });
-    return replan({ ...d, tasks }, now);
+    return replan({ ...d, tasks, dragAt: now }, now);
   },
   /** Skip (or restore) the break before these tasks. */
   setNoBreak(d: AppData, ids: string[], on: boolean, now: Ms): AppData {
@@ -303,6 +316,24 @@ export const actions = {
   },
   setSettings(d: AppData, settings: Settings, now: Ms): AppData {
     return replan({ ...d, settings }, now);
+  },
+  /** Add or edit a class. Tags only: nothing is rescheduled. */
+  saveClass(d: AppData, c: SchoolClass): AppData {
+    const exists = d.classes.some((x) => x.id === c.id);
+    return { ...d, classes: exists ? d.classes.map((x) => (x.id === c.id ? c : x)) : [...d.classes, c] };
+  },
+  /** Delete a class; its assignments just lose the tag. */
+  deleteClass(d: AppData, id: string): AppData {
+    return { ...d, classes: d.classes.filter((x) => x.id !== id), tasks: d.tasks.map((t) => (t.classId === id ? { ...t, classId: undefined } : t)) };
+  },
+  /** Add a place (or update one), e.g. created from an event's place dropdown. */
+  savePlace(d: AppData, loc: Location, now: Ms): AppData {
+    const exists = d.locations.some((l) => l.id === loc.id);
+    return replan({ ...d, locations: exists ? d.locations.map((l) => (l.id === loc.id ? loc : l)) : [...d.locations, loc] }, now);
+  },
+  /** Travel time straight from one place to another (used by events "coming from" another place). */
+  setTravel(d: AppData, from: string, to: string, min: number, now: Ms): AppData {
+    return replan({ ...d, locations: d.locations.map((l) => (l.id === to ? { ...l, travelFrom: { ...l.travelFrom, [from]: min } } : l)) }, now);
   },
 };
 

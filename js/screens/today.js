@@ -20,6 +20,8 @@ const OFF_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
 // Auto habits show the icon of the tab they tick from
 const AUTO_ICON = { food: 'food', planner: 'planner', money: 'wallet', journal: 'quill' };
 const OFF_WHY = { 'planner:work': 'nothing planned', 'money:save': 'no payday' };
+// Shown under an auto habit so its rule isn't forgotten
+const AUTO_NOTE = { 'planner:work': 'Start each task within 10 min of its time · Falling behind = no tick' };
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', planner: 'Planner', money: 'Money' };
@@ -99,9 +101,10 @@ function habitRow(h, n, st, dayOff, manual) {
   }
   const fire = [manual ? `<span class="today-auto">${icon('edit')}Manual</span>`
     : isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
-  const sub = multi
+  const note = isAuto(h) && !manual && AUTO_NOTE[h.auto] ? `<span class="imp-row__note">${AUTO_NOTE[h.auto]}</span>` : '';
+  const sub = (multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
-    : fire ? `<span class="imp-row__sub">${fire}</span>` : '';
+    : fire ? `<span class="imp-row__sub">${fire}</span>` : '') + note;
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
   return `<button class="imp-row${done ? ' is-done' : ''}" data-id="${esc(h.id)}" aria-pressed="${done}">
     ${check(done, multi && n > 0 ? n : '')}

@@ -5,6 +5,7 @@ import { commit } from './store';
 import { useUI } from './ui';
 import { category, fmtDue, fmtDur } from './format';
 import { Icon } from './icons';
+import { ClassTag } from './ClassPicker';
 import { CATS, filterTasks, VIEWS, type Cat, type View } from './taskFilters';
 
 export function TaskList({ data, now }: { data: AppData; now: Ms }) {
@@ -23,7 +24,7 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
   return (
     <div>
       <header class="top">
-        <h1>Tasks</h1>
+        <h1>Assignments</h1>
         <span class="count-pill">{open.length} to do</span>
       </header>
       <div class="filter-row" role="tablist" aria-label="Show">
@@ -69,6 +70,7 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
                   {t.status === 'inProgress' && <span class="badge">In progress</span>}
                   {t.title}
                 </span>
+                <ClassTag c={data.classes.find((c) => c.id === t.classId)} />
                 <span class="meta">
                   <span class="dot" />
                   {cat.label} · {fmtDur(t.estimateMin)} · {t.due === null ? 'missing, ASAP' : `due ${fmtDue(t.due)}`}
@@ -76,6 +78,7 @@ export function TaskList({ data, now }: { data: AppData; now: Ms }) {
                 {t.status !== 'done' && (
                   <span class={`meta ${slot?.late ? 'warn' : ''}`}>{slot ? `Do: ${fmtDue(slot.start)}` : 'Not scheduled'}</span>
                 )}
+                {t.notes && <span class="note-preview"><span>{t.notes}</span></span>}
               </button>
             </li>
           );

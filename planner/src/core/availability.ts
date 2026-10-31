@@ -11,6 +11,10 @@ export interface Occurrence {
   leave: Ms;
   /** When you are back home. */
   arrive: Ms;
+  /** Came straight from this earlier event (no stop at home in between). */
+  fromTitle?: string;
+  /** Goes straight on to this later event instead of home. */
+  toTitle?: string;
 }
 
 export function occurrencesOn(
@@ -20,7 +24,7 @@ export function occurrencesOn(
   arrivals: Record<DateKey, number> = {},
 ): Occurrence[] {
   const locs = new Map(locations.map((l) => [l.id, l]));
-  return blocks
+  const out: Occurrence[] = blocks
     .filter((b) => occursOn(b, key))
     .map((block) => {
       const loc = locs.get(block.locationId);
@@ -37,6 +41,21 @@ export function occurrencesOn(
       };
     })
     .sort((a, b) => a.start - b.start);
+  // Place to place: an event "coming from" another place follows the latest earlier event there that day.
+  // You go straight from one to the other, so the time between isn't free at home.
+  for (const o of out) {
+    const from = o.block.fromLocationId;
+    if (!from || from === 'home' || from === o.block.locationId) continue;
+    const prev = out.filter((p) => p !== o && p.block.locationId === from && p.end <= o.start).pop();
+    if (!prev) continue;
+    const loc = locs.get(o.block.locationId);
+    const travel = loc?.travelFrom?.[from] ?? loc?.fromHomeMin ?? 0;
+    o.leave = Math.max(prev.end, o.start - travel * MIN);
+    o.fromTitle = prev.block.title;
+    prev.arrive = o.leave;
+    prev.toTitle = o.block.title;
+  }
+  return out;
 }
 
 /** A beforeBlock rule this long covers the whole morning of that day only. */

@@ -3,6 +3,8 @@ import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
 import * as Backup from '../backup.js';
+import * as store from '../store.js';
+import { dayKey, appNow } from '../dates.js';
 import { getRanks, saveRanks, DEFAULT_RANKS } from '../levels.js';
 import { esc, icon, panel, streakTag, sheet, toast } from '../ui.js';
 
@@ -34,6 +36,7 @@ export function render(root) {
         </div>`,
     })}
     ${panel({ title: 'Streaks', meta: icon('flame'), body: streakList })}
+    ${plannerStats()}
     ${panel({
       title: 'Backup',
       meta: icon('scroll'),
@@ -150,4 +153,28 @@ function openRanks(refresh) {
       };
     },
   });
+}
+
+// Planner numbers (moved here from the planner's old Stats tab)
+function plannerStats() {
+  const d = store.get('planner', null);
+  if (!d || !(d.tasks || []).length) return '';
+  const day = (ms) => dayKey(appNow(new Date(ms)));
+  const today = dayKey();
+  const weekAgo = dayKey(appNow(new Date(Date.now() - 7 * 86400000)));
+  const tasks = new Map(d.tasks.map((t) => [t.id, t]));
+  const done = d.tasks.filter((t) => t.status === 'done');
+  const inWeek = (ms) => day(ms) >= today && day(ms) < dayKey(appNow(new Date(Date.now() + 7 * 86400000)));
+  const planned = (d.plan?.items || []).filter((i) => tasks.get(i.taskId)?.status !== 'done' && inWeek(i.start)).reduce((m, i) => m + (i.end - i.start) / 60000, 0);
+  const tracked = (d.history || []).reduce((m, h) => m + h.actualMin, 0);
+  const hrs = (m) => (m >= 60 ? `${Math.round((m / 60) * 10) / 10}h` : `${Math.round(m)}m`);
+  const cells = [
+    [done.length, 'Done'],
+    [done.filter((t) => t.completedAt && day(t.completedAt) > weekAgo).length, 'This week'],
+    [d.tasks.length - done.length, 'To do'],
+    [hrs(planned), 'Next 7 days'],
+    [hrs(tracked), 'Timed'],
+    [(d.classes || []).length, 'Classes'],
+  ];
+  return panel({ title: 'Planner', meta: icon('planner'), body: `<div class="prof-totals">${cells.map(([v, l]) => `<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>` });
 }

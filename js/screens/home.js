@@ -38,7 +38,7 @@ function upNext() {
   const items = (data.plan?.items || [])
     .filter((i) => tasks.get(i.taskId) && tasks.get(i.taskId).status !== 'done' && i.end > now)
     .sort((a, b) => a.start - b.start);
-  return { items, tasks, open: (data.tasks || []).filter((t) => t.status !== 'done').length };
+  return { items, tasks, classes: new Map((data.classes || []).map((c) => [c.id, c])), open: (data.tasks || []).filter((t) => t.status !== 'done').length };
 }
 
 export function render(root, refresh) {
@@ -65,7 +65,9 @@ export function render(root, refresh) {
     const [first, ...rest] = un.items;
     const t = un.tasks.get(first.taskId);
     const mins = Math.round((first.end - first.start) / 60000);
-    planBody = `<div class="next${first.late ? ' is-late' : ''}"><span class="next__bar"></span><div><div class="next__title">${esc(t.title)}</div><div class="hcard__sub">${t.due ? fmtDue(t.due) : 'missing work'}${first.late ? ' · late' : ''}</div></div>
+    const cls = un.classes.get(t.classId);
+    const tag = cls ? `<span class="ctag" style="--c:${esc(cls.color)}"><i></i>${esc(cls.name)}</span>` : '';
+    planBody = `<div class="next${first.late ? ' is-late' : ''}"><span class="next__bar"></span><div>${tag}<div class="next__title">${esc(t.title)}</div><div class="hcard__sub">${t.due ? fmtDue(t.due) : 'missing work'}${first.late ? ' · late' : ''}</div></div>
       <div class="next__time"><b>${fmtTime(first.start)}</b>${mins} min</div></div>
       ${rest.length ? `<div class="chips">${rest.slice(0, 1).map((i) => `<span>${dayKey(appNow(new Date(i.start))) === today ? '' : new Date(i.start).toLocaleDateString('en-US', { weekday: 'short' }) + ' '}${fmtTime(i.start)} · ${esc(un.tasks.get(i.taskId).title)}</span>`).join('')}${rest.length > 1 ? `<span>${rest.length - 1} more</span>` : ''}</div>` : ''}`;
   }

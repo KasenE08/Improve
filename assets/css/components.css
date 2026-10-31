@@ -112,6 +112,7 @@
 .imp-row__sub { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; font: 500 var(--imp-fs-xs)/1.3 var(--imp-font-head); color: var(--imp-muted); }
 .imp-row__sub .imp-icon { width: 13px; height: 13px; }
 .imp-row__end { flex: none; color: var(--imp-faint); }
+.imp-row__note { font: 500 12px/1.35 var(--imp-font-head); color: var(--imp-faint); }
 
 /* Floating feedback text (e.g. "+1"). */
 .imp-float { position: absolute; right: 8px; top: 4px; pointer-events: none; font: 700 13px var(--imp-font-head); color: var(--imp-accent); animation: imp-float .9s var(--imp-ease) forwards; }

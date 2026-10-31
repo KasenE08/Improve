@@ -64,3 +64,53 @@ input:focus, select:focus, textarea:focus { background: var(--imp-surface); bord
 /* Polish */
 .segmented button, .btn, .chip, .filter, .day, .mday { text-align: center; }
 .detail-head h2 { font-size: 17px; line-height: 1.35; }
+
+/* ---- Planner overhaul ---- */
+/* Header row: Schedule / Assignments, ⋯ (settings) and + (add) */
+.pl-more { flex: 0 0 auto; width: 44px; display: grid; place-items: center; border-radius: 12px; background: var(--imp-sunken); color: var(--imp-text); border: 0; }
+.pl-subnav .segmented button { font-size: 13px; }
+
+/* + menu */
+.add-list { display: grid; gap: 10px; padding-bottom: 6px; }
+.add-item { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px; border-radius: 16px; border: 1px solid var(--imp-frame); background: var(--imp-surface); color: var(--imp-text); text-align: left; }
+.add-item:active { transform: scale(.99); }
+.add-item__icon { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; background: var(--imp-accent-dim); color: var(--imp-accent); flex: none; }
+.add-item__text { flex: 1; display: grid; gap: 2px; }
+.add-item__text b { font: 600 16px var(--imp-font-head); }
+.add-item__text small { font-size: 13px; color: var(--imp-muted); }
+.add-item > .icon:last-child { color: var(--imp-faint); }
+
+/* Full-page sheet (an assignment, planner settings) */
+.sheet-backdrop.full { align-items: stretch; }
+.sheet.full { max-width: 640px; max-height: none; height: 100%; border-radius: 0; border: 0; padding-top: env(safe-area-inset-top); }
+.sheet.full .sheet-grabber { display: none; }
+
+/* Class tag + class picker */
+.class-tag { display: inline-flex; align-items: center; gap: 6px; align-self: start; justify-self: start; width: fit-content; margin: 2px 0; padding: 2px 9px 2px 7px; border-radius: 99px;
+  background: color-mix(in srgb, var(--c) 14%, transparent); color: color-mix(in srgb, var(--c) 80%, var(--imp-text)); font: 600 12px var(--imp-font-head); }
+.class-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
+.detail-head .class-tag { margin-bottom: 8px; }
+.class-pick > .row { align-items: center; }
+.class-pick select { flex: 1; }
+.class-edit, .inline-card { display: grid; gap: 10px; margin-top: 10px; padding: 12px; border-radius: 14px; background: var(--imp-surface-2); border: 1px solid var(--imp-frame); }
+.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.swatches button { aspect-ratio: 1; border-radius: 50%; border: 0; background: var(--c); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .25); }
+.swatches button.on { box-shadow: 0 0 0 2px var(--imp-surface-2), 0 0 0 4px var(--c); }
+.class-edit__btns { align-items: center; gap: 8px; }
+.class-edit__btns .link { margin-left: auto; }
+.type-pick { margin: 0; }
+
+/* Notes: a preview on the list, everything on the assignment's page */
+.note-preview { display: block; margin: 6px 0 0; padding: 7px 10px; border-radius: 10px; background: var(--imp-surface-2); border: 1px solid var(--imp-divider);
+  font-size: 13px; line-height: 1.45; color: var(--imp-muted); text-align: left; }
+.note-preview > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
+.notes-full { min-height: 120px; line-height: 1.5; }
+
+/* Assignment page */
+.detail-actions { display: flex; gap: 10px; margin-bottom: 16px; }
+.detail-actions .btn { flex: 1; min-height: 48px; gap: 6px; }
+.detail-more { display: flex; gap: 10px; margin-top: 18px; }
+.detail-more .btn { flex: 1; }
+.entry.block { cursor: pointer; }
+/* Inside the full-page settings sheet the sheet title already says it */
+.sheet.full .sheet-body > div > header.top:first-child { display: none; }

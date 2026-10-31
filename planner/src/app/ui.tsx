@@ -7,7 +7,9 @@ export type Sheet =
   | { kind: 'task'; task?: Task }
   | { kind: 'detail'; id: string }
   | { kind: 'block'; block?: FixedBlock; once?: boolean }
-  | { kind: 'notifyGuide' };
+  | { kind: 'notifyGuide' }
+  | { kind: 'add' }
+  | { kind: 'settings' };
 
 export const UI = createContext<{ open: (s: Sheet) => void; close: () => void }>({ open: () => {}, close: () => {} });
 export const useUI = () => useContext(UI);
@@ -16,12 +18,14 @@ export function SheetFrame(p: {
   title: string;
   onSave?: () => void;
   saveLabel?: string;
+  /** Takes the whole screen (e.g. an assignment opened from the list). */
+  full?: boolean;
   children: ComponentChildren;
 }) {
   const { close } = useUI();
   return (
-    <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && close()}>
-      <div class="sheet" role="dialog" aria-label={p.title}>
+    <div class={`sheet-backdrop ${p.full ? 'full' : ''}`} onClick={(e) => e.target === e.currentTarget && close()}>
+      <div class={`sheet ${p.full ? 'full' : ''}`} role="dialog" aria-label={p.title}>
         <div class="sheet-grabber" />
         <header class="sheet-head">
           <button class="icon-btn" aria-label={p.onSave ? 'Cancel' : 'Close'} onClick={close}>

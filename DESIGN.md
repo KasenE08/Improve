@@ -9,6 +9,13 @@ Inter font (self-hosted), Lucide line icons (`assets/icons/icons.svg`). `stylegu
 - **XP and levels are hidden** everywhere (habit rows, header, Profile, celebrations, habit editor). The history still records XP (`imp_log` xp, `imp_bonus`) so nothing is lost. Perfect Day and streaks stay as markers. A limit counts as done while you're at or under it.
 - **Header** (`js/hud.js`): weekday + date (tap → month calendar), this week Mon–Sun as circles (ring = share of that day's daily habits done, days off left out; solid red = Perfect Day; today filled dark), and a bar for this week's weekly habits. Tapping a day (in the week or the calendar) opens its details: habits done/missed, food + water, money entries, planner assignments finished, journal.
 - **App icon**: white page, red calendar band, two dark chevrons (`assets/app-icons/`).
+- **One screen**: no tab bar. Home (`js/screens/home.js`) = header + cards (habits with the next few to tick, up next in the planner, food, water +8/+16, money, journal). Each card opens a page (`#today`, `#planner`, `#food`, `#money`, `#journal`, `#profile` = "You") with "‹ Home" at the top.
+- **Plan page**: Schedule / Assignments only. **+** opens Assignment / One-time event / Repeating time; **⋯** opens planner settings as a full page (fixed schedule, places, rules, pacing, learning, notifications, backup). Tapping a fixed time in the schedule edits it. Planner stats moved to the You page.
+- **Classes** (`data.classes { id, name, color, format }`, `task.classId`): picked, created and edited from the assignment form's Class dropdown; picking one fills in its usual type. Shown as a colored tag on the schedule, the list, the assignment page and Home's Up next. Tags only, never ordering.
+- **Online / Paper / Other** is one choice (Other = errands, chores).
+- **Notes**: up to 3 lines show on the schedule and list; tapping an assignment opens it as a full page with everything.
+- **Place to place**: an event can say "Coming from" another place (with minutes from there, saved on the place as `travelFrom`). It then follows that day's event at that place directly: no time at home in between. New places can be made from the event's Where dropdown.
+- **Finished today's work** (`js/planner-auto.js`) also needs every task started (Start tapped) no later than 10 minutes after its planned time (early is fine) and finished by its due time, and no "Falling behind" that day (`data.behindDays`). Dragging an assignment to a new time or day (`data.dragAt`) makes the new time count; an automatic replan after a missed start does not. The habit row says so.
 
 ## Using it on any screen (including copied apps)
 

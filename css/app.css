@@ -57,6 +57,8 @@
 .next { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; }
 .next__bar { align-self: stretch; border-radius: 99px; background: var(--imp-accent); }
 .next.is-late .next__bar { background: var(--imp-danger); }
+.ctag { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 4px; padding: 2px 9px 2px 7px; border-radius: 99px; background: color-mix(in srgb, var(--c) 14%, transparent); color: color-mix(in srgb, var(--c) 80%, var(--imp-text)); font: 600 12px var(--imp-font-head); }
+.ctag i { width: 7px; height: 7px; border-radius: 50%; background: var(--c); }
 .next__title { font: 600 16px/1.3 var(--imp-font-head); }
 .next__time { font: 600 12px var(--imp-font-head); color: var(--imp-muted); text-align: right; white-space: nowrap; }
 .next__time b { display: block; color: var(--imp-text); font-size: 15px; }

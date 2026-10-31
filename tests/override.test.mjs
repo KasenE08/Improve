@@ -40,7 +40,7 @@ eq(!!entry(), true, 'unfinished task: override still stands');
 H.setOverride(work, false, noon);
 P.recheckPlanner(late);
 eq([!!entry(), H.isOverridden(work, noon)], [false, false], 'back to auto: unfinished task = not done');
-plan({ tasks: [{ id: 'a', status: 'done', completedAt: t(14) }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
+plan({ tasks: [{ id: 'a', status: 'done', startedAt: t(13), completedAt: t(14) }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
 P.recheckPlanner(late);
 eq(!!entry(), true, 'back to auto: finished task ticks it again');
 

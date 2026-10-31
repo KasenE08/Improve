@@ -1,11 +1,13 @@
 import type { Task } from '../core/types';
 import { actions, type AppData } from './model';
 import { commit } from './store';
-import { Field, SheetFrame, useUI } from './ui';
+import { SheetFrame, useUI } from './ui';
 import { category, fmtDay, fmtDue, fmtDur, fmtTime, TYPE_LABELS } from './format';
 import { CATEGORY_ICONS, Icon } from './icons';
 import { categoryRank } from '../core/priority';
+import { ClassTag } from './ClassPicker';
 
+/** An assignment opened on its own page: everything about it, with Start / Done up front. */
 export function TaskDetail({ data, id }: { data: AppData; id: string }) {
   const ui = useUI();
   const t = data.tasks.find((x) => x.id === id);
@@ -13,17 +15,39 @@ export function TaskDetail({ data, id }: { data: AppData; id: string }) {
   const slot = data.plan?.items.find((i) => i.taskId === id);
   const warning = data.plan?.warnings.find((w) => w.taskId === id);
   const cat = category(t);
+  const cls = data.classes.find((c) => c.id === t.classId);
   const act = (fn: (d: AppData, id: string, now: number) => AppData) => commit((d, now) => fn(d, id, now));
+  const lines = (t.notes ?? '').split('\n').length;
 
   return (
-    <SheetFrame title="Assignment">
+    <SheetFrame title="Assignment" full>
       <div class="detail-head" style={{ '--cat': cat.color }}>
         <span class="chip-icon lg"><Icon name={CATEGORY_ICONS[categoryRank(t)]} size={26} /></span>
+        {cls && <ClassTag c={cls} />}
         <h2>{t.title}</h2>
         <div class="meta">
           {cat.label} · {TYPE_LABELS[t.type]} · {fmtDur(t.estimateMin)}
         </div>
       </div>
+
+      <div class="detail-actions">
+        {t.status === 'todo' && (
+          <button class="btn primary wide-ish" onClick={() => act(actions.startTask)}>
+            <Icon name="play" size={16} /> Start
+          </button>
+        )}
+        {t.status !== 'done' && (
+          <button class={`btn ${t.status === 'todo' ? '' : 'primary'} wide-ish`} onClick={() => act(actions.completeTask)}>
+            <Icon name="check" size={16} /> Done
+          </button>
+        )}
+        {t.status !== 'todo' && (
+          <button class="btn wide-ish" onClick={() => act(actions.reopenTask)}>
+            {t.status === 'done' ? 'Not done yet' : 'Stop (not started)'}
+          </button>
+        )}
+      </div>
+
       <div class="info-list">
         <div class="info-row">
           <Icon name="flag" />
@@ -63,32 +87,22 @@ export function TaskDetail({ data, id }: { data: AppData; id: string }) {
           {warning.kind === 'late' ? "This can't be finished before it's due." : 'No free time fits this yet.'}
         </p>
       )}
-      <Field label="Notes">
+
+      <label class="field">
+        <span class="field-label">Notes</span>
         <textarea
-          rows={4}
+          class="notes-full"
+          rows={Math.max(4, lines + 1)}
+          placeholder="Add notes…"
           value={t.notes ?? ''}
           onChange={(e) => {
             const v = e.currentTarget.value;
             commit((d) => actions.setNotes(d, id, v));
           }}
         />
-      </Field>
-      <div class="actions">
-        {t.status === 'todo' && (
-          <button class="btn primary" onClick={() => act(actions.startTask)}>
-            Start
-          </button>
-        )}
-        {t.status !== 'done' && (
-          <button class="btn primary" onClick={() => act(actions.completeTask)}>
-            Done
-          </button>
-        )}
-        {t.status !== 'todo' && (
-          <button class="btn" onClick={() => act(actions.reopenTask)}>
-            {t.status === 'done' ? 'Not done yet' : 'Stop (not started)'}
-          </button>
-        )}
+      </label>
+
+      <div class="detail-more">
         <button class="btn" onClick={() => ui.open({ kind: 'task', task: t })}>
           <Icon name="edit" size={16} /> Edit
         </button>

@@ -16,7 +16,8 @@ const day = new Date(2026, 9, 26, 16); // Mon Oct 26, 4 PM (after the 3 PM tick 
 const t = (h) => new Date(2026, 9, 26, h).getTime();
 const done = () => !!H.getLog()['2026-10-26']?.['work-on-schedule'];
 const save = (d) => { mem.imp_planner = JSON.stringify(d); };
-const task = (id, status = 'todo') => ({ id, title: id, status });
+// Done tasks were started (early) unless a test says otherwise
+const task = (id, status = 'todo') => ({ id, title: id, status, ...(status === 'done' ? { startedAt: 1 } : {}) });
 
 P.recheckPlanner(day);
 eq(done(), false, 'planner never set up: no free XP');
@@ -154,4 +155,53 @@ eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.
   save({ tasks: [task('poem')], blocks: [{ id: 'school' }], plan: { items: [{ taskId: 'poem', start: wedPm + 86400000, end: wedPm + 86400000 + 35 * 60000 }] } });
   P.recheckPlanner(new Date(2026, 10, 18, 15, 55)); // moved to Thursday before 4:20 PM
   eq([!!H.getLog()['2026-11-18']?.['work-on-schedule'], H.isExcused('work-on-schedule', '2026-11-18')], [false, true], 'moved off today before its time: day off, not stuck');
+}
+
+// ---- On time: start within 10 minutes of the planned time, finish by the due time, no "Falling behind" ----
+{
+  const at = (h, m = 0, d = 20) => new Date(2026, 10, d, h, m).getTime();
+  const item = (id, h, m = 0, d = 20) => ({ taskId: id, start: at(h, m, d), end: at(h, m, d) + 45 * 60000 });
+  const hit = (data, h, m = 0) => P.plannerHit(data, new Date(2026, 10, 20, h, m), new Date(2026, 10, 20, h, m));
+  const fresh = () => { mem.imp_planner_day = 'null'; };
+  const done = (id, startedAt, extra = {}) => ({ id, title: id, status: 'done', startedAt, completedAt: startedAt + 30 * 60000, ...extra });
+
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 5);
+  eq(hit({ tasks: [done('a', at(16, 8))], plan: { items: [] } }, 17), true, 'started 8 min after its time: on time');
+
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 5);
+  eq(hit({ tasks: [done('a', at(16, 11))], plan: { items: [] } }, 17), false, 'started 11 min late: no tick');
+
+  fresh();
+  eq(hit({ tasks: [done('a', at(15, 30))], plan: { items: [item('a', 16)] } }, 17), true, 'started early: fine');
+
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 5);
+  eq(hit({ tasks: [{ id: 'a', title: 'a', status: 'done', completedAt: at(16, 30) }], plan: { items: [] } }, 17), false, 'ticked done without Start: no tick');
+
+  fresh();
+  eq(hit({ tasks: [done('a', at(16), { due: at(16, 10) })], plan: { items: [item('a', 16)] } }, 17), false, 'finished after it was due: no tick');
+
+  fresh();
+  eq(hit({ tasks: [done('a', at(16))], plan: { items: [item('a', 16)] }, behindDays: ['2026-11-20'] }, 17), false, 'Falling behind used today: no tick');
+
+  // Missed the start, then an unrelated replan moved it later: still missed
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 20);
+  hit({ tasks: [task('a')], plan: { items: [item('a', 17)] } }, 16, 30);
+  eq(hit({ tasks: [done('a', at(17))], plan: { items: [item('a', 17)] } }, 18), false, 'a replan after a missed start does not reset it');
+
+  // Dragged to a later time by hand: the new time counts
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 20);
+  hit({ tasks: [task('a')], plan: { items: [item('a', 17)] }, dragAt: at(16, 25) }, 17, 1);
+  eq(hit({ tasks: [done('a', at(17, 5))], plan: { items: [item('a', 17)] }, dragAt: at(16, 25) }, 18), true, 'dragged to 5 PM, started 5:05: on time');
+
+  // Dragged to tomorrow after its time came: tomorrow's work now
+  fresh();
+  hit({ tasks: [task('a')], plan: { items: [item('a', 16)] } }, 16, 20);
+  eq(hit({ tasks: [task('a')], plan: { items: [item('a', 16, 0, 21)] }, dragAt: at(16, 25) }, 17), 'off', 'dragged to tomorrow: not today\'s work (day off)');
+  console.log(fails ? `${fails} FAILED` : 'all passed (on time)');
+  process.exitCode = fails ? 1 : 0;
 }

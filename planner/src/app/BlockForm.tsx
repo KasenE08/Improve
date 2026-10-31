@@ -22,6 +22,14 @@ export function BlockForm({ data, block, once }: { data: AppData; block?: FixedB
   const [title, setTitle] = useState(block?.title ?? '');
   const [tag, setTag] = useState<BlockTag>(block?.tag ?? 'other');
   const [locationId, setLocationId] = useState(block?.locationId ?? 'home');
+  // Place to place: where you come from (Home = leave from home), and how long it takes from there
+  const [fromId, setFromId] = useState(block?.fromLocationId ?? 'home');
+  const [travel, setTravel] = useState<string>(() => {
+    const m = data.locations.find((l) => l.id === (block?.locationId ?? 'home'))?.travelFrom?.[block?.fromLocationId ?? ''];
+    return m != null ? String(m) : '';
+  });
+  // A new place made right here (no settings page)
+  const [newPlace, setNewPlace] = useState<{ name: string; there: string; back: string } | null>(null);
   const [start, setStart] = useState(minToInput(block?.startMin ?? 18 * 60));
   const [end, setEnd] = useState(minToInput(block?.endMin ?? 19 * 60));
   const [kind, setKind] = useState<Kind>(r?.kind ?? (once ? 'once' : 'weekly'));
@@ -55,6 +63,9 @@ export function BlockForm({ data, block, once }: { data: AppData; block?: FixedB
   const save = () => {
     if (!title.trim()) return setError('Give it a name.');
     if (kind === 'weekly' && weekdays.length === 0) return setError('Pick at least one day.');
+    if (newPlace) return setError('Add the new place first (or cancel it).');
+    const fromOther = fromId !== 'home' && fromId !== locationId;
+    if (fromOther && !(Number(travel) >= 0 && travel !== '')) return setError(`How long does it take to get here from ${placeName(fromId)}?`);
     const s = inputToMin(start);
     let e = inputToMin(end);
     if (e <= s) e += 24 * 60; // ends after midnight
@@ -70,12 +81,25 @@ export function BlockForm({ data, block, once }: { data: AppData; block?: FixedB
       endDate: kind !== 'once' && endDate ? endDate : undefined,
       skipDates: kind !== 'once' && skips.length ? skips : undefined,
       blocksScheduling: blocks ? undefined : false,
+      fromLocationId: fromOther ? fromId : undefined,
       steps: steps.length
         ? steps.filter((x) => x.title.trim()).map((x): ReminderStep => ({ offsetMin: x.before ? -x.mins : x.mins, title: x.title }))
         : undefined,
     };
-    commit((d, now) => actions.saveBlock(d, next, now));
+    commit((d, now) => {
+      const withTravel = fromOther ? actions.setTravel(d, fromId, locationId, Math.round(Number(travel)), now) : d;
+      return actions.saveBlock(withTravel, next, now);
+    });
     ui.close();
+  };
+  const placeName = (id: string) => data.locations.find((l) => l.id === id)?.name ?? 'there';
+  const addPlace = () => {
+    if (!newPlace?.name.trim()) return setError('Give the place a name.');
+    const loc = { id: uid(), name: newPlace.name.trim(), fromHomeMin: Math.max(0, Math.round(Number(newPlace.there) || 0)), toHomeMin: Math.max(0, Math.round(Number(newPlace.back) || Number(newPlace.there) || 0)) };
+    commit((d, now) => actions.savePlace(d, loc, now));
+    setLocationId(loc.id);
+    setNewPlace(null);
+    setError('');
   };
 
   return (
@@ -92,13 +116,61 @@ export function BlockForm({ data, block, once }: { data: AppData; block?: FixedB
           </select>
         </Field>
         <Field label="Where">
-          <select value={locationId} onChange={(e) => setLocationId(e.currentTarget.value)}>
+          <select
+            value={newPlace ? '__new' : locationId}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              if (v === '__new') return setNewPlace({ name: '', there: '', back: '' });
+              setNewPlace(null);
+              setLocationId(v);
+            }}
+          >
             {data.locations.map((l) => (
               <option value={l.id}>{l.name}</option>
             ))}
+            <option value="__new">+ New place…</option>
           </select>
         </Field>
       </div>
+      {newPlace && (
+        <div class="inline-card">
+          <input placeholder="Place name, e.g. Archery Range" value={newPlace.name} autoFocus onInput={(e) => setNewPlace({ ...newPlace, name: e.currentTarget.value })} />
+          <div class="row2">
+            <Field label="Minutes from home">
+              <input type="number" inputMode="numeric" min={0} value={newPlace.there} onInput={(e) => setNewPlace({ ...newPlace, there: e.currentTarget.value })} />
+            </Field>
+            <Field label="Minutes back home">
+              <input type="number" inputMode="numeric" min={0} placeholder="same" value={newPlace.back} onInput={(e) => setNewPlace({ ...newPlace, back: e.currentTarget.value })} />
+            </Field>
+          </div>
+          <div class="row">
+            <button type="button" class="btn small primary" onClick={addPlace}>Add place</button>
+            <button type="button" class="btn small" onClick={() => setNewPlace(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
+      {!newPlace && locationId !== 'home' && (
+        <div class="row2">
+          <Field label="Coming from" hint={fromId === 'home' ? 'Leaving from home.' : `Straight from your ${placeName(fromId)} event that day.`}>
+            <select value={fromId} onChange={(e) => {
+              const v = e.currentTarget.value;
+              setFromId(v);
+              const m = data.locations.find((l) => l.id === locationId)?.travelFrom?.[v];
+              setTravel(m != null ? String(m) : '');
+            }}>
+              <option value="home">Home</option>
+              {data.locations.filter((l) => l.id !== 'home' && l.id !== locationId).map((l) => (
+                <option value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </Field>
+          {fromId !== 'home' && (
+            <Field label={`Minutes from ${placeName(fromId)}`}>
+              <input type="number" inputMode="numeric" min={0} value={travel} onInput={(e) => setTravel(e.currentTarget.value)} />
+            </Field>
+          )}
+        </div>
+      )}
       <div class="row2">
         <Field label="Starts">
           <input type="time" value={start} onInput={(e) => setStart(e.currentTarget.value)} />

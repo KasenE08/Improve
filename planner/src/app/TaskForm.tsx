@@ -4,7 +4,8 @@ import { BASE_ESTIMATES, estimateMinutes, learnedRatio } from '../core/estimate'
 import { dateKey } from '../core/time';
 import { actions, type AppData } from './model';
 import { commit } from './store';
-import { Chips, Field, SheetFrame, useUI } from './ui';
+import { Field, SheetFrame, useUI } from './ui';
+import { ClassPicker, TypePicker } from './ClassPicker';
 import { fmtDur, TYPE_LABELS, uid } from './format';
 import { splitMinutes } from '../core/estimate';
 
@@ -15,7 +16,9 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
   const due = task?.due ? new Date(task.due) : null;
   const [title, setTitle] = useState(task?.title ?? '');
   const [type, setType] = useState<AssignmentType>(task?.type ?? 'worksheet');
-  const [formats, setFormats] = useState<Format[]>(task?.formats ?? ['online']);
+  // Online / Paper / Other (null): exactly one
+  const [fmt, setFmt] = useState<Format | null>(task ? task.formats[0] ?? null : 'online');
+  const [classId, setClassId] = useState<string | undefined>(task?.classId);
   const [missing, setMissing] = useState(task?.missing ?? false);
   const [dueDate, setDueDate] = useState(due ? dateKey(due) : '');
   const [dueTime, setDueTime] = useState(due ? due.toTimeString().slice(0, 5) : '23:59');
@@ -29,7 +32,7 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
 
   const save = () => {
     if (!title.trim()) return setError('Give it a title.');
-    if (!missing && !dueDate) return setError('Enter the actual due date.');
+    if (!(fmt && missing) && !dueDate) return setError('Enter the actual due date.');
     if (!(estimate > 0)) return setError('Estimate must be at least 1 minute.');
     const [y, m, d] = dueDate.split('-').map(Number);
     const [hh, mm] = dueTime.split(':').map(Number);
@@ -37,13 +40,14 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
       id: task?.id ?? uid(),
       title: title.trim(),
       type,
-      formats,
-      missing,
+      formats: fmt ? [fmt] : [],
+      missing: fmt ? missing : false,
       due: missing ? null : new Date(y, m - 1, d, hh, mm).getTime(),
       estimateMin: estimate,
       estimateManual: manual !== null,
       baseMin: manual !== null ? task?.baseMin : task?.group ? task.baseMin : BASE_ESTIMATES[type],
       notes: notes.trim() || undefined,
+      classId,
       status: task?.status ?? 'todo',
       startedAt: task?.startedAt,
       completedAt: task?.completedAt,
@@ -59,32 +63,31 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
   return (
     <SheetFrame title={task ? 'Edit assignment' : 'New assignment'} onSave={save}>
       <Field label="What do you have to do?">
-        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. Chem worksheet 4.2" />
+        <input value={title} onInput={(e) => setTitle(e.currentTarget.value)} placeholder="e.g. 2.6 worksheet" />
       </Field>
-      <Field label="Type">
+      <div class="field">
+        <span class="field-label">Class</span>
+        <ClassPicker data={data} value={classId} onChange={(id, c) => { setClassId(id); if (c) setFmt(c.format); }} />
+      </div>
+      <div class="field">
+        <span class="field-label">Online, paper or other</span>
+        <TypePicker value={fmt} onChange={setFmt} />
+        {fmt === null && <span class="hint">Other = errands and chores (not schoolwork).</span>}
+      </div>
+      <Field label="Kind of work">
         <select value={type} onChange={(e) => setType(e.currentTarget.value as AssignmentType)}>
           {TYPES.map((t) => (
             <option value={t}>{TYPE_LABELS[t]}</option>
           ))}
         </select>
       </Field>
-      <Field label="Category" hint={formats.length === 0 ? 'No format selected = Other (errands, chores).' : undefined}>
-        <Chips
-          options={[
-            { value: 'online' as Format, label: 'Online' },
-            { value: 'paper' as Format, label: 'Paper' },
-          ]}
-          selected={formats}
-          onToggle={(f) => setFormats(formats.includes(f) ? formats.filter((x) => x !== f) : [...formats, f])}
-        />
-      </Field>
-      {formats.length > 0 && (
+      {fmt !== null && (
         <label class="toggle">
           <input type="checkbox" checked={missing} onChange={(e) => setMissing(e.currentTarget.checked)} />
           Missing assignment (do as soon as possible)
         </label>
       )}
-      {!missing && (
+      {!(fmt && missing) && (
         <div class="row2">
           <Field label="Actual due date">
             <input type="date" value={dueDate} onInput={(e) => setDueDate(e.currentTarget.value)} />
@@ -117,7 +120,7 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
         </div>
       </Field>
       <Field label="Notes">
-        <textarea rows={3} value={notes} onInput={(e) => setNotes(e.currentTarget.value)} />
+        <textarea rows={4} placeholder="Anything to remember: pages, links, what the teacher said…" value={notes} onInput={(e) => setNotes(e.currentTarget.value)} />
       </Field>
       {error && <p class="warn">{error}</p>}
     </SheetFrame>
