@@ -1,8 +1,9 @@
 // Improve service worker. Scope is this folder only (/Improve/), set by its location.
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'v36';
+const VERSION = 'v37';
 // The dev preview (/Improve/dev/) keeps its own caches so the two never delete each other's.
-const PREFIX = /\/dev\//.test(self.location.pathname) ? 'imp-dev-cache-' : 'imp-cache-'; // only caches with this prefix are ever touched
+const DEV = /\/dev\//.test(self.location.pathname);
+const PREFIX = DEV ? 'imp-dev-cache-' : 'imp-cache-'; // only caches with this prefix are ever touched
 const CACHE = PREFIX + VERSION;
 
 const FILES = [
@@ -81,11 +82,22 @@ self.addEventListener('fetch', (event) => {
     const scopePath = new URL(self.registration.scope).pathname;
     if (url.pathname === scopePath || url.pathname === scopePath + 'index.html') {
       // App page: cached copy so it opens offline instantly
-      event.respondWith(caches.match('index.html').then((r) => r || fetch(req)));
+      event.respondWith(DEV
+        ? fetch(req, { cache: 'no-cache' }).catch(() => caches.open(CACHE).then((c) => c.match('index.html')))
+        : caches.match('index.html').then((r) => r || fetch(req)));
     } else {
       // Other pages in the folder (design samples, style guide): network first
       event.respondWith(fetch(req).catch(() => caches.match(req, { ignoreSearch: true })));
     }
+    return;
+  }
+
+  // Dev preview: always the newest files when online (the redesign changes often); the saved copy is only for offline
+  if (DEV) {
+    event.respondWith(fetch(req, { cache: 'no-cache' }).then((res) => {
+      if (res.ok && res.type === 'basic') { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+      return res;
+    }).catch(() => caches.open(CACHE).then((c) => c.match(req, { ignoreSearch: true }))));
     return;
   }
 
