@@ -1,5 +1,7 @@
-# Deploys Improve to GitHub Pages on every push to main.
+# Deploys Improve to GitHub Pages on every push to main (and when run by hand).
 # The Planner tab is TypeScript/Preact: it is type-checked, tested and built into js/planner/ first.
+# The dev branch is also built into /dev/ (a preview with its own separate data). A failing dev
+# build never blocks the main site.
 name: Deploy to GitHub Pages
 on:
   push:
@@ -46,8 +48,25 @@ jobs:
       - name: Collect the site (without Planner sources)
         run: |
           mkdir _site
-          tar --exclude=./_site --exclude=./.git --exclude=./.github --exclude=./planner --exclude=./tests -cf - . | tar -xf - -C _site
+          tar --exclude=./_site --exclude=./devsrc --exclude=./.git --exclude=./.github --exclude=./planner --exclude=./tests -cf - . | tar -xf - -C _site
           test -f _site/js/planner/planner.js
+      - name: Get the dev branch
+        id: devsrc
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: claude/improve-phase-1-design-x04avr
+          path: devsrc
+      - name: Test and build the dev preview into /dev/
+        if: steps.devsrc.outcome == 'success' && hashFiles('devsrc/js/devmode.js') != ''
+        continue-on-error: true
+        run: |
+          set -e
+          cd devsrc/planner && npm ci && npm run check && npm run build && cd ..
+          for t in tests/*.test.mjs; do node "$t"; done
+          mkdir -p ../_site/dev
+          tar --exclude=./.git --exclude=./.github --exclude=./planner --exclude=./tests -cf - . | tar -xf - -C ../_site/dev
+          test -f ../_site/dev/js/planner/planner.js
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
