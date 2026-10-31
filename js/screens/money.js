@@ -227,7 +227,7 @@ function paydayPanel(s) {
   const st = L.saveStatus(s);
   const next = L.nextPayday(s.settings.pay, today());
   let status;
-  if (st.offWeek) status = `<p class="mon-status">No payday this week: a week off for your saving habit (no XP, streak safe).</p>`;
+  if (st.offWeek) status = `<p class="mon-status">No payday this week: a week off for your saving habit (streak safe).</p>`;
   else if (st.pending) status = `<p class="mon-status">Payday ${st.expected.map(shortDate).join(', ')}: log the paycheck and it splits itself.</p>`;
   else status = `<p class="mon-status${st.hit ? ' is-on' : ''}">${st.hit ? icon('check') : ''} This week: set aside ${money(s, st.saved)} of ${money(s, st.required)}</p>`;
   return box('Paydays', `<div class="mon-stack">

@@ -2,8 +2,10 @@
 import * as H from './habits.js';
 import * as R from './rewards.js';
 import * as Stats from './stats.js';
-import { dayKey, prettyDate } from './dates.js';
-import { esc, icon, lvl, xpbar, meter, pct } from './ui.js';
+import { dayKey } from './dates.js';
+import { icon } from './ui.js';
+import { renderHud as drawHud, bindHud } from './hud.js';
+import { startTheme } from './theme.js';
 import * as Today from './screens/today.js';
 import * as Food from './screens/food.js';
 import * as Money from './screens/money.js';
@@ -80,20 +82,7 @@ function boot() {
       .catch(() => { screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'info', title: 'Couldn’t load', text: 'Check your connection and reopen the app.' }) })}</div>`; });
   }
 
-  function renderHud() {
-    const st = Stats.compute();
-    const t = Stats.today();
-    const name = H.getProfile().name;
-    const o = st.overall;
-
-    hud.innerHTML = `${lvl(o.level)}
-      <div class="hud__main">
-        <div class="hud__top"><button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button><span class="hud__rank">${esc(st.rank.name)}</span></div>
-        ${xpbar(o.pct)}
-        <div class="hud__meta"><span>${o.into} / ${o.need} XP</span><span class="hud__date">${prettyDate()}</span></div>
-        ${meter('Today', pct(t.earned, t.max), `${icon('xp')}+${t.earned}`)}
-      </div>`;
-  }
+  const renderHud = () => drawHud(hud);
 
   function renderTabs(active) {
     tabbar.innerHTML = TABS.map(([id, label, ic]) =>
@@ -121,7 +110,8 @@ function boot() {
   Money.bind(screen);
   Journal.bind(screen);
   Profile.bind(screen, refresh);
-  hud.addEventListener('click', (e) => { if (e.target.closest('[data-act="rename"]')) Profile.openNameSheet(refresh); });
+  bindHud(hud, { rename: () => Profile.openNameSheet(refresh), refresh });
+  startTheme(() => renderHud()); // light/dark: 7 PM → 4 AM automatically
 
   window.addEventListener('hashchange', () => {
     const id = takeTaskFromHash();

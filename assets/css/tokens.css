@@ -1,61 +1,111 @@
 /* ==========================================================================
-   Improve design tokens: Pixel HUD theme.
+   Improve design tokens: "Week View" theme, light and dark.
    Change values here to restyle every screen. Components only use these vars.
+   Dark mode: <html data-theme="dark"> (set by js/theme.js: 7 PM → 4 AM, or the switch in the header).
    ========================================================================== */
 
-@font-face { font-family: Silkscreen; font-weight: 400; font-display: swap; src: url(../fonts/silkscreen-latin-400-normal.woff2) format('woff2'); }
-/* Bold Silkscreen draws some digits badly (the 4 and 9), so bold text uses the regular-weight digits. */
-@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-700-normal.woff2) format('woff2'); unicode-range: U+0000-002F, U+003A-FFFF; }
-@font-face { font-family: Silkscreen; font-weight: 700; font-display: swap; src: url(../fonts/silkscreen-latin-400-normal.woff2) format('woff2'); unicode-range: U+0030-0039; }
-@font-face { font-family: VT323; font-weight: 400; font-display: swap; src: url(../fonts/vt323-latin-400-normal.woff2) format('woff2'); }
+/* Inter (SIL Open Font License 1.1), self-hosted so the app works offline */
+@font-face { font-family: Inter; font-style: normal; font-weight: 400 800; font-display: swap; src: url(../fonts/inter-latin-var.woff2) format('woff2'); }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* Surfaces */
-  --imp-bg: #07070d;
-  --imp-surface: #0c1020;        /* panel body */
-  --imp-surface-2: #10213a;      /* panel header strip */
-  --imp-sunken: #000;            /* inside bars, inputs, checkboxes */
-  --imp-frame: #1c4a66;          /* pixel borders */
-  --imp-divider: #1a2a40;
+  --imp-bg: #f4f5f7;             /* page */
+  --imp-surface: #ffffff;        /* cards */
+  --imp-surface-2: #fafbfc;      /* card header strip */
+  --imp-sunken: #eef0f3;         /* bar tracks, inputs, empty checkboxes */
+  --imp-frame: #e4e7ec;          /* borders */
+  --imp-divider: #eef0f3;        /* lines between rows */
+  --imp-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
+  --imp-shadow-lg: 0 12px 32px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .06);
 
-  /* Accent (cyan / electric blue) */
-  --imp-accent: #29f0ff;
-  --imp-accent-dim: #0f6f80;
-  --imp-accent-deep: #08414d;    /* pixel drop-shadows */
-  --imp-on-accent: #07070d;      /* text on accent fills */
+  /* Accent (red) */
+  --imp-accent: #e5484d;
+  --imp-accent-dim: #fde8e8;     /* soft red background */
+  --imp-accent-deep: #c5343a;    /* pressed */
+  --imp-on-accent: #ffffff;
 
   /* Text */
-  --imp-text: #e2fbff;
-  --imp-muted: #6b86a0;
+  --imp-text: #111827;
+  --imp-muted: #6b7280;
+  --imp-faint: #9ca3af;
 
-  /* Food: calories use the accent, protein is orange */
-  --imp-protein: #ff9f1c;
-  --imp-protein-deep: #5c3500;
-  --imp-water: #5b8cff;
+  /* Food: calories use the accent, protein is orange, water blue */
+  --imp-protein: #f97316;
+  --imp-protein-deep: #c2410c;
+  --imp-water: #3b82f6;
+
+  /* Planner categories */
+  --imp-cat-online: #3b82f6;
+  --imp-cat-online-missing: #8b5cf6;
+  --imp-cat-paper: #16a34a;
+  --imp-cat-paper-missing: #0f766e;
+  --imp-cat-other: #d97706;
 
   /* Status */
-  --imp-danger: #ff4f6d;
-  --imp-danger-deep: #5c1422;
-  --imp-warn: #ffd23f;
+  --imp-good: #16a34a;
+  --imp-danger: #d92d20;
+  --imp-danger-deep: #b42318;
+  --imp-warn: #f59e0b;
 
   /* Type */
-  --imp-font-head: Silkscreen, ui-monospace, monospace;  /* labels, titles, buttons */
-  --imp-font-body: VT323, ui-monospace, monospace;       /* body text + numbers */
-  --imp-fs-xs: 10px;   /* head font: tiny labels */
-  --imp-fs-sm: 12px;   /* head font: buttons, panel titles */
-  --imp-fs-md: 18px;   /* head font: big titles */
-  --imp-fs-body: 21px; /* body font base */
-  --imp-fs-body-lg: 23px;
+  --imp-font-head: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --imp-font-body: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --imp-fs-xs: 12px;   /* small labels */
+  --imp-fs-sm: 14px;   /* buttons, card titles */
+  --imp-fs-md: 20px;   /* big titles */
+  --imp-fs-body: 16px; /* body text */
+  --imp-fs-body-lg: 16px;
 
   /* Shape + spacing */
-  --imp-px: 3px;       /* "pixel" unit for borders and offsets */
+  --imp-px: 1px;       /* border width */
+  --imp-radius: 16px;  /* cards */
+  --imp-radius-sm: 10px; /* buttons, inputs */
   --imp-gap: 16px;
-  --imp-pad: 14px;
+  --imp-pad: 16px;
   --imp-gutter: 16px;  /* page side padding */
   --imp-tabbar-h: 64px;
 
   /* Motion */
-  --imp-steps: steps(4);
+  --imp-ease: cubic-bezier(.2, .8, .2, 1);
+  --imp-steps: var(--imp-ease);
+}
+
+/* Dark: deep blue-gray layers (not flat black), softer text, a brighter red so it still pops. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --imp-bg: #0b0d12;
+  --imp-surface: #14171e;
+  --imp-surface-2: #181b23;
+  --imp-sunken: #1f232c;
+  --imp-frame: #252a34;
+  --imp-divider: #1e222b;
+  --imp-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 1px 2px rgba(0, 0, 0, .4);
+  --imp-shadow-lg: 0 20px 48px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .05);
+
+  --imp-accent: #ff5c62;
+  --imp-accent-dim: rgba(255, 92, 98, .14);
+  --imp-accent-deep: #e0454b;
+  --imp-on-accent: #ffffff;
+
+  --imp-text: #eef0f4;
+  --imp-muted: #8f97a6;
+  --imp-faint: #5d6472;
+
+  --imp-protein: #fb923c;
+  --imp-protein-deep: #ea580c;
+  --imp-water: #60a5fa;
+
+  --imp-cat-online: #60a5fa;
+  --imp-cat-online-missing: #a78bfa;
+  --imp-cat-paper: #34d399;
+  --imp-cat-paper-missing: #2dd4bf;
+  --imp-cat-other: #fbbf24;
+
+  --imp-good: #34d399;
+  --imp-danger: #f97066;
+  --imp-danger-deep: #d92d20;
+  --imp-warn: #fbbf24;
 }

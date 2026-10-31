@@ -2,26 +2,25 @@
 .jr-gear::before { content: none; }
 .jr-gear .imp-icon { width: 18px; height: 18px; }
 .jr-meter { padding-top: 10px; display: grid; gap: 8px; }
-.jr-status { display: flex; align-items: center; gap: 6px; font-size: 19px; color: var(--imp-muted); }
+.jr-status { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--imp-muted); }
 .jr-status.is-on { color: var(--imp-accent); }
 .jr-status .imp-icon { width: 16px; height: 16px; }
-.jr-hint { font-size: 18px; color: var(--imp-muted); line-height: 1.1; padding: 6px 0; }
+.jr-hint { font-size: 14px; color: var(--imp-muted); line-height: 1.4; padding: 6px 0; }
 .jr-older { margin: 6px 0 4px; }
 
 .jr-day { padding: 10px 0 12px; }
-.jr-day + .jr-day { border-top: var(--imp-px) dotted var(--imp-divider); }
+.jr-day + .jr-day { border-top: 1px solid var(--imp-divider); }
 .jr-date { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px;
-  font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-accent); }
-.jr-date::before { content: "\25B8"; margin-right: -4px; }
+  font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-accent); }
 .jr-date span:first-child { flex: 1; }
 .jr-wc { color: var(--imp-muted); }
-.jr-text { display: block; width: 100%; font-size: 21px; line-height: 1.15; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left !important; color: var(--imp-text); }
-.jr-text:active { background: rgba(41, 240, 255, .06); }
+.jr-text { display: block; width: 100%; font-size: 16px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; text-align: left !important; color: var(--imp-text); }
+.jr-text:active { background: var(--imp-sunken); }
 
-.jr-input { display: block; width: 100%; min-height: 160px; resize: none; overflow: hidden; border: 0; border-radius: 0; margin: 0;
-  padding: 10px; font: 400 21px/1.15 var(--imp-font-body); color: var(--imp-text); background: var(--imp-sunken);
-  box-shadow: 0 0 0 var(--imp-px) var(--imp-frame); -webkit-appearance: none; appearance: none; }
-.jr-input:focus { outline: none; box-shadow: 0 0 0 var(--imp-px) var(--imp-accent); }
+.jr-input { display: block; width: 100%; min-height: 160px; resize: none; overflow: hidden; margin: 0;
+  padding: 12px; font: 400 16px/1.5 var(--imp-font-body); color: var(--imp-text); background: var(--imp-surface);
+  border: 1px solid var(--imp-frame); border-radius: 12px; -webkit-appearance: none; appearance: none; }
+.jr-input:focus { outline: none; border-color: var(--imp-accent); box-shadow: 0 0 0 3px var(--imp-accent-dim); }
 .jr-input::placeholder { color: var(--imp-muted); }
-.jr-input--past { min-height: 80px; box-shadow: 0 0 0 var(--imp-px) var(--imp-warn); }
+.jr-input--past { min-height: 80px; border-color: var(--imp-warn); }
 .jr-day.is-today .jr-date { color: var(--imp-text); }

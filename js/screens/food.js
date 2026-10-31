@@ -257,7 +257,7 @@ function renderImportConfirm(p) {
         <li>${plural(s.savedMeals, 'saved meal')}</li>
         ${p.data.settings.calGoal ? `<li>Calorie goal ${fmt(p.data.settings.calGoal)} (your protein goal + hit rules stay as set here)</li>` : ''}
       </ul>
-      <p class="food-warn">This replaces Improve's food data (now ${plural(cur.entries.length, 'entry').replace('entrys', 'entries')}, ${plural(cur.foods.length, 'food')}). Past days won't award habit XP; today's food day is checked.</p>
+      <p class="food-warn">This replaces Improve's food data (now ${plural(cur.entries.length, 'entry').replace('entrys', 'entries')}, ${plural(cur.foods.length, 'food')}). Past days aren't re-checked for habits; today's food day is.</p>
       <button class="imp-btn imp-btn--danger imp-btn--block" data-f="import-confirm">Copy into Improve</button>
       <button class="imp-btn imp-btn--ghost imp-btn--block" data-f="back">Cancel</button></div>`)}`;
 }

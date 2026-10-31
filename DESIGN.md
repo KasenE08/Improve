@@ -1,7 +1,14 @@
 # Improve design system
 
-Pixel-HUD theme: dark background, cyan accent, Silkscreen + VT323 fonts, game-icons.net icons (Tabler bolt for XP).
-Live examples with copy-paste markup: `styleguide.html`.
+"Week View" theme (UI overhaul, in progress on the dev preview): light by default with a high-quality dark mode, red accent,
+Inter font (self-hosted), Lucide line icons (`assets/icons/icons.svg`). `styleguide.html` and `/design/` still show the old Pixel-HUD theme.
+
+## UI overhaul (dev preview)
+- **Dev preview** at `/Improve/dev/`: the deploy workflow builds `claude/improve-phase-1-design-x04avr` there (only once it has `js/devmode.js`). The preview keeps its own copy of the data under `imp_dev_` (copied from the real app on first open, read-only on the real keys; the DEV badge in the header copies it again), its own caches (`imp-dev-cache-`), and notifications are off. Nothing goes to main until the whole overhaul is confirmed.
+- **Light / dark** (`js/theme.js`): dark from 7 PM until 4 AM, light otherwise. The sun/moon switch in the header overrides that until the next automatic change (`imp_theme { mode, until }`). An inline script in `index.html` sets it before the first paint. Dark mode has its own layered blue-gray surfaces, softer text and a brighter red (tokens under `:root[data-theme="dark"]`).
+- **XP and levels are hidden** everywhere (habit rows, header, Profile, celebrations, habit editor). The history still records XP (`imp_log` xp, `imp_bonus`) so nothing is lost. Perfect Day and streaks stay as markers. A limit counts as done while you're at or under it.
+- **Header** (`js/hud.js`): weekday + date (tap → month calendar), this week Mon–Sun as circles (ring = share of that day's daily habits done, days off left out; solid red = Perfect Day; today filled dark), and a bar for this week's weekly habits. Tapping a day (in the week or the calendar) opens its details: habits done/missed, food + water, money entries, planner assignments finished, journal.
+- **App icon**: white page, red calendar band, two dark chevrons (`assets/app-icons/`).
 
 ## Using it on any screen (including copied apps)
 

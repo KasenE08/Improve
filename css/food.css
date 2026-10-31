@@ -1,93 +1,94 @@
-/* Food tab layout (ported from calorie-tracker, Pixel HUD style) */
+/* Food tab layout (ported from calorie-tracker, Week View style) */
 .food-c { color: var(--imp-accent); }
 .food-p { color: var(--imp-protein); }
 .food-subnav { margin: 0 var(--imp-px); }
 .food-stack { display: grid; gap: 14px; padding: 6px 0 4px; }
-.food-note { font-size: 18px; color: var(--imp-muted); line-height: 1.1; }
-.food-err { color: var(--imp-danger); font-size: 19px; min-height: 0; }
+.food-note { font-size: 14px; color: var(--imp-muted); line-height: 1.4; }
+.food-err { color: var(--imp-danger); font-size: 15px; min-height: 0; }
 .food-err:empty { display: none; }
-.food-warn { color: var(--imp-warn); font-size: 19px; }
-.food-empty { padding: 14px 0; color: var(--imp-muted); font-size: 19px; }
+.food-warn { color: var(--imp-warn); font-size: 15px; }
+.food-empty { padding: 14px 0; color: var(--imp-muted); font-size: 15px; }
 .food-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 .food-nav { display: flex; align-items: center; gap: 12px; }
 
 /* Week strip */
 .wk { display: flex; align-items: center; gap: 4px; padding: 8px 0 4px; touch-action: pan-y; }
-.wk-arrow { flex: none; width: 28px; height: 56px; color: var(--imp-accent); font-size: 18px; text-align: center !important; }
+.wk-arrow { flex: none; width: 28px; height: 56px; color: var(--imp-accent); font-size: 14px; text-align: center !important; }
 .wk-days { flex: 1; display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-.wk-days.from-right { animation: wk-in-r .2s steps(3); }
-.wk-days.from-left { animation: wk-in-l .2s steps(3); }
+.wk-days.from-right { animation: wk-in-r .2s var(--imp-ease); }
+.wk-days.from-left { animation: wk-in-l .2s var(--imp-ease); }
 @keyframes wk-in-r { from { transform: translateX(24px); opacity: .3; } }
 @keyframes wk-in-l { from { transform: translateX(-24px); opacity: .3; } }
 .wk-day { display: grid; justify-items: center; gap: 3px; padding: 6px 0; text-align: center !important; color: var(--imp-muted); }
-.wk-dow { font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; }
-.wk-num { font-size: 22px; color: var(--imp-text); }
-.wk-bar { position: relative; width: 10px; height: 18px; background: var(--imp-sunken); box-shadow: 0 0 0 2px var(--imp-divider); }
+.wk-dow { font: 400 var(--imp-fs-xs) var(--imp-font-head); }
+.wk-num { font-size: 16px; color: var(--imp-text); }
+.wk-bar { position: relative; width: 6px; height: 18px; border-radius: 99px; overflow: hidden; background: var(--imp-sunken); }
 .wk-bar span { position: absolute; left: 0; right: 0; bottom: 0; background: var(--imp-accent); }
 .wk-day.is-over .wk-bar span { background: var(--imp-danger); }
 .wk-day.is-today .wk-dow { color: var(--imp-accent); }
-.wk-day.is-sel { background: var(--imp-surface-2); box-shadow: 0 0 0 2px var(--imp-accent); }
+.wk-day.is-sel { background: var(--imp-surface-2); box-shadow: 0 0 0 2px var(--imp-accent); border-radius: 12px; }
 
 /* Hero */
 .food-hero { display: grid; gap: 10px; padding: 10px 0 6px; }
-.food-big { font: 400 64px/.9 var(--imp-font-body); color: var(--imp-accent); text-align: center; letter-spacing: .02em; }
-.food-cap { margin-top: -4px; text-align: center; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.food-big { font: 800 46px/1 var(--imp-font-body); color: var(--imp-accent); text-align: center; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.food-cap { margin-top: -4px; text-align: center; font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); }
 .food-hero.is-over .food-big, .food-hero.is-over .food-cap { color: var(--imp-danger); }
 .food-bar { display: grid; gap: 6px; }
 .food-bar__top { display: flex; justify-content: space-between; align-items: baseline; }
-.food-val { font-size: 20px; }
-.food-val small { font-size: 17px; color: var(--imp-muted); }
+.food-val { font-size: 15px; }
+.food-val small { font-size: 13px; color: var(--imp-muted); }
 .food-hits { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
-.food-hit { display: flex; align-items: center; gap: 8px; font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; color: var(--imp-muted); }
+.food-hit { display: flex; align-items: center; gap: 8px; font: 400 var(--imp-fs-xs) var(--imp-font-head); color: var(--imp-muted); }
 .food-hit .imp-check { width: 18px; height: 18px; }
 .food-hit .imp-check .imp-icon { width: 12px; height: 12px; }
-.food-hit small { display: block; font: 400 16px var(--imp-font-body); text-transform: none; margin-top: 2px; }
+.food-hit small { display: block; font: 400 13px var(--imp-font-body); text-transform: none; margin-top: 2px; }
 .food-hit.is-on { color: var(--imp-accent); }
 
 /* Meal tabs */
-.food-mealtabs { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--imp-surface-2); }
-.food-mealtabs button { display: grid; gap: 3px; justify-items: center; padding: 9px 2px; text-align: center !important; color: var(--imp-muted); font: 400 var(--imp-fs-xs) var(--imp-font-head); text-transform: uppercase; }
-.food-mealtabs b { font: 400 19px var(--imp-font-body); color: var(--imp-text); }
+.food-mealtabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px; margin: 0 var(--imp-pad); border-radius: 12px; background: var(--imp-sunken); }
+.food-mealtabs button { display: grid; gap: 3px; justify-items: center; padding: 9px 2px; text-align: center !important; color: var(--imp-muted); font: 400 var(--imp-fs-xs) var(--imp-font-head); }
+.food-mealtabs b { font: 400 15px var(--imp-font-body); color: var(--imp-text); }
+.food-mealtabs button { border-radius: 9px; }
 .food-mealtabs button.is-on { background: var(--imp-accent); color: var(--imp-on-accent); }
 .food-mealtabs button.is-on b { color: var(--imp-on-accent); }
 
 /* Rows */
-.food-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 0; min-height: 52px; border-bottom: var(--imp-px) dotted var(--imp-divider); }
-.food-row:active { background: rgba(41, 240, 255, .07); }
+.food-row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 9px 0; min-height: 52px; border-bottom: 1px solid var(--imp-divider); }
+.food-row:active { background: var(--imp-sunken); }
 .food-row__mid { flex: 1; min-width: 0; display: grid; gap: 2px; text-align: left; }
-.food-row__name { font-size: 22px; overflow-wrap: anywhere; }
-.food-row__sub { font-size: 17px; color: var(--imp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.food-row__name { font-size: 16px; overflow-wrap: anywhere; }
+.food-row__sub { font-size: 13px; color: var(--imp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .food-row__sub--wrap { white-space: normal; }
-.food-row__val { flex: none; display: grid; justify-items: end; gap: 2px; font-size: 19px; }
-.food-av { flex: none; width: 32px; height: 32px; display: grid; place-items: center; background: var(--imp-surface-2); color: var(--imp-accent); font: 700 var(--imp-fs-sm) var(--imp-font-head); box-shadow: 0 0 0 2px var(--imp-frame); }
+.food-row__val { flex: none; display: grid; justify-items: end; gap: 2px; font-size: 15px; }
+.food-av { flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--imp-accent-dim); color: var(--imp-accent); font: 700 var(--imp-fs-sm) var(--imp-font-head); }
 .food-av.is-quick { color: var(--imp-protein); }
 .food-mealrow { display: flex; align-items: center; gap: 10px; }
 .food-mealrow .food-row { flex: 1; }
 .food-x::before { content: none; }
-.food-subtotal { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 0 4px; font-size: 19px; }
+.food-subtotal { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 10px 0 4px; font-size: 15px; }
 .food-add { padding: 10px 0 6px; gap: 10px; }
 .food-add .imp-btn { flex: 1; padding-left: 8px; padding-right: 8px; }
 
 /* Number fields with a unit */
 .food-unit { position: relative; display: block; }
-.food-unit span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--imp-muted); font-size: 19px; pointer-events: none; }
+.food-unit span { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--imp-muted); font-size: 15px; pointer-events: none; }
 .food-unit .imp-input { padding-right: 46px; }
 
 /* Keypad page */
 .food-amt { display: grid; justify-items: center; gap: 4px; padding: 6px 0; }
-.food-amt__n { font: 400 60px/.9 var(--imp-font-body); }
+.food-amt__n { font: 800 44px/1 var(--imp-font-body); letter-spacing: -.02em; }
 .food-res { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: center; }
-.food-res div { display: grid; gap: 4px; padding: 8px; background: var(--imp-sunken); box-shadow: 0 0 0 2px var(--imp-divider); }
-.food-res b { font: 400 26px var(--imp-font-body); }
+.food-res div { display: grid; gap: 4px; padding: 8px; background: var(--imp-sunken); border: 1px solid var(--imp-divider); border-radius: 12px; }
+.food-res b { font: 400 20px var(--imp-font-body); }
 .food-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.food-pad button { height: 52px; text-align: center !important; font: 400 28px var(--imp-font-body); background: var(--imp-surface-2); box-shadow: 0 3px 0 #000; }
-.food-pad button:active { transform: translateY(3px); box-shadow: none; background: var(--imp-accent); color: var(--imp-on-accent); }
+.food-pad button { height: 52px; text-align: center !important; font: 500 22px var(--imp-font-body); background: var(--imp-sunken); border-radius: 12px; }
+.food-pad button:active { background: var(--imp-accent); color: var(--imp-on-accent); }
 
 /* Today tab: auto-check tag */
-.today-auto { display: inline-flex; align-items: center; gap: 3px; color: var(--imp-protein); }
+.today-auto { display: inline-flex; align-items: center; gap: 4px; color: var(--imp-muted); }
 
 /* Water */
 .food-w { color: var(--imp-water); }
-.imp-xpbar--water .imp-xpbar__fill { background: repeating-linear-gradient(90deg, var(--imp-water) 0 8px, transparent 8px 11px); }
+.imp-xpbar--water .imp-xpbar__fill { background: var(--imp-water); }
 .food-water { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .food-water .imp-btn { flex: 1 1 0; min-width: 0; padding-left: 2px; padding-right: 2px; white-space: nowrap; }

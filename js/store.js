@@ -1,9 +1,11 @@
 // localStorage wrapper. Every key is forced to start with "imp_" so this app
 // never reads or writes data from the other apps on kasene08.github.io.
+// The dev preview uses "imp_dev_" instead (see devmode.js).
+import { toStore, seedDev } from './devmode.js';
 
-const PREFIX = 'imp_';
+seedDev(); // dev preview only: copy the real data in on first open
 
-const full = (key) => (key.startsWith(PREFIX) ? key : PREFIX + key);
+const full = (key) => toStore(key);
 
 export function get(key, fallback = null) {
   try {
