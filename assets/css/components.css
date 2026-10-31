@@ -94,8 +94,9 @@
 
 /* ---- Progress pips (multi-count habits) ------------------------------------ */
 .imp-pips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-.imp-pip { width: 18px; height: 4px; border-radius: 99px; background: var(--imp-sunken); }
-.imp-pip.is-on { background: var(--imp-accent); }
+.imp-pip { width: 8px; height: 8px; border-radius: 50%; background: var(--imp-sunken); box-shadow: inset 0 0 0 1.5px var(--imp-frame); }
+.imp-pip.is-on { background: var(--imp-accent); box-shadow: none; }
+.imp-pip.is-over { background: var(--imp-danger); box-shadow: none; }
 
 /* ---- List row (checklist item) --------------------------------------------- */
 .imp-row {

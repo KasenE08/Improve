@@ -214,3 +214,17 @@
 .phead__more { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--imp-text); background: var(--imp-sunken); }
 .phead__more .imp-icon { width: 20px; height: 20px; }
 .next.is-event .next__bar { background: var(--imp-faint); }
+
+/* Habits page: one list at a time (Daily / Weekly / Monthly), hold a habit to edit it */
+.hab { gap: 12px; }
+.hab-seg button { display: inline-flex; align-items: baseline; justify-content: center; gap: 6px; padding: 9px 4px; font-size: 14px; }
+.hab-seg small { font: 600 11px var(--imp-font-head); color: var(--imp-faint); font-variant-numeric: tabular-nums; }
+.hab-seg button.is-on small { color: var(--imp-accent); }
+.hab-info { margin: -4px 4px 0; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+.hab-list .imp-panel__body { padding-top: 0; }
+.hab-empty { text-align: center; color: var(--imp-muted); padding: 30px 0; }
+.hab-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 2px 4px 8px; font: 500 12.5px var(--imp-font-head); color: var(--imp-faint); }
+.hab-cats { font: 600 13px var(--imp-font-head); color: var(--imp-accent); }
+.hab-undo { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--imp-sunken); font: 600 14px var(--imp-font-head); }
+.imp-limit-box.is-over { border-color: var(--imp-danger); }
+.imp-row.is-limit .imp-row__sub { flex-wrap: wrap; }

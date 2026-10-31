@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 12;
+export const SCHEMA = 13;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -159,6 +159,10 @@ export function init() {
     const ex = store.get('excused', {});
     const today = dayKey(appNow());
     if (ex[today]?.['work-on-schedule']) { delete ex[today]['work-on-schedule']; if (!Object.keys(ex[today]).length) delete ex[today]; store.set('excused', ex); }
+  }
+  // Schema 13: old names brought up to date ("3L water (100oz)" → "100 oz water", the goal is in oz now)
+  if (found > 0 && found < 13) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'water' && /3\s*L/i.test(h.name) ? { ...h, name: '100 oz water' } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
