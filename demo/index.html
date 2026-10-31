@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Improve · One-screen demo</title>
+<meta name="theme-color" content="#f4f5f7">
+<link rel="stylesheet" href="../assets/css/tokens.css">
+<link rel="stylesheet" href="../assets/css/components.css">
+<link rel="stylesheet" href="../css/app.css">
+<script>
+  (function () { var m = new Date().getHours() * 60 + new Date().getMinutes(); document.documentElement.dataset.theme = m >= 1140 || m < 240 ? 'dark' : 'light'; })();
+</script>
+<style>
+  /* ---- Demo layout: one screen, cards open full pages ---- */
+  .app { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
+  .view { display: none; }
+  .view.is-on { display: grid; gap: 14px; animation: v-in .32s var(--imp-ease); }
+  .view.is-back { animation: v-back .32s var(--imp-ease); }
+  @keyframes v-in { from { transform: translateX(28px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes v-back { from { transform: translateX(-28px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .demo-note { font: 600 11px var(--imp-font-head); letter-spacing: .06em; text-transform: uppercase; text-align: center; color: var(--imp-faint); padding-top: calc(env(safe-area-inset-top) + 6px); }
+  .hud { padding-top: 10px; }
+  .hud__me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font: 700 15px var(--imp-font-head); color: #fff; background: linear-gradient(135deg, var(--imp-accent), #f97316); }
+
+  /* Cards on Home */
+  .card { position: relative; display: grid; gap: 10px; padding: 16px; border-radius: 18px; background: var(--imp-surface); border: 1px solid var(--imp-frame); box-shadow: var(--imp-shadow); text-align: left; width: 100%; }
+  .card__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .card__title { display: inline-flex; align-items: center; gap: 8px; font: 700 15px var(--imp-font-head); }
+  .card__title .imp-icon { width: 18px; height: 18px; color: var(--imp-accent); }
+  .card__more { display: inline-flex; align-items: center; gap: 2px; font: 600 13px var(--imp-font-head); color: var(--imp-muted); }
+  .card__more .imp-icon { width: 15px; height: 15px; }
+  .card__big { font: 800 30px/1 var(--imp-font-head); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .card__big small { font: 500 14px var(--imp-font-head); color: var(--imp-muted); letter-spacing: 0; margin-left: 4px; }
+  .card__sub { font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .mini { display: grid; gap: 5px; }
+  .mini__top { display: flex; justify-content: space-between; font: 500 12px var(--imp-font-head); color: var(--imp-muted); }
+  .mini__top b { color: var(--imp-text); font-weight: 600; }
+  .pill-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill { padding: 7px 12px; border-radius: 99px; background: var(--imp-sunken); font: 600 13px var(--imp-font-head); }
+  .pill:active { background: var(--imp-accent); color: #fff; }
+  .pill.is-water { color: var(--imp-water); }
+
+  /* Habit quick list */
+  .hq { display: grid; }
+  .hq__row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--imp-divider); font-size: 15px; width: 100%; text-align: left; }
+  .hq__row:last-child { border-bottom: 0; }
+  .hq__row.is-done span:last-child { color: var(--imp-faint); text-decoration: line-through; }
+  .ring { --p: 45; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--imp-accent) calc(var(--p) * 1%), var(--imp-sunken) 0); }
+  .ring span { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--imp-surface); font: 700 12px var(--imp-font-head); font-variant-numeric: tabular-nums; }
+
+  /* Up next */
+  .next { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; }
+  .next__bar { align-self: stretch; border-radius: 99px; background: var(--imp-cat-online); }
+  .next__title { font: 600 16px var(--imp-font-head); }
+  .next__time { font: 600 13px var(--imp-font-head); color: var(--imp-muted); text-align: right; }
+  .next__time b { display: block; color: var(--imp-text); font-size: 15px; }
+  .later { display: flex; gap: 8px; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+  .later span { padding: 6px 10px; border-radius: 10px; background: var(--imp-sunken); }
+
+  /* Journal card */
+  .jcard { padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--imp-frame); color: var(--imp-faint); font-size: 15px; }
+
+  /* Floating + (quick add from anywhere) */
+  .fab { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); z-index: 45; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--imp-accent); color: #fff; box-shadow: 0 10px 26px color-mix(in srgb, var(--imp-accent) 45%, transparent); transition: transform .2s var(--imp-ease); }
+  .fab .imp-icon { width: 26px; height: 26px; stroke-width: 2.5; }
+  .fab:active { transform: scale(.92); }
+  .qa { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .qa button { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 14px; background: var(--imp-sunken); font: 600 13px var(--imp-font-head); }
+  .qa .imp-icon { width: 24px; height: 24px; color: var(--imp-accent); }
+
+  /* Page header (inside a card's page) */
+  .phead { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px; margin: 0 calc(-1 * var(--imp-gutter)); padding: calc(env(safe-area-inset-top) + 12px) var(--imp-gutter) 10px;
+    background: color-mix(in srgb, var(--imp-bg) 88%, transparent); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+  .back { display: inline-flex; align-items: center; gap: 2px; font: 600 16px var(--imp-font-head); color: var(--imp-accent); padding: 6px 4px 6px 0; }
+  .back .imp-icon { width: 22px; height: 22px; }
+  .phead h1 { flex: 1; text-align: center; font: 700 17px var(--imp-font-head); margin-right: 64px; }
+  .ptitle { font: 800 30px var(--imp-font-head); letter-spacing: -.02em; margin-top: 4px; }
+
+  /* Page bits */
+  .seg-wrap { margin: 2px 0; }
+  .big-center { text-align: center; display: grid; gap: 2px; padding: 8px 0; }
+  .big-center b { font: 800 46px/1 var(--imp-font-head); letter-spacing: -.03em; color: var(--imp-accent); font-variant-numeric: tabular-nums; }
+  .big-center span { font: 500 14px var(--imp-font-head); color: var(--imp-muted); }
+  .list-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--imp-divider); font-size: 15px; }
+  .list-row:last-child { border-bottom: 0; }
+  .list-row .imp-icon { width: 20px; height: 20px; color: var(--imp-muted); }
+  .list-row b { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .list-row small { display: block; font-size: 12px; color: var(--imp-muted); }
+  .tl { display: grid; gap: 10px; }
+  .tl__item { display: grid; grid-template-columns: 62px 1fr; gap: 10px; align-items: start; }
+  .tl__t { font: 600 13px var(--imp-font-head); color: var(--imp-muted); padding-top: 12px; font-variant-numeric: tabular-nums; }
+  .tl__card { padding: 12px 14px; border-radius: 14px; background: var(--imp-surface); border: 1px solid var(--imp-frame); box-shadow: inset 4px 0 0 var(--c, var(--imp-frame)); }
+  .tl__card b { display: block; font-size: 15px; }
+  .tl__card span { font-size: 13px; color: var(--imp-muted); }
+  .tl__card.is-block { background: var(--imp-surface-2); }
+  textarea.jr { width: 100%; min-height: 180px; padding: 14px; border-radius: 14px; border: 1px solid var(--imp-frame); background: var(--imp-surface); color: var(--imp-text); font: 400 16px/1.5 var(--imp-font-body); resize: none; }
+  textarea.jr:focus { outline: none; border-color: var(--imp-accent); box-shadow: 0 0 0 3px var(--imp-accent-dim); }
+  .you { display: flex; align-items: center; gap: 14px; }
+  .you .hud__me { width: 56px; height: 56px; font-size: 22px; }
+</style>
+</head>
+<body class="imp-root">
+<div class="app">
+
+<!-- ================= HOME (the one screen) ================= -->
+<section class="view is-on" id="v-home">
+  <p class="demo-note">Demo · sample numbers · tap anything</p>
+  <header class="hud" style="padding-bottom:4px">
+    <div class="hud__top">
+      <button class="hud__date" data-go="calendar"><span class="hud__dow">Friday</span><span class="hud__day">Oct 30<svg class="imp-icon hud__chev"><use href="../assets/icons/icons.svg#next"/></svg></span></button>
+      <div class="hud__right">
+        <button class="hud__theme" data-act="theme" aria-label="Light or dark"><svg class="imp-icon"><use href="../assets/icons/icons.svg#moon"/></svg></button>
+        <button class="hud__me" data-go="you" aria-label="You">K</button>
+      </div>
+    </div>
+    <div class="hud__week" id="week"></div>
+    <div class="hud__wbar"><div class="hud__wtop"><span>This week</span><span><b>2</b> of 8 weekly habits</span></div><div class="imp-xpbar imp-xpbar--sm" style="--p:25%"><div class="imp-xpbar__fill"></div></div></div>
+  </header>
+
+  <!-- Habits -->
+  <div class="card" data-go="habits">
+    <div class="card__head"><span class="card__title"><svg class="imp-icon"><use href="../assets/icons/icons.svg#today"/></svg>Habits</span><span class="card__more">All 33<svg class="imp-icon"><use href="../assets/icons/icons.svg#next"/></svg></span></div>
+    <div style="display:flex;align-items:center;gap:14px"><div class="ring" id="hring" style="--p:45"><span id="hcount">9/20</span></div>
+      <div><div class="card__big" style="font-size:22px">11 left today</div><div class="card__sub">Up next, tap to tick:</div></div></div>
+    <div class="hq" id="hq"></div>
+  </div>
+
+  <!-- Up next (Planner) -->
+  <div class="card" data-go="plan">
+    <div class="card__head"><span class="card__title"><svg class="imp-icon"><use href="../assets/icons/icons.svg#planner"/></svg>Up next</span><span class="card__more">Plan<svg class="imp-icon"><use href="../assets/icons/icons.svg#next"/></svg></span></div>
+    <div class="next"><span class="next__bar"></span><div><div class="next__title">Interpret a Poem Discussion</div><div class="card__sub">AP Lit · due tonight 11:59 PM</div></div><div class="next__time"><b>4:00</b>45 min</div></div>
+    <div class="later"><span>5:15 · Media Project</span><span>2 more this week</span></div>
+  </div>
+
+  <!-- Food + Water -->
+  <div class="tiles">
+    <div class="card" data-go="food">
+      <div class="card__head"><span class="card__title"><svg class="imp-icon"><use href="../assets/icons/icons.svg#food"/></svg>Food</span><svg class="imp-icon" style="width:15px;height:15px;color:var(--imp-muted)"><use href="../assets/icons/icons.svg#next"/></svg></div>
+      <div class="card__big">960<small>cal left</small></div>
+      <div class="mini"><div class="mini__top"><span>Protein</span><b>96/150 g</b></div><div class="imp-xpbar imp-xpbar--sm imp-xpbar--protein" style="--p:64%"><div class="imp-xpbar__fill"></div></div></div>
+    </div>
+    <div class="card" data-go="food">
+      <div class="card__head"><span class="card__title"><svg class="imp-icon" style="color:var(--imp-water)"><use href="../assets/icons/icons.svg#skin"/></svg>Water</span></div>
+      <div class="card__big" id="wbig">48<small>/ 100 oz</small></div>
+      <div class="pill-row"><button class="pill is-water" data-water="8">+8</button><button class="pill is-water" data-water="16">+16</button></div>
+    </div>
+  </div>
+
+  <!-- Money -->
+  <div class="card" data-go="money">
+    <div class="card__head"><span class="card__title"><svg class="imp-icon"><use href="../assets/icons/icons.svg#wallet"/></svg>Money</span><span class="card__more">October<svg class="imp-icon"><use href="../assets/icons/icons.svg#next"/></svg></span></div>
+    <div style="display:flex;align-items:end;justify-content:space-between"><div class="card__big">$33.15<small>of $100 spent</small></div><button class="pill" data-sheet="expense">+ Expense</button></div>
+    <div class="imp-xpbar imp-xpbar--sm" style="--p:33%"><div class="imp-xpbar__fill"></div></div>
+    <div class="later"><span>Checking $0.45</span><span>Savings $1,081.46</span></div>
+  </div>
+
+  <!-- Journal -->
+  <div class="card" data-go="journal">
+    <div class="card__head"><span class="card__title"><svg class="imp-icon"><use href="../assets/icons/icons.svg#quill"/></svg>Journal</span><span class="card__more">0 / 25 words<svg class="imp-icon"><use href="../assets/icons/icons.svg#next"/></svg></span></div>
+    <div class="jcard">How did today go?</div>
+  </div>
+</section>
+
+<!-- ================= PAGES (opened from Home) ================= -->
+<section class="view" id="v-habits">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Habits</h1></div>
+  <div class="imp-seg seg-wrap" id="hseg"><button class="is-on" data-f="d">Daily</button><button data-f="w">This week</button><button data-f="m">This month</button></div>
+  <section class="imp-panel"><div class="imp-panel__body" id="hfull"></div></section>
+  <button class="imp-btn imp-btn--secondary imp-btn--block"><svg class="imp-icon"><use href="../assets/icons/icons.svg#edit"/></svg>Edit habits</button>
+</section>
+
+<section class="view" id="v-plan">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Plan</h1></div>
+  <div class="imp-seg"><button class="is-on">Today</button><button>Assignments</button><button>Month</button></div>
+  <div class="tl">
+    <div class="tl__item"><span class="tl__t">10:48</span><div class="tl__card is-block"><b>School</b><span>10:48 AM – 3:05 PM · FHS</span></div></div>
+    <div class="tl__item"><span class="tl__t">3:20</span><div class="tl__card is-block"><b>Home from school</b><span>~15 min</span></div></div>
+    <div class="tl__item"><span class="tl__t">4:00</span><div class="tl__card" style="--c:var(--imp-cat-online)"><b>Interpret a Poem Discussion</b><span>45 min · due tonight 11:59 PM</span></div></div>
+    <div class="tl__item"><span class="tl__t">5:15</span><div class="tl__card" style="--c:var(--imp-cat-paper)"><b>Media Project</b><span>1 h 30 min · due Wed</span></div></div>
+  </div>
+  <div class="imp-btn-row"><button class="imp-btn imp-btn--secondary" style="flex:1">Falling behind</button><button class="imp-btn imp-btn--primary" style="flex:1"><svg class="imp-icon"><use href="../assets/icons/icons.svg#plus"/></svg>Assignment</button></div>
+  <p class="card__sub" style="text-align:center">Planner Settings and Stats move into a menu here.</p>
+</section>
+
+<section class="view" id="v-food">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Food &amp; water</h1></div>
+  <section class="imp-panel"><div class="imp-panel__body">
+    <div class="big-center"><b>960</b><span>calories left of 2,200</span></div>
+    <div class="mini"><div class="mini__top"><span>Protein</span><b>96 / 150 g</b></div><div class="imp-xpbar imp-xpbar--protein" style="--p:64%"><div class="imp-xpbar__fill"></div></div></div>
+    <div class="mini" style="margin-top:12px"><div class="mini__top"><span>Water</span><b id="wpage">48 / 100 oz</b></div><div class="imp-xpbar imp-xpbar--water" id="wbar" style="--p:48%"><div class="imp-xpbar__fill"></div></div></div>
+    <div class="pill-row" style="margin-top:10px"><button class="pill is-water" data-water="8">+8</button><button class="pill is-water" data-water="16">+16</button><button class="pill is-water" data-water="32">+32</button></div>
+  </div></section>
+  <div class="imp-seg"><button>Breakfast</button><button class="is-on">Lunch</button><button>Dinner</button><button>Late</button></div>
+  <section class="imp-panel"><div class="imp-panel__body">
+    <div class="list-row">Diced Chicken Breast<b>263 cal</b></div>
+    <div class="list-row">Rice Bowl<b>230 cal</b></div>
+    <div class="list-row">Greek Yogurt<b>150 cal</b></div>
+  </div></section>
+  <button class="imp-btn imp-btn--primary imp-btn--block"><svg class="imp-icon"><use href="../assets/icons/icons.svg#plus"/></svg>Log food</button>
+  <p class="card__sub" style="text-align:center">Foods, saved meals and goals move into a menu here.</p>
+</section>
+
+<section class="view" id="v-money">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Money</h1></div>
+  <section class="imp-panel"><div class="imp-panel__body">
+    <div class="big-center"><b>$33.15</b><span>spent of $100 in October</span></div>
+    <div class="imp-xpbar" style="--p:33%"><div class="imp-xpbar__fill"></div></div>
+  </div></section>
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Accounts</h2></header><div class="imp-panel__body">
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#bank"/></svg>Checking<b>$0.45</b></div>
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#piggy"/></svg>Savings<b>$1,081.46</b></div>
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#cash"/></svg>Investing<b>$0</b></div>
+  </div></section>
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Recent</h2></header><div class="imp-panel__body">
+    <div class="list-row"><span>McDonald's<small>Spending · Oct 27</small></span><b>−$14.85</b></div>
+    <div class="list-row"><span>Paycheck<small>Split 75% savings · 10% investing · Oct 26</small></span><b style="color:var(--imp-good)">+$121.98</b></div>
+  </div></section>
+  <div class="imp-btn-row"><button class="imp-btn imp-btn--primary" style="flex:1" data-sheet="expense">+ Expense</button><button class="imp-btn imp-btn--secondary" style="flex:1">Paycheck</button></div>
+</section>
+
+<section class="view" id="v-journal">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Journal</h1></div>
+  <textarea class="jr" placeholder="How did today go?"></textarea>
+  <div class="mini"><div class="mini__top"><span>Today</span><b>0 / 25 words</b></div><div class="imp-xpbar imp-xpbar--sm" style="--p:0%"><div class="imp-xpbar__fill"></div></div></div>
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Tuesday, Oct 27</h2><span class="imp-panel__meta">213 words</span></header><div class="imp-panel__body"><p style="font-size:15px;line-height:1.55;padding-bottom:6px">i woke up a bit earlier than usual which was great i could really live in the moment and try to not live so automatically…</p></div></section>
+</section>
+
+<section class="view" id="v-you">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>You</h1></div>
+  <div class="you"><span class="hud__me">K</span><div><div class="ptitle" style="font-size:24px">Kasen</div><div class="card__sub">Started Oct 26</div></div></div>
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Streaks</h2></header><div class="imp-panel__body">
+    <div class="list-row">Save set % of paycheck<b style="color:var(--imp-warn)">1 week</b></div>
+    <div class="list-row">Finished today's work<b style="color:var(--imp-warn)">1 day</b></div>
+  </div></section>
+  <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Settings</h2></header><div class="imp-panel__body">
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#moon"/></svg>Dark mode<b class="card__sub">7 PM – 4 AM</b></div>
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#scroll"/></svg>Backup<b class="card__sub">Export / import</b></div>
+    <div class="list-row"><svg class="imp-icon"><use href="../assets/icons/icons.svg#cog"/></svg>Habit categories<b class="card__sub">7</b></div>
+  </div></section>
+</section>
+
+<section class="view" id="v-calendar">
+  <div class="phead"><button class="back" data-back><svg class="imp-icon"><use href="../assets/icons/icons.svg#prev"/></svg>Home</button><h1>Calendar</h1></div>
+  <p class="card__sub" style="text-align:center;padding:30px 0">The month calendar and day details (already on the dev link) open from here.</p>
+</section>
+
+</div>
+
+<button class="fab" data-sheet="add" aria-label="Quick add"><svg class="imp-icon"><use href="../assets/icons/icons.svg#plus"/></svg></button>
+
+<script>
+  const I = (n) => `<svg class="imp-icon"><use href="../assets/icons/icons.svg#${n}"/></svg>`;
+  const check = (on) => `<span class="imp-check${on ? ' is-on' : ''}">${I('check')}</span>`;
+
+  // Week circles (sample)
+  const week = [['M', 26, 40], ['T', 27, 85], ['W', 28, 60], ['T', 29, 100, 'perfect'], ['F', 30, 45, 'today'], ['S', 31], ['S', 1]];
+  document.getElementById('week').innerHTML = week.map(([d, n, p, k]) => `<button class="hday${k === 'today' ? ' is-today' : ''}${k === 'perfect' ? ' is-perfect' : ''}${p == null ? ' is-blank' : ''}" style="--p:${p || 0}" data-go="calendar"><span class="hday__dow">${d}</span><span class="hday__ring"><span class="hday__num">${n}</span></span></button>`).join('');
+
+  // Habits (your real list, sample ticks)
+  const H = {
+    d: [['Body', ['7–9 hrs sleep', 1], ['8–10k steps', 0], ['Morning Stretching', 1]], ['Diet', ['Hit calories', 0, 'Auto'], ['Hit protein', 0, 'Auto'], ['3L water (100oz)', 0, 'Auto']],
+      ['Skin & Hygiene', ['Skincare (AM + PM)', 0, '1/2'], ['Full oral care', 0, '1/2'], ['Shower, deodorant', 1], ['Hands off face', 0]],
+      ['Mind', ['No Night TV', 0], ["Finished today's work", 0, 'Auto · 3 PM+'], ['No phone first 30 min of morning', 1], ['Journal', 0, 'Auto'], ['Kept my word', 1], ['Be proactive', 0], ['Make Bed + Pick Up Room', 1]],
+      ['Money', ['Log spending', 1]], ['Style', ['Dressed intentionally', 1]], ['People', ["Don't Let Social Anxiety Stop You", 0]]],
+    w: [['Body', ['Lift', 0, '2/5'], ['Progress photo + weigh-in', 1]], ['Diet', ['Fast Food', 1, '1/3 max']], ['Skin & Hygiene', ['Nails & brows', 0]], ['Money', ['Save set % of paycheck', 0, 'Auto']], ['Style', ['Clean shoes', 0]], ['People', ['Time with friends', 0], ['Family time', 0]]],
+    m: [['Body', ['Body check-in', 0]], ['Skin & Hygiene', ['Haircut', 0], ['Restock products', 0]], ['Money', ['Budget review', 0, 'Auto']], ['People', ['Try something new', 0]]],
+  };
+  const drawFull = (f) => {
+    document.getElementById('hfull').innerHTML = H[f].map(([cat, ...rows]) => `<div class="imp-panel__sub">${cat}</div>` + rows.map(([n, on, sub]) => `<button class="imp-row${on ? ' is-done' : ''}" data-tick>${check(on)}<span class="imp-row__main"><span class="imp-row__title">${n}</span>${sub ? `<span class="imp-row__sub">${sub}</span>` : ''}</span></button>`).join('')).join('');
+  };
+  drawFull('d');
+  document.getElementById('hseg').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; document.querySelectorAll('#hseg button').forEach((x) => x.classList.toggle('is-on', x === b)); drawFull(b.dataset.f); };
+
+  let done = 9;
+  const quick = ['8–10k steps', 'Hands off face', 'No Night TV', 'Be proactive'];
+  document.getElementById('hq').innerHTML = quick.map((n) => `<button class="hq__row" data-quick>${check(false)}<span>${n}</span></button>`).join('');
+
+  // Navigation: one screen, pages slide in; the phone's back swipe works too
+  const show = (id, back) => {
+    document.querySelectorAll('.view').forEach((v) => v.classList.remove('is-on', 'is-back'));
+    const v = document.getElementById('v-' + id) || document.getElementById('v-home');
+    v.classList.add('is-on'); if (back) v.classList.add('is-back');
+    document.querySelector('.fab').style.display = id === 'journal' ? 'none' : '';
+    window.scrollTo(0, 0);
+  };
+  window.addEventListener('hashchange', () => show(location.hash.slice(1) || 'home', !location.hash));
+  show(location.hash.slice(1) || 'home');
+
+  let water = 48;
+  const sheetEl = document.createElement('div');
+  document.body.appendChild(sheetEl);
+  const openSheet = (title, body) => {
+    sheetEl.className = 'imp-sheet is-open';
+    sheetEl.innerHTML = `<div class="imp-sheet__backdrop" data-close></div><div class="imp-sheet__panel imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">${title}</h2><button class="imp-btn imp-btn--sm imp-btn--ghost" data-close>Close</button></header><div class="imp-sheet__body">${body}</div></div>`;
+  };
+
+  document.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t.closest('[data-close]')) { sheetEl.className = 'imp-sheet'; return; }
+    const q = t.closest('[data-quick]');
+    if (q) { e.stopPropagation(); const c = q.querySelector('.imp-check'); const on = !c.classList.contains('is-on'); c.classList.toggle('is-on', on); q.classList.toggle('is-done', on); done += on ? 1 : -1;
+      document.getElementById('hcount').textContent = `${done}/20`; document.getElementById('hring').style.setProperty('--p', Math.round(done / 20 * 100)); return; }
+    const tick = t.closest('[data-tick]');
+    if (tick) { const c = tick.querySelector('.imp-check'); c.classList.toggle('is-on'); tick.classList.toggle('is-done'); return; }
+    const w = t.closest('[data-water]');
+    if (w) { e.stopPropagation(); water += +w.dataset.water; document.getElementById('wbig').innerHTML = `${water}<small>/ 100 oz</small>`; document.getElementById('wpage').textContent = `${water} / 100 oz`; document.getElementById('wbar').style.setProperty('--p', Math.min(100, water) + '%'); return; }
+    const s = t.closest('[data-sheet]');
+    if (s) { e.stopPropagation();
+      if (s.dataset.sheet === 'add') openSheet('Quick add', `<div class="qa"><button>${I('food')}Log food</button><button>${I('skin')}Water</button><button>${I('wallet')}Expense</button><button>${I('planner')}Assignment</button><button>${I('quill')}Journal</button><button>${I('check')}Tick habit</button></div><p class="card__sub" style="text-align:center">The + is on every screen, so logging is always one tap away.</p>`);
+      else openSheet('New expense', `<label class="imp-field"><span class="imp-label">Amount</span><input class="imp-input" inputmode="decimal" placeholder="$0.00"></label><label class="imp-field"><span class="imp-label">Note</span><input class="imp-input" placeholder="What was it?"></label><button class="imp-btn imp-btn--primary imp-btn--block" data-close>Save</button>`);
+      return; }
+    if (t.closest('[data-back]')) { history.length > 1 ? history.back() : (location.hash = ''); return; }
+    if (t.closest('[data-act="theme"]')) { const r = document.documentElement; r.dataset.theme = r.dataset.theme === 'dark' ? 'light' : 'dark'; t.closest('button').innerHTML = I(r.dataset.theme === 'dark' ? 'sun' : 'moon'); return; }
+    const g = t.closest('[data-go]');
+    if (g) location.hash = g.dataset.go;
+  });
+  document.querySelector('[data-act="theme"]').innerHTML = I(document.documentElement.dataset.theme === 'dark' ? 'sun' : 'moon');
+</script>
+</body>
+</html>
