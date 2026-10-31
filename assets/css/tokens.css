@@ -65,7 +65,7 @@
   --imp-gap: 16px;
   --imp-pad: 16px;
   --imp-gutter: 16px;  /* page side padding */
-  --imp-tabbar-h: 64px;
+  --imp-tabbar-h: 0px;  /* no tab bar: one screen */
 
   /* Motion */
   --imp-ease: cubic-bezier(.2, .8, .2, 1);

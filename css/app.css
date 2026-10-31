@@ -1,5 +1,5 @@
 /* App-specific layout. Generic pieces live in assets/css/components.css. */
-.app { max-width: 480px; margin: 0 auto; padding: 0 var(--imp-gutter) calc(var(--imp-tabbar-h) + 32px + env(safe-area-inset-bottom)); }
+.app { max-width: 480px; margin: 0 auto; padding: 0 var(--imp-gutter) calc(40px + env(safe-area-inset-bottom)); }
 .screen { display: grid; gap: var(--imp-gap); }
 
 /* Header ("Week View"): date, week circles, weekly bar, light/dark switch */
@@ -15,6 +15,58 @@
 .hud__theme:active { transform: rotate(40deg) scale(.92); }
 .hud__theme .imp-icon { width: 18px; height: 18px; }
 .hud__dev { font: 800 10px var(--imp-font-head); letter-spacing: .08em; padding: 4px 7px; border-radius: 6px; background: var(--imp-warn); color: #111; }
+
+/* Avatar: opens the You page */
+.hud__me { flex: none; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font: 700 15px var(--imp-font-head); color: #fff; background: linear-gradient(135deg, var(--imp-accent), #f97316); }
+
+/* Page header (a page opened from Home) */
+.phead { position: sticky; top: 0; z-index: 30; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 0 calc(-1 * var(--imp-gutter)) 6px;
+  padding: calc(env(safe-area-inset-top) + 10px) var(--imp-gutter) 10px; background: color-mix(in srgb, var(--imp-bg) 86%, transparent);
+  backdrop-filter: saturate(1.5) blur(16px); -webkit-backdrop-filter: saturate(1.5) blur(16px); border-bottom: 1px solid color-mix(in srgb, var(--imp-frame) 60%, transparent); }
+.phead__back { justify-self: start; display: inline-flex; align-items: center; gap: 1px; font: 600 16px var(--imp-font-head); color: var(--imp-accent); padding: 6px 6px 6px 0; }
+.phead__back .imp-icon { width: 22px; height: 22px; }
+.phead__title { font: 700 17px var(--imp-font-head); }
+
+/* Home cards */
+.home { gap: 14px; }
+.hcard { display: grid; gap: 10px; padding: 16px; border-radius: 18px; background: var(--imp-surface); border: 1px solid var(--imp-frame); box-shadow: var(--imp-shadow); cursor: pointer; min-width: 0; }
+.hcard:active { transform: scale(.99); }
+.hcard__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hcard__title { display: inline-flex; align-items: center; gap: 8px; font: 700 15px var(--imp-font-head); }
+.hcard__title .imp-icon { width: 18px; height: 18px; color: var(--imp-accent); }
+.hcard--water .hcard__title .imp-icon { color: var(--imp-water); }
+.hcard__more { display: inline-flex; align-items: center; gap: 2px; font: 600 13px var(--imp-font-head); color: var(--imp-muted); white-space: nowrap; }
+.hcard__more .imp-icon { width: 15px; height: 15px; }
+.hcard__big { font: 800 28px/1.05 var(--imp-font-head); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.hcard__big small { font: 500 13px var(--imp-font-head); color: var(--imp-muted); letter-spacing: 0; margin-left: 5px; }
+.hcard__big.is-over { color: var(--imp-danger); }
+.hcard__big--sm { font-size: 21px; }
+.hcard__sub { font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+.hcard__row { display: flex; align-items: center; gap: 14px; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.mini { display: grid; gap: 5px; }
+.mini__top { display: flex; justify-content: space-between; gap: 6px; font: 500 12px var(--imp-font-head); color: var(--imp-muted); }
+.mini__top b { color: var(--imp-text); font-weight: 600; }
+.hring { --p: 0; flex: none; width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--imp-accent) calc(var(--p) * 1%), var(--imp-sunken) 0); }
+.hring span { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--imp-surface); font: 700 12px var(--imp-font-head); font-variant-numeric: tabular-nums; }
+.hring.is-perfect span { background: var(--imp-accent); color: #fff; }
+.hq { display: grid; }
+.hq__row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--imp-divider); font-size: 15px; text-align: left; }
+.hq__row:last-child { border-bottom: 0; }
+.hq__row small { color: var(--imp-muted); font-size: 12px; }
+.next { display: grid; grid-template-columns: 4px 1fr auto; gap: 12px; align-items: center; }
+.next__bar { align-self: stretch; border-radius: 99px; background: var(--imp-accent); }
+.next.is-late .next__bar { background: var(--imp-danger); }
+.next__title { font: 600 16px/1.3 var(--imp-font-head); }
+.next__time { font: 600 12px var(--imp-font-head); color: var(--imp-muted); text-align: right; white-space: nowrap; }
+.next__time b { display: block; color: var(--imp-text); font-size: 15px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+.chips > span { padding: 6px 10px; border-radius: 10px; background: var(--imp-sunken); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip-btn { padding: 7px 12px; border-radius: 99px; background: var(--imp-sunken); font: 600 13px var(--imp-font-head); }
+.chip-btn.is-water { color: var(--imp-water); }
+.chip-btn:active { background: var(--imp-water); color: #fff; }
+.jprompt { padding: 12px 14px; border-radius: 12px; border: 1px dashed var(--imp-frame); color: var(--imp-faint); font-size: 15px; line-height: 1.45; }
+.jprompt.is-on { border-style: solid; color: var(--imp-text); background: var(--imp-surface-2); }
 
 /* Day circles: the ring fills with daily habits done (--p %), a Perfect Day is solid */
 .hud__week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 16px; }

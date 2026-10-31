@@ -63,7 +63,7 @@ function left() {
 
 // Full-screen countdown. Reloads into the real app once it unlocks.
 export function showCountdown() {
-  document.getElementById('tabbar').hidden = true;
+  const tb = document.getElementById('tabbar'); if (tb) tb.hidden = true;
   document.getElementById('hud').hidden = true;
   const screen = document.getElementById('screen');
   const when = unlockAt().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });

@@ -13,24 +13,18 @@ import * as Journal from './screens/journal.js';
 import { recheckJournal } from './journal/autocheck.js';
 import { recheckMoney } from './money/autocheck.js';
 import * as Profile from './screens/profile.js';
+import * as Home from './screens/home.js';
 import { recheckPlanner } from './planner-auto.js';
 import { panel, empty } from './ui.js';
 import { celebrate } from './screens/today.js';
 import { isLocked, showCountdown, wipeTestData } from './launch.js';
 import { reload as reloadFood } from './food/store.js';
 
-const TABS = [
-  ['today', 'Today', 'today'],
-  ['food', 'Food', 'food'],
-  ['planner', 'Planner', 'planner'],
-  ['money', 'Money', 'wallet'],
-  ['journal', 'Journal', 'quill'],
-  ['profile', 'Profile', 'profile'],
-];
+// One screen: Home (header + cards). Each card opens a full page with "‹ Home" at the top.
+const PAGES = { home: '', today: 'Habits', food: 'Food & water', planner: 'Plan', money: 'Money', journal: 'Journal', profile: 'You' };
 
 const hud = document.getElementById('hud');
 const screen = document.getElementById('screen');
-const tabbar = document.getElementById('tabbar');
 let shownDay = dayKey();
 
 // Locked behind a countdown until launch day; on launch day, test data is wiped once.
@@ -50,7 +44,7 @@ function boot() {
 
   function currentTab() {
     const t = location.hash.replace('#', '').split('?')[0];
-    return TABS.some(([id]) => id === t) ? t : 'today';
+    return t in PAGES ? t : 'home';
   }
 
   // ---- Planner tab (built bundle, loaded on demand) ----
@@ -64,7 +58,7 @@ function boot() {
       m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
       const added = recheckPlanner();
       renderHud();
-      if (currentTab() === 'today') refresh(); // show Work's tick or day off
+      if (['home', 'today'].includes(currentTab())) refresh(); // show Work's tick or day off
       if (added.length) celebrate(Stats.compute(), Stats.compute(), added);
       return m;
     }).catch((e) => { console.warn('Planner failed to load', e); plannerLoad = null; throw e; });
@@ -82,38 +76,49 @@ function boot() {
       .catch(() => { screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'info', title: 'Couldn’t load', text: 'Check your connection and reopen the app.' }) })}</div>`; });
   }
 
-  const renderHud = () => drawHud(hud);
-
-  function renderTabs(active) {
-    tabbar.innerHTML = TABS.map(([id, label, ic]) =>
-      `<a class="imp-tab${id === active ? ' is-active' : ''}" href="#${id}"${id === active ? ' aria-current="page"' : ''}>${icon(ic)}<span>${label}</span></a>`).join('');
-  }
+  // Home shows the week header; a page shows "‹ Home" and its title
+  const renderHud = () => {
+    const tab = currentTab();
+    hud.className = tab === 'home' ? 'hud' : 'phead';
+    if (tab === 'home') drawHud(hud);
+    else hud.innerHTML = `<button class="phead__back" data-act="home">${icon('prev')}Home</button><h1 class="phead__title">${PAGES[tab]}</h1><span class="phead__end"></span>`;
+  };
+  let openedFromHome = false; // back goes back in history only when Home is behind this page
 
   function refresh() {
     shownDay = dayKey();
     const tab = currentTab();
     renderHud();
-    renderTabs(tab);
     Journal.flush(); // save anything still being typed before the screen changes
     if (tab === 'planner') { screen.dataset.tab = tab; showPlanner(); return; }
     unmountPlanner();
     screen.dataset.tab = tab;
-    if (tab === 'today') Today.render(screen, refresh);
+    if (tab === 'home') Home.render(screen, refresh);
+    else if (tab === 'today') Today.render(screen, refresh);
     else if (tab === 'food') Food.render(screen, refresh);
     else if (tab === 'money') Money.render(screen, refresh);
     else if (tab === 'journal') Journal.render(screen, refresh, renderHud);
     else if (tab === 'profile') Profile.render(screen);
   }
 
+  Home.bind(screen);
   Today.bind(screen);
   Food.bind(screen);
   Money.bind(screen);
   Journal.bind(screen);
   Profile.bind(screen, refresh);
   bindHud(hud, { rename: () => Profile.openNameSheet(refresh), refresh });
+  hud.addEventListener('click', (e) => {
+    if (!e.target.closest('[data-act="home"]')) return;
+    if (openedFromHome) history.back(); else location.replace('#');
+  });
   startTheme(() => renderHud()); // light/dark: 7 PM → 4 AM automatically
 
+  let lastTab = currentTab();
   window.addEventListener('hashchange', () => {
+    const tab = currentTab();
+    if (tab !== 'home') openedFromHome = lastTab === 'home' || (openedFromHome && lastTab === tab);
+    lastTab = tab;
     const id = takeTaskFromHash();
     refresh();
     window.scrollTo(0, 0);
@@ -131,7 +136,7 @@ function boot() {
     if (after.total === before.total && !added.length && JSON.stringify(H.getExcused()) === offBefore) return;
     renderHud();
     // Redraw lists that show ticks; leave Food/Money/Journal/Planner alone so typing isn't interrupted
-    if (['today', 'profile'].includes(currentTab())) refresh();
+    if (['home', 'today', 'profile'].includes(currentTab())) refresh();
     celebrate(before, after, added);
   };
   setInterval(checkDay, 30000);

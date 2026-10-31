@@ -70,8 +70,8 @@ export function renderHud(el) {
       </button>
       <div class="hud__right">
         ${DEV ? '<button class="hud__dev" data-act="dev">DEV</button>' : ''}
-        <button class="hud__name" data-act="rename" aria-label="Edit name">${esc(name)}</button>
         <button class="hud__theme" data-act="theme" aria-label="${theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}">${icon(theme === 'dark' ? 'sun' : 'moon')}</button>
+        <a class="hud__me" href="#profile" aria-label="You: ${esc(name)}">${esc((name.trim()[0] || '?').toUpperCase())}</a>
       </div>
     </div>
     <div class="hud__week">${days.map((k) => dayCircle(k, dayStatus(k, ctx), { today })).join('')}</div>
