@@ -23,56 +23,60 @@ export function Settings({ data }: { data: AppData }) {
     .sort((a, b) => (a.recurrence as { date: string }).date.localeCompare((b.recurrence as { date: string }).date) || byStart(a, b));
 
   const blockRow = (b: (typeof data.blocks)[number]) => (
-    <li class="list-item settings-row" style={{ '--cat': TAG_STYLE[b.tag].color }} onClick={() => ui.open({ kind: 'block', block: b })}>
-      <span class="chip-icon"><Icon name={TAG_STYLE[b.tag].icon} /></span>
-      <div class="body">
-        <div class="title">{b.title}</div>
-        <div class="meta">
+    <button class="g-row" onClick={() => ui.open({ kind: 'block', block: b })}>
+      <span class="g-icon"><Icon name={TAG_STYLE[b.tag].icon} size={17} /></span>
+      <span class="g-main">
+        <span class="g-title">{b.title}</span>
+        <span class="g-sub">
           {recurrenceText(b.recurrence)} · {fmtMin(b.startMin)}–{fmtMin(b.endMin)} · {locName(b.locationId)}
           {b.blocksScheduling === false ? ' · assignments allowed' : ''}
-        </div>
-      </div>
-      <span class="chev"><Icon name="chevronRight" size={18} /></span>
-    </li>
+        </span>
+      </span>
+      <Icon name="chevronRight" size={18} />
+    </button>
   );
 
   const [page, setPage] = useState<Page | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
   const go = (p: Page | null) => {
     setPage(p);
-    scrollTo(0, 0);
+    setPlaceId(null);
   };
-  const add = (onClick: () => void) => <button class="link" onClick={onClick}>+ Add</button>;
 
   if (page) {
-    const sub = (title: string, body: preact.ComponentChildren, action?: preact.ComponentChildren) => (
-      <div>
-        <button class="link back" onClick={() => go(null)}>
-          <Icon name="chevronLeft" size={18} /> Settings
-        </button>
-        <header class="top">
-          <h1>{title}</h1>
-          {action}
-        </header>
+    const place = placeId ? data.locations.find((l) => l.id === placeId) : undefined;
+    const sub = (title: string, body: preact.ComponentChildren) => (
+      <div class="set-page">
+        <div class="set-sub">
+          <button class="set-back" onClick={() => (place ? setPlaceId(null) : go(null))} aria-label="Back">
+            <Icon name="chevronLeft" size={20} />
+          </button>
+          <h2>{place ? place.name : title}</h2>
+        </div>
         {body}
       </div>
     );
     if (page === 'schedule')
       return sub('Schedule', <>
-        <h3 class="set-h">Repeating {add(() => ui.open({ kind: 'block' }))}</h3>
-        <ul class="list">{recurring.map(blockRow)}</ul>
-        {recurring.length === 0 && <p class="muted small">None yet.</p>}
-        <h3 class="set-h">One-time, coming up {add(() => ui.open({ kind: 'block', once: true }))}</h3>
-        <ul class="list">{events.map(blockRow)}</ul>
-        {events.length === 0 && <p class="muted small">Nothing coming up.</p>}
+        <h3 class="g-head">Repeating</h3>
+        <div class="group">
+          {recurring.map(blockRow)}
+          <button class="g-row g-add" onClick={() => ui.open({ kind: 'block' })}><Icon name="plus" size={18} /> Add repeating time</button>
+        </div>
+        <h3 class="g-head">One-time, coming up</h3>
+        <div class="group">
+          {events.map(blockRow)}
+          <button class="g-row g-add" onClick={() => ui.open({ kind: 'block', once: true })}><Icon name="plus" size={18} /> Add event</button>
+        </div>
       </>);
-    if (page === 'places') return sub('Places', <Locations data={data} />);
+    if (page === 'places') return sub('Places', <Locations data={data} editing={placeId} setEditing={setPlaceId} />);
     if (page === 'rules')
       return sub('Planning rules', <>
-        <h3 class="set-h">Pacing</h3>
+        <h3 class="g-head">Pacing</h3>
         <General settings={data.settings} />
-        <h3 class="set-h">Cutoffs</h3>
+        <h3 class="g-head">Cutoffs</h3>
         <Rules data={data} />
-        <h3 class="set-h">Learning</h3>
+        <h3 class="g-head">Learning</h3>
         <Learning data={data} />
       </>);
     if (page === 'notify') return sub('Notifications', <Notifications data={data} />);
@@ -113,39 +117,95 @@ export function Settings({ data }: { data: AppData }) {
 
 type Page = 'schedule' | 'places' | 'rules' | 'notify' | 'backup';
 
-function Locations({ data }: { data: AppData }) {
+function Locations({ data, editing, setEditing }: { data: AppData; editing: string | null; setEditing: (id: string | null) => void }) {
   const set = (locations: Location[]) => commit((d, now) => actions.setLocations(d, locations, now));
-  const patch = (id: string, p: Partial<Location>) => set(data.locations.map((l) => (l.id === id ? { ...l, ...p } : l)));
+  const places = data.locations.filter((l) => l.id !== 'home');
+  const current = places.find((l) => l.id === editing);
+  if (current) return <PlaceEditor data={data} place={current} back={() => setEditing(null)} />;
   return (
     <section>
-      <p class="muted small hint">Travel minutes from Home to each place and back.</p>
-      <div class="card">
-        <div class="loc-row muted small">
-          <span>Place</span>
-          <span>There</span>
-          <span>Back</span>
-          <span />
-        </div>
-        {data.locations.map((l) => (
-          <div class="loc-row">
-            <input value={l.name} disabled={l.id === 'home'} onChange={(e) => patch(l.id, { name: e.currentTarget.value })} />
-            <input type="number" inputMode="numeric" disabled={l.id === 'home'} value={l.fromHomeMin}
-              onChange={(e) => patch(l.id, { fromHomeMin: Number(e.currentTarget.value) || 0 })} />
-            <input type="number" inputMode="numeric" disabled={l.id === 'home'} value={l.toHomeMin}
-              onChange={(e) => patch(l.id, { toHomeMin: Number(e.currentTarget.value) || 0 })} />
-            {l.id === 'home' ? <span /> : (
-              <button class="link" aria-label={`Delete ${l.name}`} onClick={() => {
-                const used = data.blocks.some((b) => b.locationId === l.id);
-                if (confirm(used ? `${l.name} is used by fixed times; they will have no travel time. Delete?` : `Delete ${l.name}?`))
-                  set(data.locations.filter((x) => x.id !== l.id));
-              }}>✕</button>
-            )}
-          </div>
-        ))}
-        <button class="link" onClick={() => set([...data.locations, { id: uid(), name: 'New place', fromHomeMin: 15, toHomeMin: 15 }])}>
-          + Add place
+      <div class="group">
+        {places.map((l) => {
+          const links = Object.keys(l.travelFrom ?? {}).length;
+          return (
+            <button class="g-row place-row" onClick={() => setEditing(l.id)}>
+              <span class="g-icon"><Icon name="pin" size={17} /></span>
+              <span class="g-main">
+                <span class="g-title">{l.name}</span>
+                <span class="g-sub">{l.fromHomeMin} min from home · {l.toHomeMin} back{links ? ` · ${links} other ${links === 1 ? 'route' : 'routes'}` : ''}</span>
+              </span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+          );
+        })}
+        <button class="g-row g-add" onClick={() => {
+          const id = uid();
+          set([...data.locations, { id, name: 'New place', fromHomeMin: 15, toHomeMin: 15 }]);
+          setEditing(id);
+        }}>
+          <Icon name="plus" size={18} /> Add place
         </button>
-        <p class="muted small">Minutes. "There" = Home → place, "Back" = place → Home.</p>
+      </div>
+      <p class="g-foot">Tap a place to set how long it takes to get there from home or from any other place.</p>
+    </section>
+  );
+}
+
+/** One place: its name, and every travel time to get there (from home or straight from another place). */
+function PlaceEditor({ data, place, back }: { data: AppData; place: Location; back: () => void }) {
+  const set = (p: Partial<Location>) => commit((d, now) => actions.setLocations(d, d.locations.map((l) => (l.id === place.id ? { ...l, ...p } : l)), now));
+  const others = data.locations.filter((l) => l.id !== 'home' && l.id !== place.id);
+  const min = (v: string) => Math.max(0, Math.round(Number(v) || 0));
+  const num = (value: number | '', onChange: (v: string) => void) => (
+    <span class="g-num">
+      <input type="number" inputMode="numeric" min={0} placeholder="–" value={value} onChange={(e) => onChange(e.currentTarget.value)} />
+      min
+    </span>
+  );
+  return (
+    <section>
+      <div class="group">
+        <label class="g-row">
+          <span class="g-label">Name</span>
+          <input class="g-text" value={place.name} onChange={(e) => set({ name: e.currentTarget.value.trim() || place.name })} />
+        </label>
+      </div>
+
+      <h3 class="g-head">Getting here</h3>
+      <div class="group">
+        <label class="g-row">
+          <span class="g-label">From Home</span>
+          {num(place.fromHomeMin, (v) => set({ fromHomeMin: min(v) }))}
+        </label>
+        {others.map((o) => (
+          <label class="g-row">
+            <span class="g-label">From {o.name}</span>
+            {num(place.travelFrom?.[o.id] ?? '', (v) => {
+              const t = { ...place.travelFrom };
+              if (v === '') delete t[o.id];
+              else t[o.id] = min(v);
+              set({ travelFrom: t });
+            })}
+          </label>
+        ))}
+      </div>
+      <p class="g-foot">"From {others[0]?.name ?? 'another place'}" is used when an event here says it's coming straight from there. Leave it blank if you never go that way.</p>
+
+      <h3 class="g-head">Leaving</h3>
+      <div class="group">
+        <label class="g-row">
+          <span class="g-label">Back to Home</span>
+          {num(place.toHomeMin, (v) => set({ toHomeMin: min(v) }))}
+        </label>
+      </div>
+
+      <div class="group">
+        <button class="g-row g-danger" onClick={() => {
+          const used = data.blocks.some((b) => b.locationId === place.id);
+          if (!confirm(used ? `${place.name} is used by fixed times; they will have no travel time. Delete?` : `Delete ${place.name}?`)) return;
+          commit((d, now) => actions.setLocations(d, d.locations.filter((x) => x.id !== place.id), now));
+          back();
+        }}>Delete place</button>
       </div>
     </section>
   );
@@ -189,11 +249,11 @@ function Rules({ data }: { data: AppData }) {
 
   return (
     <section>
-      <p class="muted small hint">Times the app won't schedule work. Tap a rule to change it.</p>
+      <div class="group">
       {data.rules.map((r) => open !== r.id ? (
-        <button class="card rule-line" onClick={() => setOpen(r.id)}>
-          <span>{ruleText(r)}</span>
-          <span class="chev"><Icon name="chevronRight" size={18} /></span>
+        <button class="g-row rule-line" onClick={() => setOpen(r.id)}>
+          <span class="g-main"><span class="g-title">{ruleText(r)}</span></span>
+          <Icon name="chevronRight" size={18} />
         </button>
       ) : (
         <div class="card rule">
@@ -236,6 +296,8 @@ function Rules({ data }: { data: AppData }) {
           </div>
         </div>
       ))}
+      </div>
+      <p class="g-foot">Times the app won't schedule work. Tap one to change it.</p>
       <select class="add-rule" value="" onChange={(e) => {
         const k = e.currentTarget.value;
         const id = uid();
@@ -256,43 +318,42 @@ function Rules({ data }: { data: AppData }) {
 function General({ settings }: { settings: S }) {
   const set = (p: Partial<S>) => commit((d, now) => actions.setSettings(d, { ...d.settings, ...p }, now));
   const numRow = (label: string, key: Exclude<keyof S, 'spreadWork'>, unit = 'min') => (
-    <label class="set-row">
-      <span>{label}</span>
-      <span>
+    <label class="g-row">
+      <span class="g-label">{label}</span>
+      <span class="g-num">
         <input type="number" inputMode="numeric" value={settings[key]} onChange={(e) => set({ [key]: Math.max(0, Number(e.currentTarget.value) || 0) })} /> {unit}
       </span>
     </label>
   );
+  const timeRow = (label: string, value: string, onChange: (v: string) => void) => (
+    <label class="g-row">
+      <span class="g-label">{label}</span>
+      <input class="g-time" type="time" value={value} onChange={(e) => onChange(e.currentTarget.value)} />
+    </label>
+  );
   return (
     <section>
-      <div class="card">
-        <label class="toggle">
-          <input type="checkbox" checked={settings.spreadWork !== false} onChange={(e) => set({ spreadWork: e.currentTarget.checked })} />
-          Spread work across days
+      <div class="group">
+        <label class="g-row">
+          <span class="g-label">Spread work across days</span>
+          <input class="g-switch" type="checkbox" checked={settings.spreadWork !== false} onChange={(e) => set({ spreadWork: e.currentTarget.checked })} />
         </label>
-        <p class="muted small">
-          {settings.spreadWork !== false
-            ? 'Each assignment goes on the day with the least work that still finishes it on time, so days stay light and end early.'
-            : 'Off: assignments fill the earliest days first.'}
-        </p>
-        <label class="set-row">
-          <span>Earliest start</span>
-          <input type="time" value={minToInput(settings.earliestStartMin)} onChange={(e) => set({ earliestStartMin: inputToMin(e.currentTarget.value) })} />
-        </label>
-        <label class="set-row">
-          <span>No work after</span>
-          <input type="time" value={minToInput(settings.dayEndMin % 1440)} onChange={(e) => set({ dayEndMin: endOfDayMin(inputToMin(e.currentTarget.value), settings.earliestStartMin) })} />
-        </label>
-        {numRow('Break between assignments', 'breakMin')}
-        {numRow('Short assignment is at most', 'shortTaskMaxMin')}
-        {numRow('Break between 2 short ones', 'shortPairBreakMin')}
-        {numRow('Big task is over', 'bigTaskMin')}
-        {numRow('Estimate padding', 'paddingPct', '%')}
+        {timeRow('Earliest start', minToInput(settings.earliestStartMin), (v) => set({ earliestStartMin: inputToMin(v) }))}
+        {timeRow('No work after', minToInput(settings.dayEndMin % 1440), (v) => set({ dayEndMin: endOfDayMin(inputToMin(v), settings.earliestStartMin) }))}
+        {timeRow('Falling behind until', minToInput(settings.latestNightMin), (v) => set({ latestNightMin: inputToMin(v) }))}
+      </div>
+      <p class="g-foot">
+        {settings.spreadWork !== false
+          ? 'Spread: each assignment goes on the least busy day that still gets it done on time.'
+          : 'Off: assignments fill the earliest days first.'}
+      </p>
+      <div class="group">
+        {numRow('Break between', 'breakMin')}
+        {numRow('Short task is up to', 'shortTaskMaxMin')}
+        {numRow('Break between short ones', 'shortPairBreakMin')}
+        {numRow('Split tasks over', 'bigTaskMin')}
+        {numRow('Extra estimate time', 'paddingPct', '%')}
         {numRow('Plan ahead', 'horizonDays', 'days')}
-        <label class="set-row">
-          <span>Falling behind: latest</span>
-          <input type="time" value={minToInput(settings.latestNightMin)} onChange={(e) => set({ latestNightMin: inputToMin(e.currentTarget.value) })} />
-        </label>
       </div>
     </section>
   );
@@ -304,18 +365,16 @@ function Learning({ data }: { data: AppData }) {
     .filter((r) => r.samples > 0);
   return (
     <section>
-      <div class="card">
-        <p class="muted small">
-          Tap Start and Done on assignments and estimates adjust to how long you really take (after 3 of a type). Finishing early leaves free time.
-        </p>
+      <div class="group">
         {rows.map((r) => (
-          <div class="set-row">
-            <span>{TYPE_LABELS[r.t]}</span>
-            <span class="small">{r.samples < 3 ? `${r.samples} of 3 timed` : `${Math.round(r.ratio * 100)}% of the usual time`}</span>
+          <div class="g-row">
+            <span class="g-label">{TYPE_LABELS[r.t]}</span>
+            <span class="g-value">{r.samples < 3 ? `${r.samples} of 3 timed` : `${Math.round(r.ratio * 100)}% of usual`}</span>
           </div>
         ))}
-        {rows.length === 0 && <p class="muted small">Nothing timed yet.</p>}
+        {rows.length === 0 && <div class="g-row"><span class="g-label muted">Nothing timed yet</span></div>}
       </div>
+      <p class="g-foot">Tap Start and Done on assignments and estimates adjust to how long you really take (after 3 of a type).</p>
     </section>
   );
 }
@@ -352,25 +411,22 @@ function Backup({ data }: { data: AppData }) {
   };
   return (
     <section>
-      <div class="card">
-        <p class="muted small">
-          Planner data is included in Improve&apos;s backup (Profile tab), minus this phone&apos;s notification keys.
-        </p>
+      <p class="g-foot g-foot--top">Your planner is saved in Improve&apos;s own backup (on the You page), so there&apos;s nothing extra to do here.</p>
+      <h3 class="g-head">Copy from the old Schedule Planner</h3>
+      <div class="group">
+        <label class="g-row g-action">
+          <span class="g-icon"><Icon name="download" size={17} /></span>
+          <span class="g-main"><span class="g-title">Choose a backup file</span><span class="g-sub">Exported from the old app</span></span>
+          <input type="file" accept="application/json,.json" hidden onChange={(e) => importFile(e.currentTarget.files?.[0])} />
+          <Icon name="chevronRight" size={18} />
+        </label>
+        <button class="g-row g-action" onClick={copyDirect}>
+          <span class="g-icon"><Icon name="list" size={17} /></span>
+          <span class="g-main"><span class="g-title">Copy directly</span><span class="g-sub">Only if the old app runs in this same browser</span></span>
+          <Icon name="chevronRight" size={18} />
+        </button>
       </div>
-      <h3>Copy from Schedule Planner</h3>
-      <div class="card">
-        <p class="muted small">
-          One-time copy of your old planner. On iPhone: open Schedule Planner → Settings → Backup → Export backup → Save to Files, then pick that file here.
-          The old app is only read, never changed.
-        </p>
-        <div class="actions">
-          <label class="btn primary">
-            Choose backup file
-            <input type="file" accept="application/json,.json" hidden onChange={(e) => importFile(e.currentTarget.files?.[0])} />
-          </label>
-          <button class="btn" onClick={copyDirect}>Copy directly</button>
-        </div>
-      </div>
+      <p class="g-foot">One-time copy. The old app is only read, never changed.</p>
     </section>
   );
 }
@@ -394,48 +450,57 @@ function Notifications({ data }: { data: AppData }) {
   const unsupported = pushSupported();
   return (
     <section>
-      <div class="card">
-        {!p ? (
-          <>
-            <p class="muted small">
-              Get a notification when it's time to start each assignment, plus laundry steps. Needs your free notification server
-              (one-time setup).
-            </p>
-            {unsupported && <p class="warn small">{unsupported}</p>}
-            <label class="field">
-              <span class="field-label">Notification server address</span>
-              <input type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" placeholder="https://planner-push.yourname.workers.dev"
+      {!p ? (
+        <>
+          <p class="g-foot g-foot--top">A notification when it&apos;s time to start each assignment, plus laundry steps. Uses your free notification server (one-time setup).</p>
+          {unsupported && <p class="g-warn">{unsupported}</p>}
+          <div class="group">
+            <label class="g-row g-stack">
+              <span class="g-label">Server address</span>
+              <input class="g-text" type="url" inputMode="url" autoCapitalize="off" autoCorrect="off" placeholder="https://planner-push.yourname.workers.dev"
                 value={url} onInput={(e) => setUrl(e.currentTarget.value)} />
             </label>
-            <div class="actions">
-              <button class="btn primary" disabled={busy || !url} onClick={() => run(() => enablePush(url), 'Notifications are on.')}>
-                Turn on notifications
-              </button>
-              <button class="btn" onClick={() => ui.open({ kind: 'notifyGuide' })}>Setup guide</button>
+            <button class="g-row g-action" onClick={() => ui.open({ kind: 'notifyGuide' })}>
+              <span class="g-main"><span class="g-title">How to set it up</span></span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+          </div>
+          <button class="btn primary wide" disabled={busy || !url} onClick={() => run(() => enablePush(url), 'Notifications are on.')}>
+            Turn on notifications
+          </button>
+        </>
+      ) : (
+        <>
+          <div class="group">
+            <div class="g-row">
+              <span class="g-label">Status</span>
+              <span class="g-value">{p.error ? <span class="warn">{p.error}</span> : p.uploadedAt ? `On · updated ${new Date(p.uploadedAt).toLocaleDateString()}` : 'On · updating…'}</span>
             </div>
-          </>
-        ) : (
-          <>
-            <p class="small">
-              On · {p.error ? <span class="warn">{p.error}</span> : p.uploadedAt ? `updated ${new Date(p.uploadedAt).toLocaleString()}` : 'updating…'}
-            </p>
-            <label class="set-row">
-              <span>Days ahead</span>
-              <span>
+            <label class="g-row">
+              <span class="g-label">Days ahead</span>
+              <span class="g-num">
                 <input type="number" inputMode="numeric" value={data.settings.notifyDays} onChange={(e) => {
                   const v = Math.min(28, Math.max(1, Number(e.currentTarget.value) || 7));
                   commit((d) => ({ ...d, settings: { ...d.settings, notifyDays: v } }));
                 }} /> days
               </span>
             </label>
-            <div class="actions">
-              <button class="btn" disabled={busy} onClick={() => run(sendTest, 'Test sent. It should arrive in a few seconds.')}>Send test</button>
-              {p.error && <button class="btn" disabled={busy} onClick={() => run(uploadNow)}>Retry</button>}
-              <button class="btn danger" disabled={busy} onClick={() => confirm('Turn off notifications?') && run(disablePush)}>Turn off</button>
-            </div>
-          </>
-        )}
-      </div>
+            <button class="g-row g-action" disabled={busy} onClick={() => run(sendTest, 'Test sent. It should arrive in a few seconds.')}>
+              <span class="g-main"><span class="g-title">Send a test</span></span>
+              <Icon name="chevronRight" size={18} />
+            </button>
+            {p.error && (
+              <button class="g-row g-action" disabled={busy} onClick={() => run(uploadNow)}>
+                <span class="g-main"><span class="g-title">Retry</span></span>
+                <Icon name="chevronRight" size={18} />
+              </button>
+            )}
+          </div>
+          <div class="group">
+            <button class="g-row g-danger" disabled={busy} onClick={() => confirm('Turn off notifications?') && run(disablePush)}>Turn off notifications</button>
+          </div>
+        </>
+      )}
     </section>
   );
 }
