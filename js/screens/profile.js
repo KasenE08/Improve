@@ -21,42 +21,27 @@ export function render(root) {
     ? streaks.slice(0, 10).map((s) => `<div class="prof-streak"><span>${esc(s.h.name)}</span>${streakTag(s.count, s.current, R.UNIT[s.h.frequency][s.count === 1 ? 0 : 1])}</div>`).join('')
     : `<p class="imp-muted prof-note">Complete a habit in back-to-back periods to start a streak.</p>`;
 
-  // Stripped down for the redesign (XP, levels and ranks are hidden; the history keeps them). Redesigned on its turn.
+  const lastTxt = last ? (daysSince ? `${daysSince} day${daysSince === 1 ? '' : 's'} ago` : 'today') : 'never';
+  const row = (act, ic, title, sub) => `<button class="g-row" data-act="${act}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span>${sub ? `<span class="g-sub">${sub}</span>` : ''}</span>${icon('next', 'prof-go')}</button>`;
   root.innerHTML = `<div class="screen">
-    ${panel({
-      title: 'You',
-      body: `<div class="prof-player"><div class="prof-player__main">
-            <div class="prof-player__top"><span class="imp-title">${esc(p.name)}</span>
-              <button class="imp-btn imp-btn--secondary imp-btn--sm" data-act="edit-name">${icon('edit')}Rename</button></div>
-          </div></div>
-        <div class="prof-totals">
-          <div><b>${fmt(st.perfectDays)}</b><span>Perfect days</span></div>
-          <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
-          <div><b>${fmt(streaks.length)}</b><span>Streaks</span></div>
-        </div>`,
-    })}
-    ${panel({ title: 'Streaks', meta: icon('flame'), body: streakList })}
+    <section class="imp-panel"><div class="imp-panel__body">
+      <button class="prof-me" data-act="edit-name" aria-label="Rename"><span class="prof-avatar">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span>
+        <span class="prof-me__name">${esc(p.name)}</span>${icon('edit', 'prof-go')}</button>
+      <div class="prof-totals">
+        <div><b>${fmt(st.perfectDays)}</b><span>Perfect days</span></div>
+        <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
+        <div><b>${fmt(streaks.length)}</b><span>Streaks</span></div>
+      </div>
+    </div></section>
+    ${streaks.length ? panel({ title: 'Streaks', body: streakList }) : ''}
     ${plannerStats()}
-    ${panel({
-      title: 'Backup',
-      meta: icon('scroll'),
-      body: `<p class="prof-text">Last backup: <span class="${daysSince == null || daysSince > 7 ? 'prof-warn' : 'imp-accent'}">${last ? new Date(last).toLocaleDateString() + (daysSince ? ` (${daysSince}d ago)` : ' (today)') : 'never'}</span></p>
-        <p class="prof-note">Export saves a file you can keep in Files or iCloud. Import replaces everything in Improve with that file.</p>
-        <div class="imp-btn-row prof-actions">
-          <button class="imp-btn imp-btn--primary" data-act="export">Export backup</button>
-          <button class="imp-btn imp-btn--secondary" data-act="import">Import</button>
-        </div>
-        <input type="file" id="importFile" accept="application/json,.json" hidden>`,
-    })}
-    ${panel({
-      title: 'Data',
-      body: `<p class="prof-text">Everything is saved only on this phone, in this app's own storage (keys starting with <span class="imp-accent">imp_</span>). Nothing is sent anywhere.</p>`,
-    })}
-    ${panel({
-      title: 'Credits',
-      body: `<p class="prof-text">Icons by <a class="imp-accent" href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC License).
-        Font: <a class="imp-accent" href="https://rsms.me/inter/" target="_blank" rel="noopener">Inter</a> (SIL Open Font License).</p>`,
-    })}
+    <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Backup</h2><span class="imp-panel__meta ${daysSince == null || daysSince > 7 ? 'prof-warn' : ''}">Last: ${lastTxt}</span></header>
+      <div class="imp-panel__body"><div class="group prof-group">
+        ${row('export', 'scroll', 'Export backup', 'Save a file to Files or iCloud')}
+        ${row('import', 'bank', 'Import', 'Replaces everything with a backup')}
+      </div><input type="file" id="importFile" accept="application/json,.json" hidden></div></section>
+    <p class="prof-foot">Everything stays on this phone (keys start with imp_). Nothing is sent anywhere.<br>
+      Icons by <a href="https://lucide.dev" target="_blank" rel="noopener">Lucide</a> (ISC). Font: <a href="https://rsms.me/inter/" target="_blank" rel="noopener">Inter</a> (SIL OFL).</p>
   </div>`;
 }
 
