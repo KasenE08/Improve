@@ -210,3 +210,6 @@
 .imp-limit-count.is-over { color: var(--imp-danger); border-color: var(--imp-danger); }
 .imp-row.is-over .imp-row__sub { color: var(--imp-danger); }
 .imp-row.is-over .imp-pip.is-on { background: var(--imp-danger); }
+.phead__end { justify-self: end; }
+.phead__more { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: var(--imp-text); background: var(--imp-sunken); }
+.phead__more .imp-icon { width: 20px; height: 20px; }

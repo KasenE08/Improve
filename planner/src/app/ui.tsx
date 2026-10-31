@@ -9,6 +9,7 @@ export type Sheet =
   | { kind: 'block'; block?: FixedBlock; once?: boolean }
   | { kind: 'notifyGuide' }
   | { kind: 'add' }
+  | { kind: 'list' }
   | { kind: 'settings' };
 
 export const UI = createContext<{ open: (s: Sheet) => void; close: () => void }>({ open: () => {}, close: () => {} });

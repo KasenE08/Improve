@@ -6,6 +6,7 @@ import { commit, OLD_APP_KEY } from './store';
 import { Chips, useUI } from './ui';
 import { Icon, TAG_STYLE, type IconName } from './icons';
 import { useState } from 'preact/hooks';
+import { behind } from './Today';
 import { disablePush, enablePush, pushSupported, sendTest, uploadNow } from './push';
 import { fmtMin, inputToMin, minToInput, recurrenceText, ruleText, TAG_LABELS, TYPE_LABELS, uid, WEEKDAYS } from './format';
 import { learnedRatio } from '../core/estimate';
@@ -56,73 +57,61 @@ export function Settings({ data }: { data: AppData }) {
       </div>
     );
     if (page === 'schedule')
-      return sub('Fixed schedule', <>
+      return sub('Schedule', <>
+        <h3 class="set-h">Repeating {add(() => ui.open({ kind: 'block' }))}</h3>
         <ul class="list">{recurring.map(blockRow)}</ul>
         {recurring.length === 0 && <p class="muted small">None yet.</p>}
-      </>, add(() => ui.open({ kind: 'block' })));
-    if (page === 'events')
-      return sub('One-time events', <>
+        <h3 class="set-h">One-time, coming up {add(() => ui.open({ kind: 'block', once: true }))}</h3>
         <ul class="list">{events.map(blockRow)}</ul>
-        {events.length === 0 && <p class="muted small">No upcoming one-time events.</p>}
-      </>, add(() => ui.open({ kind: 'block', once: true })));
-    if (page === 'places') return sub('Places & travel', <Locations data={data} />);
-    if (page === 'rules') return sub('Cutoff rules', <Rules data={data} />);
-    if (page === 'pacing') return sub('Pacing & limits', <General settings={data.settings} />);
-    if (page === 'learning') return sub('Learning', <Learning data={data} />);
+        {events.length === 0 && <p class="muted small">Nothing coming up.</p>}
+      </>);
+    if (page === 'places') return sub('Places', <Locations data={data} />);
+    if (page === 'rules')
+      return sub('Planning rules', <>
+        <h3 class="set-h">Pacing</h3>
+        <General settings={data.settings} />
+        <h3 class="set-h">Cutoffs</h3>
+        <Rules data={data} />
+        <h3 class="set-h">Learning</h3>
+        <Learning data={data} />
+      </>);
     if (page === 'notify') return sub('Notifications', <Notifications data={data} />);
     return sub('Backup', <Backup data={data} />);
   }
 
   const s = data.settings;
-  const learned = (Object.keys(TYPE_LABELS) as AssignmentType[]).filter((t) => learnedRatio(data.history, t).samples > 0).length;
   const places = data.locations.filter((l) => l.id !== 'home').length;
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-  const row = (p: Page, icon: IconName, title: string, sub: preact.ComponentChildren) => (
-    <button class="hub-row" onClick={() => go(p)}>
-      <span class="hub-icon"><Icon name={icon} size={18} /></span>
-      <span class="body">
-        <span class="title">{title}</span>
-        <span class="meta">{sub}</span>
+  const tile = (p: Page, icon: IconName, title: string, value: preact.ComponentChildren, wide = false) => (
+    <button class={`set-tile ${wide ? 'wide' : ''}`} onClick={() => go(p)}>
+      <span class="set-tile__icon"><Icon name={icon} size={20} /></span>
+      <span class="set-tile__text">
+        <span class="set-tile__title">{title}</span>
+        <span class="set-tile__value">{value}</span>
       </span>
-      <span class="chev"><Icon name="chevronRight" size={18} /></span>
+      {wide && <span class="chev"><Icon name="chevronRight" size={18} /></span>}
     </button>
   );
   return (
-    <div>
-      <header class="top">
-        <h1>Settings</h1>
-      </header>
-      <section>
-        <h3>Your week</h3>
-        <div class="hub">
-          {row('schedule', 'calendar', 'Fixed schedule', recurring.length ? plural(recurring.length, 'repeating time') : 'None yet')}
-          {row('events', 'flag', 'One-time events', events.length ? `${events.length} coming up` : 'None coming up')}
-          {row('places', 'pin', 'Places & travel', places ? plural(places, 'place') : 'Only Home')}
-        </div>
-      </section>
-      <section>
-        <h3>How planning works</h3>
-        <div class="hub">
-          {row('rules', 'ban', 'Cutoff rules', plural(data.rules.length, 'rule'))}
-          {row('pacing', 'gauge', 'Pacing & limits', `${s.spreadWork !== false ? 'Spread out' : 'Packed'} · ${s.breakMin} min breaks · ${fmtMin(s.earliestStartMin)}–${fmtMin(s.dayEndMin)}`)}
-          {row('learning', 'sparkle', 'Learning', learned ? `${plural(learned, 'type')} timed` : 'Nothing timed yet')}
-        </div>
-      </section>
-      <section>
-        <h3>App</h3>
-        <div class="hub">
-          {row('notify', 'bell', 'Notifications', data.push ? (data.push.error ? <span class="warn">Needs attention</span> : <><span class="on-dot" />On</>) : 'Off')}
-          {row('backup', 'download', 'Backup & copy', 'Copy from Schedule Planner')}
-        </div>
-      </section>
-      <p class="muted small center">
-        Times follow your phone's timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
-      </p>
+    <div class="set-hub">
+      {tile('schedule', 'calendar', 'Schedule', `${plural(recurring.length, 'repeating time')} · ${events.length} coming up`, true)}
+      <div class="set-grid">
+        {tile('places', 'pin', 'Places', places ? plural(places, 'place') : 'Only home')}
+        {tile('rules', 'gauge', 'Planning rules', `${s.breakMin} min breaks`)}
+        {tile('notify', 'bell', 'Notifications', data.push ? (data.push.error ? <span class="warn">Needs attention</span> : 'On') : 'Off')}
+        {tile('backup', 'download', 'Backup', 'Save or restore')}
+      </div>
+      {data.tasks.some((t) => t.status === 'todo') && (
+        <button class="set-behind" onClick={behind}>
+          <Icon name="clock" size={18} /> Falling behind? Reschedule the rest of today
+        </button>
+      )}
+      <p class="muted small center">Times follow your phone's timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).</p>
     </div>
   );
 }
 
-type Page = 'schedule' | 'events' | 'places' | 'rules' | 'pacing' | 'learning' | 'notify' | 'backup';
+type Page = 'schedule' | 'places' | 'rules' | 'notify' | 'backup';
 
 function Locations({ data }: { data: AppData }) {
   const set = (locations: Location[]) => commit((d, now) => actions.setLocations(d, locations, now));

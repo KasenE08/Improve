@@ -12,12 +12,9 @@ import { NotifyGuide } from './NotifyGuide';
 import { useEffect } from 'preact/hooks';
 import { Icon } from './icons';
 
-// Two views. Adding things is under +, rarely used settings under ⋯ (stats live on Improve's You page).
-type Tab = 'today' | 'tasks';
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'today', label: 'Schedule' },
-  { id: 'tasks', label: 'Assignments' },
-];
+// One view: the day. The assignment list opens from its "to do" pill, adding from +, settings from ⋯ in
+// Improve's top bar (it sends PLANNER_MENU_EVENT). Stats live on Improve's You page.
+export const PLANNER_MENU_EVENT = 'improve:planner-menu';
 
 function AddMenu() {
   const ui = useUI();
@@ -42,7 +39,6 @@ function AddMenu() {
 export function App() {
   const data = useData();
   const now = useNow();
-  const [tab, setTab] = useState<Tab>('today');
   const [sheet, setSheet] = useState<Sheet | null>(null);
   const ui = { open: setSheet, close: () => setSheet(null) };
 
@@ -50,37 +46,30 @@ export function App() {
   useEffect(() => {
     const openTask = (id: string | null | undefined) => {
       if (!id || !getData().tasks.some((t) => t.id === id)) return;
-      setTab('today');
       setSheet({ kind: 'detail', id });
     };
     openTask(takePendingTask());
     const onOpen = () => openTask(takePendingTask());
+    const onMenu = () => setSheet({ kind: 'settings' });
     window.addEventListener(OPEN_TASK_EVENT, onOpen);
-    return () => window.removeEventListener(OPEN_TASK_EVENT, onOpen);
+    window.addEventListener(PLANNER_MENU_EVENT, onMenu);
+    return () => {
+      window.removeEventListener(OPEN_TASK_EVENT, onOpen);
+      window.removeEventListener(PLANNER_MENU_EVENT, onMenu);
+    };
   }, []);
 
   return (
     <UI.Provider value={ui}>
-      <div class="pl-subnav">
-        <div class="segmented" role="tablist">
-          {TABS.map((t) => (
-            <button class={tab === t.id ? 'on' : ''} role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <button class="pl-more" aria-label="Planner settings" onClick={() => setSheet({ kind: 'settings' })}>
-          <Icon name="more" size={22} />
-        </button>
-        <button class="pl-add" aria-label="Add" onClick={() => setSheet({ kind: 'add' })}>
-          <Icon name="plus" size={24} />
-        </button>
-      </div>
       <main class="screen">
-        {tab === 'today' && <Today data={data} now={now} />}
-        {tab === 'tasks' && <TaskList data={data} now={now} />}
+        <Today data={data} now={now} />
       </main>
       {sheet?.kind === 'add' && <AddMenu />}
+      {sheet?.kind === 'list' && (
+        <SheetFrame title="Assignments" full>
+          <TaskList data={data} now={now} />
+        </SheetFrame>
+      )}
       {sheet?.kind === 'settings' && (
         <SheetFrame title="Planner settings" full>
           <Settings data={data} />

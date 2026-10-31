@@ -55,10 +55,17 @@ export function useDrag(onDrop: (id: string, target: DropTarget) => void) {
       const d = live.current;
       if (d) {
         const before = scrollY;
-        if (d.y > innerHeight - 110) scrollBy(0, 8);
+        // Over the day's hours (their own scroll area): scroll that; otherwise the page
+        const box = document.querySelector<HTMLElement>('.tl-scroll');
+        const boxBefore = box?.scrollTop;
+        const r = box?.getBoundingClientRect();
+        if (box && r && d.y > r.top && !(d.over && 'day' in d.over)) {
+          if (d.y > r.bottom - 70) box.scrollTop += 8;
+          else if (d.y < r.top + 50) box.scrollTop -= 8;
+        } else if (d.y > innerHeight - 110) scrollBy(0, 8);
         else if (d.y < 170 && !(d.over && 'day' in d.over)) scrollBy(0, -8);
         // The page moved under a still finger: update where it would drop.
-        if (scrollY !== before) {
+        if (scrollY !== before || box?.scrollTop !== boxBefore) {
           live.current = { ...d, over: targetAt(d.x, d.y) };
           setDrag(live.current);
         }

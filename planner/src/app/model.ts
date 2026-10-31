@@ -36,6 +36,8 @@ export interface AppData {
   behindDays: DateKey[];
   /** Last time an assignment was dragged to a new time or day (its new time is the one that counts). */
   dragAt: Ms | null;
+  /** Late starts already asked about ("taskId@plannedStart"), so the Falling behind pop-up asks once each. */
+  behindAsked?: string[];
 }
 
 export interface PushState {
@@ -316,6 +318,10 @@ export const actions = {
   },
   setSettings(d: AppData, settings: Settings, now: Ms): AppData {
     return replan({ ...d, settings }, now);
+  },
+  /** The Falling behind pop-up was answered for this late start. */
+  markBehindAsked(d: AppData, key: string): AppData {
+    return { ...d, behindAsked: [...(d.behindAsked ?? []).filter((k) => k !== key), key].slice(-50) };
   },
   /** Add or edit a class. Tags only: nothing is rescheduled. */
   saveClass(d: AppData, c: SchoolClass): AppData {

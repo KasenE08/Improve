@@ -81,7 +81,11 @@ function boot() {
     const tab = currentTab();
     hud.className = tab === 'home' ? 'hud' : 'phead';
     if (tab === 'home') drawHud(hud);
-    else hud.innerHTML = `<button class="phead__back" data-act="home">${icon('prev')}Home</button><h1 class="phead__title">${PAGES[tab]}</h1><span class="phead__end"></span>`;
+    else {
+      // The planner's settings live behind ⋯ here in the top bar (the planner listens for this event)
+      const end = tab === 'planner' ? `<button class="phead__more" data-act="planner-menu" aria-label="Planner settings">${icon('more')}</button>` : '';
+      hud.innerHTML = `<button class="phead__back" data-act="home">${icon('prev')}Home</button><h1 class="phead__title">${PAGES[tab]}</h1><span class="phead__end">${end}</span>`;
+    }
   };
   let openedFromHome = false; // back goes back in history only when Home is behind this page
 
@@ -109,6 +113,7 @@ function boot() {
   Profile.bind(screen, refresh);
   bindHud(hud, { rename: () => Profile.openNameSheet(refresh), refresh });
   hud.addEventListener('click', (e) => {
+    if (e.target.closest('[data-act="planner-menu"]')) return window.dispatchEvent(new Event('improve:planner-menu'));
     if (!e.target.closest('[data-act="home"]')) return;
     if (openedFromHome) history.back(); else location.replace('#');
   });
