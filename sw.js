@@ -1,6 +1,6 @@
 // Improve service worker. Scope is this folder only (/Improve/), set by its location.
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'v44';
+const VERSION = 'v45';
 // The dev preview (/Improve/dev/) keeps its own caches so the two never delete each other's.
 const DEV = /\/dev\//.test(self.location.pathname);
 const PREFIX = DEV ? 'imp-dev-cache-' : 'imp-cache-'; // only caches with this prefix are ever touched
