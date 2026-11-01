@@ -64,6 +64,8 @@ export interface FixedBlock {
   steps?: ReminderStep[];
   /** Where you come from (a place id). Unset or Home = leave from home. Another place = go straight there after the event at that place. */
   fromLocationId?: string;
+  /** "Holds assignments" (a Homework block): assignments are placed inside it automatically. */
+  holdsWork?: boolean;
 }
 
 /** Which tasks a cutoff applies to: schoolwork only, or every task including Other. */
@@ -129,6 +131,8 @@ export type TaskStatus = 'todo' | 'inProgress' | 'done';
 
 export interface Task {
   id: string;
+  /** Order inside Homework blocks after a hand reorder (otherwise soonest due first). */
+  rank?: number;
   title: string;
   type: AssignmentType;
   /** Empty = Other category (not schoolwork). Both = counts as its highest category. */

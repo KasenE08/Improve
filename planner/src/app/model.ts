@@ -115,7 +115,41 @@ function healSettings(s: AppData['settings']): AppData['settings'] {
  * estimateMin minutes) and events repeat as you set them. The "plan" just lists them for the screens,
  * notifications and Improve.
  */
-export function replan(d: AppData, now: Ms, _exactStart?: Ms): AppData {
+/** Sort key inside Homework blocks: hand order if reordered, else soonest due first. */
+export const workKey = (t: Task) => t.rank ?? t.due ?? Number.MAX_SAFE_INTEGER;
+
+/**
+ * Assignments go into the blocks marked "Holds assignments", soonest due first, back to back.
+ * One that doesn't fit before it's due rolls into the next block; if none has room before it's due,
+ * it's left off the calendar (an "add a Homework block" warning). A block that has ended without the
+ * work being ticked no longer counts, so unfinished work moves on by itself.
+ */
+export function placeWork(d: AppData, now: Ms): { tasks: Task[]; unplaced: string[] } {
+  const work = d.blocks.filter((b) => b.holdsWork);
+  // No Homework block yet: assignments keep the times they have (the plain calendar)
+  if (!work.length) return { tasks: d.tasks, unplaced: [] };
+  const slots: { end: Ms; cursor: Ms }[] = [];
+  const today = planDay(now);
+  if (work.length) {
+    for (let i = -1; i < 90; i++) {
+      for (const o of occurrencesOn(addDays(today, i), work, d.locations)) if (o.end > now) slots.push({ end: o.end, cursor: o.start });
+    }
+  }
+  slots.sort((a, b) => a.cursor - b.cursor);
+  const todo = d.tasks.filter((t) => t.status !== 'done').sort((a, b) => workKey(a) - workKey(b) || a.createdAt - b.createdAt);
+  const placed = new Map<string, Ms | undefined>();
+  const unplaced: string[] = [];
+  for (const t of todo) {
+    const len = t.estimateMin * MIN;
+    const s = slots.find((x) => x.cursor + len <= x.end && (t.due === null || x.cursor + len <= t.due));
+    if (s) { placed.set(t.id, s.cursor); s.cursor += len; } else { placed.set(t.id, undefined); unplaced.push(t.id); }
+  }
+  return { tasks: d.tasks.map((t) => (placed.has(t.id) ? { ...t, at: placed.get(t.id) } : t)), unplaced };
+}
+
+export function replan(d0: AppData, now: Ms, _exactStart?: Ms): AppData {
+  const placed = placeWork(d0, now);
+  const d = { ...d0, tasks: placed.tasks };
   const items: ScheduledItem[] = d.tasks
     .filter((t) => t.at != null)
     .map((t) => {
@@ -130,7 +164,8 @@ export function replan(d: AppData, now: Ms, _exactStart?: Ms): AppData {
       events.push({ blockId: o.block.id, title: o.block.title, start: o.start, end: o.end });
     }
   }
-  return { ...d, night: null, plan: { at: now, items, warnings: [], blockReminders: [], events } };
+  const warnings: Warning[] = placed.unplaced.map((taskId) => ({ kind: 'unscheduled', taskId }));
+  return { ...d, night: null, plan: { at: now, items, warnings, blockReminders: [], events } };
 }
 
 /** Where an assignment without a chosen time goes: where the old planner had it, else before it's due. */
@@ -218,7 +253,8 @@ export function nightWindow(d: AppData, now: Ms): { start: Ms; end: Ms } {
 
 /** Replan when opening the app on a new day, so yesterday's leftovers move forward. */
 export function refreshIfStale(d: AppData, now: Ms): AppData {
-  return !d.plan || planDay(d.plan.at) !== planDay(now) ? replan(d, now) : d;
+  // Re-place often enough that work from a Homework block that just ended moves on
+  return !d.plan || planDay(d.plan.at) !== planDay(now) || (now - d.plan.at > 10 * MIN && d.blocks.some((b) => b.holdsWork)) ? replan(d, now) : d;
 }
 
 const patchTask = (d: AppData, id: string, patch: Partial<Task>): AppData => ({
@@ -340,6 +376,14 @@ export const actions = {
     return replan({ ...d, settings }, now);
   },
   /** Dragged to a new time (and maybe day). */
+  /** Reorder the assignments in one Homework block (ids in the new order). */
+  reorderWork(d: AppData, ids: string[], now: Ms): AppData {
+    const ts = ids.map((id) => d.tasks.find((t) => t.id === id)).filter((t): t is Task => !!t);
+    const keys = ts.map(workKey).sort((x, y) => x - y);
+    for (let i = 1; i < keys.length; i++) if (keys[i] <= keys[i - 1]) keys[i] = keys[i - 1] + 1;
+    const rank = new Map(ts.map((t, i) => [t.id, keys[i]]));
+    return replan({ ...d, tasks: d.tasks.map((t) => (rank.has(t.id) ? { ...t, rank: rank.get(t.id) } : t)) }, now);
+  },
   moveTask(d: AppData, id: string, start: Ms, now: Ms): AppData {
     return replan(patchTask(d, id, { at: start }), now);
   },

@@ -29,6 +29,7 @@ export function BlockForm({ block, date }: { data: AppData; block?: FixedBlock; 
   );
   const [weekdays, setWeekdays] = useState<number[]>(r?.kind === 'weekly' ? r.weekdays : [weekdayOf(firstDay)]);
   const [until, setUntil] = useState(block?.endDate ?? '');
+  const [holdsWork, setHoldsWork] = useState(!!block?.holdsWork);
   const [error, setError] = useState('');
 
   const recurrence = (): Recurrence => {
@@ -54,6 +55,7 @@ export function BlockForm({ block, date }: { data: AppData; block?: FixedBlock; 
       startDate: repeat === 'never' ? undefined : day,
       endDate: repeat !== 'never' && until ? until : undefined,
       skipDates: repeat === 'never' ? undefined : block?.skipDates,
+      holdsWork: holdsWork || undefined,
     } as FixedBlock;
     commit((d, now) => actions.saveBlock(d, next, now));
     ui.close();
@@ -98,6 +100,10 @@ export function BlockForm({ block, date }: { data: AppData; block?: FixedBlock; 
           <input type="date" value={until} onInput={(e) => setUntil(e.currentTarget.value)} />
         </Field>
       )}
+      <label class="work-toggle">
+        <input type="checkbox" checked={holdsWork} onChange={(e) => setHoldsWork(e.currentTarget.checked)} />
+        <span><b>Holds assignments</b><small>A Homework block: assignments go inside it automatically</small></span>
+      </label>
       {error && <p class="warn">{error}</p>}
       {block && (
         <div class="detail-more">
