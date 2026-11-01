@@ -9,6 +9,7 @@ export type Sheet =
   | { kind: 'block'; block?: FixedBlock; once?: boolean; date?: string }
   | { kind: 'notifyGuide' }
   | { kind: 'add' }
+  | { kind: 'work'; blockId: string; start: number; end: number }
   | { kind: 'list' }
   | { kind: 'settings' };
 

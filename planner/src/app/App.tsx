@@ -8,6 +8,7 @@ import { Settings } from './Settings';
 import { TaskForm } from './TaskForm';
 import { TaskDetail } from './TaskDetail';
 import { BlockForm } from './BlockForm';
+import { WorkBlock } from './WorkBlock';
 import { NotifyGuide } from './NotifyGuide';
 import { useEffect } from 'preact/hooks';
 import { Icon } from './icons';
@@ -64,6 +65,7 @@ export function App() {
         <Today data={data} now={now} />
       </main>
       {sheet?.kind === 'add' && <AddMenu />}
+      {sheet?.kind === 'work' && <WorkBlock data={data} blockId={sheet.blockId} start={sheet.start} end={sheet.end} />}
       {sheet?.kind === 'list' && (
         <SheetFrame title="Assignments" full>
           <TaskList data={data} now={now} />

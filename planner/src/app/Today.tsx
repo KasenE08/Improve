@@ -10,6 +10,7 @@ import { Icon } from './icons';
 import { useUI } from './ui';
 import { ClassTag } from './ClassPicker';
 import { fmtDay, fmtDue, fmtTime } from './format';
+import { workIn } from './WorkBlock';
 
 // The day is a calendar, like Google Calendar: everything sits at the time you put it.
 type Entry =
@@ -27,11 +28,15 @@ function entriesFor(d: AppData, key: DateKey): Entry[] {
   const to = at(addDays(key, 1), 4 * 60);
   const tasks = new Map(d.tasks.map((t) => [t.id, t]));
   const out: Entry[] = [];
+  const work: { start: Ms; end: Ms }[] = [];
   for (const o of [...occurrencesOn(addDays(key, -1), d.blocks, d.locations), ...occurrencesOn(key, d.blocks, d.locations)]) {
     if (o.end > from && o.start < to) out.push({ kind: 'event', start: o.start, end: o.end, block: o.block });
+    if (o.block.holdsWork) work.push(o);
   }
+  // Assignments inside a Homework block show in that block's page, not on the main calendar
   for (const i of d.plan?.items ?? []) {
     const task = tasks.get(i.taskId);
+    if (work.some((w) => i.start >= w.start && i.start < w.end)) continue;
     if (task && i.start >= from && i.start < to) out.push({ kind: 'task', start: i.start, end: i.end, task, late: i.late, cls: d.classes.find((c) => c.id === task.classId) });
   }
   return out.sort((a, b) => a.start - b.start);
@@ -73,7 +78,9 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   const days = Array.from({ length: 7 }, (_, i) => addDays(today, weekOffset * 7 + i));
   const entries = entriesFor(data, day);
   const toDo = data.tasks.filter((t) => t.status !== 'done').length;
-  const countFor = (k: DateKey) => entriesFor(data, k).filter((e) => e.kind === 'task' && e.task.status !== 'done').length; // dot = assignments to do
+  const todoIds = new Set(data.tasks.filter((t) => t.status !== 'done').map((t) => t.id));
+  const countFor = (k: DateKey) => (data.plan?.items ?? []).filter((i) => todoIds.has(i.taskId) && i.start >= at(k, 4 * 60) && i.start < at(addDays(k, 1), 4 * 60)).length; // dot = assignments to do
+  const unplaced = (data.plan?.warnings ?? []).filter((w) => w.kind === 'unscheduled').length;
 
   // Drag an assignment or a one-time event: onto a date (same time that day) or to a time on the day
   const onDrop = (id: string, target: DropTarget) => {
@@ -133,6 +140,9 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
           {fmtDay(mode === 'month' ? month : day, { month: 'long', year: 'numeric' })}
           <Icon name={mode === 'month' ? 'chevronUp' : 'chevronDown'} size={16} />
         </button>
+        <button class="add-work" onClick={() => ui.open({ kind: 'task' })} aria-label="Add assignment">
+          <Icon name="plus" size={14} /> Assignment
+        </button>
         <button class="todo-pill" onClick={() => ui.open({ kind: 'list' })}>
           {toDo ? `${toDo} to do` : 'All done'}
           <Icon name="chevronRight" size={16} />
@@ -140,6 +150,12 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
       </div>
 
       {data.push?.error && <div class="card small warn">Notifications: {data.push.error}</div>}
+      {unplaced > 0 && (
+        <button class="work-warn" onClick={() => ui.open({ kind: 'list' })}>
+          <b>{unplaced} assignment{unplaced === 1 ? '' : 's'} won't fit before {unplaced === 1 ? "it's" : "they're"} due</b>
+          <span>{data.blocks.some((b) => b.holdsWork) ? 'Add another Homework block (or make one longer).' : 'Make an event that holds assignments (your Homework block).'}</span>
+        </button>
+      )}
 
       {mode === 'month' ? (
         <MonthGrid data={data} month={month} setMonth={setMonth} selected={day} today={today} onSelect={(k) => { setDay(k); setMode('week'); }} isOver={dnd.isOver} />
@@ -184,7 +200,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
               width: `calc((100% - ${LABEL_W}px) / ${lanes} - 4px)`,
             };
             return e.kind === 'event'
-              ? <EventEntry e={e} dnd={dnd} pos={pos} h={h} />
+              ? <EventEntry e={e} dnd={dnd} pos={pos} h={h} count={e.block.holdsWork ? workIn(data, e.start, e.end).filter((t) => t.status !== 'done').length : undefined} />
               : <TaskEntry e={e} dnd={dnd} pos={pos} h={h} />;
           })}
           {showNow && <li class="tl-now" style={{ top: `${y(now)}px` }} aria-label={`Now, ${fmtTime(now)}`} />}
@@ -198,23 +214,23 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
       {dnd.ghost}
       {dnd.drag && <div class="drag-hint">Drop on a time, or on a date to move it to that day</div>}
 
-      <button class="plan-fab" aria-label="Add" onClick={() => ui.open({ kind: 'add' })}>
+      <button class="plan-fab" aria-label="New event" onClick={() => ui.open({ kind: 'block', date: day })}>
         <Icon name="plus" size={26} />
       </button>
     </div>
   );
 }
 
-function EventEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'event' }>; dnd: ReturnType<typeof useDrag>; pos: Record<string, string>; h: number }) {
+function EventEntry({ e, pos, h, count }: { e: Extract<Entry, { kind: 'event' }>; dnd: ReturnType<typeof useDrag>; pos: Record<string, string>; h: number; count?: number }) {
   const ui = useUI();
   const b = e.block;
-  // Events stay put; tap one to change its time
-  const open = () => ui.open({ kind: 'block', block: b, date: planDay(e.start) });
+  // Events stay put; tap one to change it. A Homework block opens its own page of assignments.
+  const open = () => (b.holdsWork ? ui.open({ kind: 'work', blockId: b.id, start: e.start, end: e.end }) : ui.open({ kind: 'block', block: b, date: planDay(e.start) }));
   return (
-    <li class={`tl-ev event ${h < 40 ? 'short' : ''} ${h < 22 ? 'tiny' : ''}`} style={pos} onClick={open}>
+    <li class={`tl-ev event ${b.holdsWork ? 'work' : ''} ${h < 40 ? 'short' : ''} ${h < 22 ? 'tiny' : ''}`} style={pos} onClick={open}>
       <div class="body">
         <div class="title">{b.recurrence.kind !== 'once' && <Icon name="repeat" size={12} />}{b.title}</div>
-        <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}</div>
+        <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}{count != null && <> · {count ? `${count} assignment${count === 1 ? '' : 's'}` : 'nothing yet'}</>}</div>
       </div>
     </li>
   );

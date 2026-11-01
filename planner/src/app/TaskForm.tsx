@@ -24,10 +24,11 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
   const [dueTime, setDueTime] = useState(due ? due.toTimeString().slice(0, 5) : '23:59');
   const [notes, setNotes] = useState(task?.notes ?? '');
   const [error, setError] = useState('');
+  const auto = data.blocks.some((b) => b.holdsWork); // Homework blocks place assignments themselves
 
   const save = () => {
     if (!title.trim()) return setError('Give it a name.');
-    if (!day || !time) return setError('Pick when you’ll do it.');
+    if (!auto && (!day || !time)) return setError('Pick when you’ll do it.');
     if (!(length > 0)) return setError('How long will it take?');
     const cls = data.classes.find((c) => c.id === classId);
     const next: Task = {
@@ -36,7 +37,7 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
       title: title.trim(),
       classId,
       formats: cls?.format ? [cls.format] : task?.formats ?? [],
-      at: at(day, inputToMin(time)),
+      at: auto ? task?.at : at(day, inputToMin(time)),
       estimateMin: Math.round(length),
       estimateManual: true,
       due: dueDate ? at(dueDate, inputToMin(dueTime)) : null,
@@ -55,6 +56,9 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
         <span class="field-label">Class</span>
         <ClassPicker data={data} value={classId} onChange={(id) => setClassId(id)} />
       </div>
+      {auto ? (
+        <p class="hint">Goes into your next Homework block before it's due.</p>
+      ) : (
       <div class="row2">
         <Field label="Day">
           <input type="date" value={day} onInput={(e) => setDay(e.currentTarget.value)} />
@@ -63,6 +67,7 @@ export function TaskForm({ data, task }: { data: AppData; task?: Task }) {
           <input type="time" value={time} onInput={(e) => setTime(e.currentTarget.value)} />
         </Field>
       </div>
+      )}
       <div class="field">
         <span class="field-label">How long</span>
         <div class="segmented len-pick" role="radiogroup">
