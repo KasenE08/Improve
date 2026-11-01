@@ -5,6 +5,7 @@ import { DEFAULT_RULES, DEFAULT_SETTINGS, HOME } from '../core/defaults';
 import { occurrencesOn } from '../core/availability';
 import { addDays, at, dateKey, DAY_START_MIN, MIN, planDay } from '../core/time';
 import { splitMinutes, type DoneRecord } from '../core/estimate';
+import { autoColor } from './colors';
 
 export interface Plan {
   at: Ms;
@@ -12,11 +13,11 @@ export interface Plan {
   warnings: Warning[];
   blockReminders: BlockReminder[];
   /** Fixed events in the next two weeks (for Improve's Home "Up next" and notifications). */
-  events?: { blockId: string; title: string; start: Ms; end: Ms }[];
+  events?: { blockId: string; title: string; start: Ms; end: Ms; remindMin?: number | null }[];
 }
 
 export interface AppData {
-  version: 1;
+  version: number;
   tasks: Task[];
   blocks: FixedBlock[];
   locations: Location[];
@@ -58,7 +59,7 @@ export interface PushState {
 
 export function emptyData(): AppData {
   return {
-    version: 1,
+    version: 2,
     tasks: [],
     blocks: [],
     locations: [HOME],
@@ -82,14 +83,35 @@ export function endOfDayMin(min: number, earliestStartMin: number): number {
   return min <= earliestStartMin ? min + 1440 : min;
 }
 
+/**
+ * Version 2 (the plain calendar): every assignment becomes a one-time event at the time it had (done
+ * ones too, so past days keep their history), and events made before colors existed get one.
+ */
+function toV2(blocks: FixedBlock[], tasks: Task[], now: Ms): FixedBlock[] {
+  const fromTasks: FixedBlock[] = tasks.map((t) => {
+    const start = t.at ?? (t.due !== null ? t.due - t.estimateMin * MIN : Math.ceil(now / (30 * MIN)) * 30 * MIN);
+    const day = dateKey(start);
+    const startMin = Math.round((start - at(day, 0)) / MIN);
+    return {
+      id: `t-${t.id}`, title: t.title, tag: 'other', locationId: HOME.id,
+      startMin, endMin: startMin + Math.max(1, t.estimateMin), recurrence: { kind: 'once', date: day },
+      color: 'purple', notes: t.notes,
+    } as FixedBlock;
+  });
+  return [...blocks.map((b) => (b.color ? b : { ...b, color: autoColor(b.title, b.tag) })), ...fromTasks];
+}
+
 export function normalize(raw: Partial<AppData>): AppData {
   const base = emptyData();
+  if (raw.version !== 2 && (raw.tasks?.length || raw.blocks?.length)) {
+    raw = { ...raw, blocks: toV2(raw.blocks ?? [], raw.tasks ?? [], Date.now()), tasks: [] };
+  }
   const { sync: _oldReminderSync, ...rest } = raw as Partial<AppData> & { sync?: unknown };
   const planned = new Map((raw.plan?.items ?? []).map((i) => [i.taskId, i.start]));
   return {
     ...base,
     ...rest,
-    version: 1,
+    version: 2,
     settings: healSettings({ ...base.settings, ...raw.settings }),
     locations: raw.locations?.some((l) => l.id === HOME.id) ? raw.locations : [HOME, ...(raw.locations ?? [])],
     arrivals: raw.arrivals ?? {},
@@ -161,7 +183,7 @@ export function replan(d0: AppData, now: Ms, _exactStart?: Ms): AppData {
   const events: NonNullable<Plan['events']> = [];
   for (let i = -1; i < 14; i++) {
     for (const o of occurrencesOn(addDays(today, i), d.blocks, d.locations)) {
-      events.push({ blockId: o.block.id, title: o.block.title, start: o.start, end: o.end });
+      events.push({ blockId: o.block.id, title: o.block.title, start: o.start, end: o.end, remindMin: o.block.remindMin });
     }
   }
   const warnings: Warning[] = placed.unplaced.map((taskId) => ({ kind: 'unscheduled', taskId }));
@@ -383,6 +405,27 @@ export const actions = {
     for (let i = 1; i < keys.length; i++) if (keys[i] <= keys[i - 1]) keys[i] = keys[i - 1] + 1;
     const rank = new Map(ts.map((t, i) => [t.id, keys[i]]));
     return replan({ ...d, tasks: d.tasks.map((t) => (rank.has(t.id) ? { ...t, rank: rank.get(t.id) } : t)) }, now);
+  },
+  /**
+   * Drag an event (the occurrence on `date`) so it starts `deltaMin` minutes later (or earlier).
+   * 'all' shifts the whole series; 'one' skips that day and makes a one-time copy at the new time.
+   */
+  moveOccurrence(d: AppData, blockId: string, date: DateKey, deltaMin: number, scope: 'one' | 'all', now: Ms): AppData {
+    const b = d.blocks.find((x) => x.id === blockId);
+    if (!b || !deltaMin) return d;
+    const startMin = b.startMin + deltaMin;
+    const endMin = b.endMin + deltaMin;
+    if (b.recurrence.kind === 'once' || scope === 'all') return actions.saveBlock(d, { ...b, startMin, endMin }, now);
+    const copy: FixedBlock = { ...b, id: `${b.id}-${date}-${now.toString(36)}`, startMin, endMin, recurrence: { kind: 'once', date }, startDate: undefined, endDate: undefined, skipDates: undefined };
+    const skipped = { ...b, skipDates: [...new Set([...(b.skipDates ?? []), date])].sort() };
+    return replan({ ...d, blocks: [...d.blocks.map((x) => (x.id === b.id ? skipped : x)), copy] }, now);
+  },
+  /** Delete an event: 'one' = just the occurrence on `date`, 'all' = the whole series. */
+  deleteOccurrence(d: AppData, blockId: string, date: DateKey, scope: 'one' | 'all', now: Ms): AppData {
+    const b = d.blocks.find((x) => x.id === blockId);
+    if (!b) return d;
+    if (b.recurrence.kind === 'once' || scope === 'all') return actions.deleteBlock(d, blockId, now);
+    return actions.saveBlock(d, { ...b, skipDates: [...new Set([...(b.skipDates ?? []), date])].sort() }, now);
   },
   moveTask(d: AppData, id: string, start: Ms, now: Ms): AppData {
     return replan(patchTask(d, id, { at: start }), now);
