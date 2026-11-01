@@ -257,3 +257,8 @@ button.g-row:active, label.g-action:active { background: var(--imp-sunken); }
 .len-pick button { font-size: 13px; }
 .done-btn { margin: 4px 0 16px; gap: 8px; }
 .detail-head h2.is-done { text-decoration: line-through; color: var(--imp-muted); }
+
+/* Very short entries squeezed above the next one: one small line */
+.tl-ev.tiny { padding-top: 0; padding-bottom: 0; overflow: hidden; }
+.tl-ev.tiny .title, .tl-ev.tiny .meta { font-size: 11px; line-height: 1.1; }
+.tl-ev.tiny .tl-check { width: 12px; height: 12px; }
