@@ -96,7 +96,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   // ---- 24-hour day: 4 AM → 4 AM, 1 minute = PX px ----
   const gridStart = at(day, 4 * 60);
   const y = (ms: Ms) => ((ms - gridStart) / 60_000) * PX;
-  const placed = layoutLanes(entries, ((MIN_H + 2) / PX) * 60_000);
+  const placed = layoutLanes(entries);
   const showNow = planDay(now) === day;
   const gridRef = useRef<HTMLDivElement>(null);
   // The hours scroll in their own area under the fixed top, sized to the screen; they open at now
@@ -174,7 +174,9 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
           ))}
           {placed.map(({ e, lane, lanes }) => {
             const top = Math.max(0, y(e.start));
-            const h = Math.max(MIN_H, y(e.end) - top - 2);
+            // Short ones get a readable height, but never run into the next one below (they stack)
+            const next = Math.min(...placed.filter((o) => o.lane === lane && o.e.start > e.start).map((o) => y(o.e.start)));
+            const h = Math.max(12, Math.min(Math.max(MIN_H, y(e.end) - top - 2), next - top - 2));
             const pos = {
               top: `${top}px`,
               height: `${h}px`,
@@ -209,7 +211,7 @@ function EventEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'event' }>; 
   // Events stay put; tap one to change its time
   const open = () => ui.open({ kind: 'block', block: b, date: planDay(e.start) });
   return (
-    <li class={`tl-ev event ${h < 40 ? 'short' : ''}`} style={pos} onClick={open}>
+    <li class={`tl-ev event ${h < 40 ? 'short' : ''} ${h < 22 ? 'tiny' : ''}`} style={pos} onClick={open}>
       <div class="body">
         <div class="title">{b.recurrence.kind !== 'once' && <Icon name="repeat" size={12} />}{b.title}</div>
         <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}</div>
@@ -226,7 +228,7 @@ function TaskEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'task' }>; dn
   const open = () => ui.open({ kind: 'detail', id: t.id });
   return (
     <li
-      class={`tl-ev task ${done ? 'done' : ''} ${e.late ? 'late' : ''} ${h < 40 ? 'short' : ''} ${dnd.drag?.id === t.id ? 'dragging' : ''}`}
+      class={`tl-ev task ${done ? 'done' : ''} ${e.late ? 'late' : ''} ${h < 40 ? 'short' : ''} ${h < 22 ? 'tiny' : ''} ${dnd.drag?.id === t.id ? 'dragging' : ''}`}
       style={{ ...pos, '--cat': e.cls?.color ?? 'var(--imp-accent)' }}
       onPointerDown={drag?.onPointerDown}
       onContextMenu={drag?.onContextMenu}

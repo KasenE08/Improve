@@ -183,10 +183,27 @@ function boot() {
 // ---- Offline support ----
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('sw.js', { scope: './' }).catch((e) => console.warn('SW failed', e));
-  let reloaded = false;
+  const reg = navigator.serviceWorker.register('sw.js', { scope: './' }).catch((e) => console.warn('SW failed', e));
+  // Look for a new version whenever the app comes back to the front
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) reg.then((r) => r?.update()).catch(() => {}); });
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    // A new version was installed: reload once so the whole app matches it.
-    if (hadController && !reloaded) { reloaded = true; location.reload(); }
+    // A new version was installed: show a pop-up; tapping it reloads into the new version.
+    if (!hadController || document.querySelector('.upd-pop')) return;
+    const pop = document.createElement('button');
+    pop.className = 'upd-pop';
+    pop.innerHTML = '<b>Update ready</b><span>Tap to load the new version</span>';
+    pop.onclick = () => { try { sessionStorage.setItem('imp_updated', '1'); } catch (_) {} location.reload(); };
+    document.body.appendChild(pop);
   });
 }
+// Just reloaded into a new version: say so
+try {
+  if (sessionStorage.getItem('imp_updated')) {
+    sessionStorage.removeItem('imp_updated');
+    const done = document.createElement('div');
+    done.className = 'upd-pop is-done';
+    done.innerHTML = '<b>Updated</b><span>You\'re on the newest version</span>';
+    document.body.appendChild(done);
+    setTimeout(() => done.remove(), 3500);
+  }
+} catch (_) {}
