@@ -37,8 +37,10 @@ function entriesFor(d: AppData, key: DateKey): Entry[] {
   return out.sort((a, b) => a.start - b.start);
 }
 
-/** Side-by-side lanes for things that overlap (like Google Calendar). */
-function layoutLanes<T extends { start: Ms; end: Ms }>(list: T[]): { e: T; lane: number; lanes: number }[] {
+/** Side-by-side lanes for things that overlap (like Google Calendar). A short entry still takes up
+ *  its drawn height (MIN_H), so it counts as overlapping anything inside that height. */
+function layoutLanes<T extends { start: Ms; end: Ms }>(list: T[], minMs = 0): { e: T; lane: number; lanes: number }[] {
+  const vend = (e: T) => Math.max(e.end, e.start + minMs);
   const out: { e: T; lane: number; lanes: number }[] = [];
   let group: { e: T; lane: number; lanes: number }[] = [];
   let groupEnd = -Infinity;
@@ -51,11 +53,11 @@ function layoutLanes<T extends { start: Ms; end: Ms }>(list: T[]): { e: T; lane:
   for (const e of [...list].sort((a, b) => a.start - b.start || b.end - a.end)) {
     if (e.start >= groupEnd && group.length) flush();
     const ends: Ms[] = [];
-    for (const g of group) ends[g.lane] = Math.max(ends[g.lane] ?? -Infinity, g.e.end);
+    for (const g of group) ends[g.lane] = Math.max(ends[g.lane] ?? -Infinity, vend(g.e));
     let lane = 0;
     while (ends[lane] !== undefined && ends[lane] > e.start) lane++;
     group.push({ e, lane, lanes: 1 });
-    groupEnd = Math.max(groupEnd, e.end);
+    groupEnd = Math.max(groupEnd, vend(e));
   }
   if (group.length) flush();
   return out;
@@ -94,7 +96,7 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
   // ---- 24-hour day: 4 AM → 4 AM, 1 minute = PX px ----
   const gridStart = at(day, 4 * 60);
   const y = (ms: Ms) => ((ms - gridStart) / 60_000) * PX;
-  const placed = layoutLanes(entries);
+  const placed = layoutLanes(entries, ((MIN_H + 2) / PX) * 60_000);
   const showNow = planDay(now) === day;
   const gridRef = useRef<HTMLDivElement>(null);
   // The hours scroll in their own area under the fixed top, sized to the screen; they open at now
@@ -204,17 +206,10 @@ export function Today({ data, now }: { data: AppData; now: Ms }) {
 function EventEntry({ e, dnd, pos, h }: { e: Extract<Entry, { kind: 'event' }>; dnd: ReturnType<typeof useDrag>; pos: Record<string, string>; h: number }) {
   const ui = useUI();
   const b = e.block;
-  // One-time events can be dragged; repeating ones are changed by tapping them
-  const drag = b.recurrence.kind === 'once' ? dnd.bind(`ev:${b.id}`, b.title) : null;
+  // Events stay put; tap one to change its time
   const open = () => ui.open({ kind: 'block', block: b, date: planDay(e.start) });
   return (
-    <li
-      class={`tl-ev event ${h < 40 ? 'short' : ''} ${dnd.drag?.id === `ev:${b.id}` ? 'dragging' : ''}`}
-      style={pos}
-      onPointerDown={drag?.onPointerDown}
-      onContextMenu={drag?.onContextMenu}
-      onClick={drag ? drag.guard(open) : open}
-    >
+    <li class={`tl-ev event ${h < 40 ? 'short' : ''}`} style={pos} onClick={open}>
       <div class="body">
         <div class="title">{b.recurrence.kind !== 'once' && <Icon name="repeat" size={12} />}{b.title}</div>
         <div class="meta">{fmtTime(e.start)} – {fmtTime(e.end)}</div>
