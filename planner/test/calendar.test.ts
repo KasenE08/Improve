@@ -41,11 +41,4 @@ describe('calendar style', () => {
     expect(ev.some((e) => e.title === 'Archery' && fmt(e.start) === `${WED} 18:00`)).toBe(true);
   });
 
-  it('older saves keep the times the old planner gave each assignment', () => {
-    const t = task({ id: 'old', estimateMin: 35, due: T(TUE, '23:59') });
-    const d = normalize({ tasks: [t], plan: { at: NOW, items: [{ taskId: 'old', start: T(MON, '16:20'), end: T(MON, '16:55'), late: false }], warnings: [], blockReminders: [] } });
-    expect(fmt(d.tasks[0].at!)).toBe(`${MON} 16:20`);
-    const d2 = normalize({ tasks: [t] }); // never planned: before it's due
-    expect(fmt(d2.tasks[0].at!)).toBe(`${TUE} 23:24`);
-  });
 });

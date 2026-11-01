@@ -152,3 +152,8 @@ Periods: the app's day runs 4:01 AM → 4:00 AM (`appNow()` in `js/dates.js`, sa
 ## Deploying
 
 Pushes to `main` deploy through `.github/workflows/pages.yml` (it type-checks, tests and builds the Planner, runs the other tests, then publishes everything except `planner/` and `tests/`). When app files change, bump `VERSION` in `sw.js` (and add any new file to its `FILES` list) so installed phones update.
+
+## Plan v4 (plain day calendar)
+- `planner/src/app/Day.tsx`: one day (4 AM → 4 AM), swipe for days, "Today" button, pinch to zoom (saved in `imp_planner_zoom`), opens with now a quarter down. Tap empty space = new event there (1 hour). Hold a block to drag it minute by minute. Overlaps side by side; blocks drawn at least 5 minutes tall.
+- `EventForm.tsx` (name, day, start/end to the minute, 14 colors = 7 basics + dark versions, repeat never/daily/weekly/monthly, reminder none/at start/5/10/30, notes), `EventView.tsx` (overview; ⋯ = Edit / Delete; repeating events ask "just this one / all of them" for move and delete).
+- Data version 2: assignments became one-time events (`toV2` in model.ts), events got colors from their names (`autoColor`). No assignments, no tick circles.

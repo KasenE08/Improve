@@ -66,6 +66,11 @@ export interface FixedBlock {
   fromLocationId?: string;
   /** "Holds assignments" (a Homework block): assignments are placed inside it automatically. */
   holdsWork?: boolean;
+  /** Color id (see app/colors.ts). */
+  color?: string;
+  notes?: string;
+  /** Minutes before the start to remind. Unset = 5. null = no reminder. 0 = at the start. */
+  remindMin?: number | null;
 }
 
 /** Which tasks a cutoff applies to: schoolwork only, or every task including Other. */

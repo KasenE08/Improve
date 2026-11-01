@@ -1,16 +1,14 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useContext } from 'preact/hooks';
-import type { FixedBlock, Task } from '../core/types';
+import type { FixedBlock } from '../core/types';
 import { Icon } from './icons';
 
 export type Sheet =
-  | { kind: 'task'; task?: Task }
-  | { kind: 'detail'; id: string }
-  | { kind: 'block'; block?: FixedBlock; once?: boolean; date?: string }
+  /** New or edit form. `start` = tapped minute (new event on `date`). */
+  | { kind: 'form'; block?: FixedBlock; date: string; startMin?: number }
+  /** Overview of one occurrence. */
+  | { kind: 'view'; blockId: string; date: string; start: number; end: number }
   | { kind: 'notifyGuide' }
-  | { kind: 'add' }
-  | { kind: 'work'; blockId: string; start: number; end: number }
-  | { kind: 'list' }
   | { kind: 'settings' };
 
 export const UI = createContext<{ open: (s: Sheet) => void; close: () => void }>({ open: () => {}, close: () => {} });
@@ -22,6 +20,8 @@ export function SheetFrame(p: {
   saveLabel?: string;
   /** Takes the whole screen (e.g. an assignment opened from the list). */
   full?: boolean;
+  /** Something for the top-right corner (e.g. a ⋯ menu button). */
+  action?: ComponentChildren;
   children: ComponentChildren;
 }) {
   const { close } = useUI();
@@ -34,7 +34,7 @@ export function SheetFrame(p: {
             <Icon name="close" />
           </button>
           <h2>{p.title}</h2>
-          <span />
+          {p.action ?? <span />}
         </header>
         <div class="sheet-body">{p.children}</div>
         {p.onSave && (

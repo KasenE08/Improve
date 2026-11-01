@@ -44,9 +44,12 @@ export function notifications(d: AppData, now: Ms): Note[] {
     });
   }
   for (const e of d.plan.events ?? []) {
-    const when = e.start - lead;
+    if (e.remindMin === null) continue; // reminder turned off for this event
+    const mins = e.remindMin ?? LEAD_MIN;
+    const when = e.start - mins * 60_000;
     if (when < from || when >= to) continue;
-    out.push({ at: when, title: e.title, body: `In ${LEAD_MIN} min · ${fmtTime(e.start)}–${fmtTime(e.end)}`, tag: `event-${e.blockId}-${e.start}` });
+    const lead = mins ? `In ${mins} min` : 'Starting now';
+    out.push({ at: when, title: e.title, body: `${lead} · ${fmtTime(e.start)}–${fmtTime(e.end)}`, tag: `event-${e.blockId}-${e.start}` });
   }
   return out.sort((a, b) => a.at - b.at || a.tag.localeCompare(b.tag));
 }
