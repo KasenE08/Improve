@@ -43,7 +43,7 @@ const nav = (title) => `<div class="food-nav mon-pagenav"><button class="food-ba
 export function render(root, refresh) {
   ctx = { root, refresh };
   const s = M.getState();
-  const body = ui.page === 'budget' ? nav('Budgets') + budget(s) : ui.page === 'settings' ? nav('Paychecks') + settings(s) : main(s);
+  const body = ui.page === 'budget' ? nav('Budgets') + budget(s) : ui.page === 'settings' ? nav('Paychecks & cash back') + settings(s) : main(s);
   root.innerHTML = `<div class="screen money">${body}</div>`;
   // Settings: put back anything typed before switching pay schedule or saving mode
   if (ui.page === 'settings' && ui.typed) {
@@ -58,7 +58,7 @@ function keepTyped() {
 export const reset = () => { ui.page = null; ui.month = today().slice(0, 7); };
 
 function openPage(page) {
-  ui.page = page; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null;
+  ui.page = page; ui.cbAcct = null; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null;
   rerender();
   window.scrollTo(0, 0);
 }
@@ -72,7 +72,7 @@ export function openMenu() {
     title: 'Money',
     body: `<div class="group">
       ${row('budget', 'wallet', 'Budgets', total ? `${money(s, total)} a month · ${s.categories.length} categories` : `${s.categories.length} categories · no budgets yet`)}
-      ${row('settings', 'piggy', 'Paychecks', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${splitText(s, s.settings.split)}` : 'Pay schedule and paycheck split')}
+      ${row('settings', 'piggy', 'Paychecks & cash back', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${splitText(s, s.settings.split)}${s.settings.cashback?.rate ? ` · ${s.settings.cashback.rate}% cash back` : ''}` : 'Pay schedule, paycheck split, cash back')}
     </div>`,
     onMount(b) {
       b.onclick = (e) => {
@@ -146,7 +146,7 @@ function accountsPanel(s) {
   const rows = s.accounts.map((a) => `<button class="mon-row" data-m="acct" data-id="${esc(a.id)}">${icon(a.icon || 'cash', 'mon-row__icon')}
       <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span></span>
       <span class="mon-row__amt${bal[a.id] < 0 ? ' mon-over' : ''}">${money(s, bal[a.id])}</span></button>`).join('');
-  return box('Accounts', `${rows}${paydayRow(s)}`, `<button class="mon-link" data-m="acct-add" aria-label="Add account">${icon('plus')}Add</button>`);
+  return box('Accounts', `${rows}${paydayRow(s)}${cashbackRow(s)}`, `<button class="mon-link" data-m="acct-add" aria-label="Add account">${icon('plus')}Add</button>`);
 }
 
 function openAccountSetup() {
@@ -258,6 +258,58 @@ function paydayRow(s) {
     ${st.pending ? `<button class="imp-btn imp-btn--sm imp-btn--primary" data-m="add" data-kind="income">Log</button>` : ''}</div>`;
 }
 
+// Card cash back: the estimate for this month so far, and a quick "Log" for the deposit when it lands
+// (the bank pays last month's cash back early this month).
+function cashbackRow(s) {
+  const cb = s.settings.cashback || {};
+  if (!(cb.rate > 0)) return '';
+  const mk = today().slice(0, 7);
+  const last = L.shiftMonth(mk, -1);
+  const [a, b] = L.monthRange(mk);
+  const got = s.entries.filter((e) => e.kind === 'cashback' && e.date >= a && e.date <= b);
+  const sofar = `≈ ${money(s, L.cashbackFor(s, mk))} so far in ${L.monthLabel(mk).split(' ')[0]}`;
+  const sub = got.length
+    ? `Got ${money(s, got.reduce((t, e) => t + e.amount, 0))} on ${shortDate(got[got.length - 1].date).replace(/^\w+, /, '')} · ${sofar}`
+    : `≈ ${money(s, L.cashbackFor(s, last))} for ${L.monthLabel(last).split(' ')[0]} · ${sofar}`;
+  return `<div class="mon-row mon-payrow">${icon('star', 'mon-row__icon')}
+    <span class="mon-row__mid"><span class="mon-row__name">Cash back · ${cb.rate}%</span><span class="mon-row__sub">${esc(sub)}</span></span>
+    ${got.length ? '' : '<button class="imp-btn imp-btn--sm imp-btn--secondary" data-m="cashback">Log</button>'}</div>`;
+}
+
+function openCashback(e = null) {
+  const s = M.getState();
+  const cb = s.settings.cashback || {};
+  const last = L.shiftMonth(today().slice(0, 7), -1);
+  let acct = e?.account || cb.account || 'savings';
+  const accts = s.accounts || [];
+  sheet.open({
+    title: e ? 'Edit cash back' : 'Log cash back',
+    body: `<label class="imp-field"><span class="imp-label">Amount</span><span class="food-unit"><input class="imp-input mon-amt" id="c-amt" inputmode="decimal" placeholder="0.00" value="${e ? e.amount / 100 : (L.cashbackFor(s, last) / 100 || '')}"><span>${esc(s.settings.currency)}</span></span></label>
+      ${e ? '' : `<p class="mon-note">Filled in with ${cb.rate}% of ${L.monthLabel(last).split(' ')[0]}'s logged spending. Change it to what the bank actually paid.</p>`}
+      ${accts.length ? `<div class="imp-field"><span class="imp-label">Into</span><div class="mon-chips">${accts.map((a) => `<button type="button" data-acct="${esc(a.id)}" class="mon-chip${acct === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>` : ''}
+      <label class="imp-field"><span class="imp-label">Date</span><input class="imp-input" type="date" id="c-date" value="${e?.date || today()}" max="${today()}"></label>
+      <p class="food-err" id="c-err"></p>
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="c-save">${e ? 'Save' : 'Add cash back'}</button>
+      ${e ? `<button class="imp-btn imp-btn--danger imp-btn--block" id="c-del">${icon('trash')}Delete</button>` : ''}`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        if (t.dataset.acct) { acct = t.dataset.acct; b.querySelectorAll('.mon-chip').forEach((x) => x.classList.toggle('is-on', x === t)); return; }
+        if (t.id === 'c-save') {
+          const amount = L.toCents(b.querySelector('#c-amt').value);
+          if (!(amount > 0)) { b.querySelector('#c-err').textContent = 'Enter an amount above 0.'; return; }
+          const date = b.querySelector('#c-date').value || today();
+          sheet.close();
+          changed(() => M.upsertEntry({ ...(e || {}), kind: 'cashback', amount, account: acct, note: 'Cash back', date }), [date, e?.date]);
+          toast(e ? 'Saved' : 'Cash back added');
+        }
+        if (t.id === 'c-del' && confirm('Delete this cash back?')) { sheet.close(); changed(() => M.deleteEntry(e.id), [e.date]); toast('Deleted'); }
+      };
+    },
+  });
+}
+
 // History: everything logged this month, newest first, with the time it was logged
 function history(s) {
   const [start, end] = L.monthRange(ui.month);
@@ -266,9 +318,9 @@ function history(s) {
   const days = [...new Set(list.map((e) => e.date))];
   const rows = days.map((d) => `<div class="mon-day">${d === today() ? 'Today' : shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
-    const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll' }[e.kind] || c?.icon || 'cash';
+    const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll', cashback: 'star' }[e.kind] || c?.icon || 'cash';
     const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
-    const what = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money'
+    const what = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money' : e.kind === 'cashback' ? `Into ${acctName(s, e.account || 'savings')}`
       : L.beforeTracking(s, e) ? 'Before tracking' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : '')
       : e.kind === 'income' && e.splits?.length > 1 ? e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ') : e.note ? KIND[e.kind] : '';
     const time = e.at && dayKey(new Date(e.at)) === e.date ? timeOf(e.at) : '';
@@ -313,11 +365,24 @@ function settings(s) {
       <div class="imp-seg mon-seg">${Object.entries(L.FREQS).map(([k, v]) => `<button data-m="freq" data-freq="${k}" class="${f === k ? 'is-on' : ''}">${v}</button>`).join('')}</div>
       ${fields}</div>`)}
     ${splitBox(s)}
+    ${cashbackBox(s)}
     ${box('Other', `<div class="mon-stack">
       <label class="imp-field"><span class="imp-label">Currency symbol</span><input class="imp-input" id="s-cur" maxlength="3" value="${esc(s.settings.currency)}"></label>
       <p class="food-err" id="s-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-m="save-settings">Save settings</button>
       <p class="mon-note">Money is included in the backup on the You page.</p></div>`)}`;
+}
+
+// Card cash back: % of spending, and the account it's paid into
+function cashbackBox(s) {
+  const cb = s.settings.cashback || {};
+  const acct = ui.cbAcct || cb.account || 'savings';
+  const accts = s.accounts || [];
+  return box('Cash back', `<div class="mon-stack">
+    <p class="mon-note">If your card pays cash back, set the rate. Money shows about how much you've earned this month, and you log the deposit when the bank pays it.</p>
+    <label class="imp-field"><span class="imp-label">Rate (blank = off)</span><span class="food-unit"><input class="imp-input" id="cb-rate" inputmode="decimal" placeholder="0" value="${cb.rate || ''}"><span>%</span></span></label>
+    ${accts.length ? `<div class="imp-field"><span class="imp-label">Paid into</span><div class="mon-chips">${accts.map((a) => `<button type="button" data-m="cb-acct" data-id="${esc(a.id)}" class="mon-chip${acct === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>` : ''}
+  </div>`);
 }
 
 // Paycheck split editor (works on a draft until Save settings)
@@ -486,12 +551,14 @@ export function bind(root) {
       case 'add': openEntry(el.dataset.kind); break;
       case 'edit': {
         const entry = s.entries.find((e) => e.id === el.dataset.id);
-        if (entry?.kind === 'adjust') {
+        if (entry?.kind === 'cashback') openCashback(entry);
+        else if (entry?.kind === 'adjust') {
           if (confirm(`Remove this ${money(s, entry.amount)} balance fix?`)) { M.deleteEntry(entry.id); rerender(); toast('Removed'); }
         } else openEntry(null, entry);
         break;
       }
       case 'acct-setup': openAccountSetup(); break;
+      case 'cashback': openCashback(); break;
       case 'acct': openAccount(el.dataset.id); break;
       case 'acct-add': openAddAccount(); break;
 
@@ -527,6 +594,7 @@ export function bind(root) {
         break;
       }
       case 'split-rest': keepTyped(); splitDraft(s).rest = el.dataset.id; rerender(); break;
+      case 'cb-acct': keepTyped(); ui.cbAcct = el.dataset.id; rerender(); break;
       case 'save-settings': saveSettings(s); break;
     }
   });
@@ -570,11 +638,16 @@ function saveSettings(s) {
     split = { rest: sp.rest, parts };
   }
   const currency = ctx.root.querySelector('#s-cur').value.trim() || '$';
+  const rateRaw = ctx.root.querySelector('#cb-rate')?.value.trim() || '';
+  const rate = rateRaw ? Number(rateRaw) : 0;
+  if (!(rate >= 0 && rate <= 20)) { err.textContent = 'Cash back rate must be 0–20%.'; return; }
+  const cashback = { rate, account: ui.cbAcct || s.settings.cashback?.account || 'savings' };
+  ui.cbAcct = null;
   ui.payFreq = null;
   ui.split = null;
   ui.typed = null;
   ui.page = null;
-  changed(() => M.saveSettings({ pay, split, currency, setup: true }));
+  changed(() => M.saveSettings({ pay, split, currency, cashback, setup: true }));
   window.scrollTo(0, 0);
   toast('Settings saved');
 }
