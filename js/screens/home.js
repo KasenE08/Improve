@@ -3,14 +3,13 @@
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
-import * as store from '../store.js';
 import * as Food from '../food/store.js';
 import * as FoodAuto from '../food/autocheck.js';
 import * as Money from '../money/store.js';
 import * as ML from '../money/logic.js';
 import * as Journal from '../journal/store.js';
 import { totals } from '../food/logic.js';
-import { dayKey, appNow } from '../dates.js';
+import { dayKey } from '../dates.js';
 import { isAuto } from '../auto.js';
 import { esc, icon, check, xpbar, pct, toast } from '../ui.js';
 import { dayStatus } from '../hud.js';
@@ -18,30 +17,8 @@ import { celebrate } from './today.js';
 
 let ctx; // { root, refresh }
 
-const fmtTime = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' ', '').replace(':00', '').toLowerCase();
-const fmtDue = (ms) => {
-  const d = new Date(ms);
-  const today = dayKey();
-  const k = dayKey(appNow(d));
-  const day = k === today ? 'today' : d.toLocaleDateString('en-US', { weekday: 'short' });
-  return `due ${day} ${fmtTime(ms)}`;
-};
 const card = (go, title, ic, more, body, cls = '') => `<div class="hcard ${cls}" data-go="${go}">
     <div class="hcard__head"><span class="hcard__title">${icon(ic)}${esc(title)}</span><span class="hcard__more">${more}${icon('next')}</span></div>${body}</div>`;
-
-// Next assignments from the planner's saved plan
-function upNext() {
-  const data = store.get('planner', null);
-  if (!data) return null;
-  const tasks = new Map((data.tasks || []).map((t) => [t.id, t]));
-  const now = Date.now();
-  // Assignments not done yet and events, whatever comes next (the planner is a calendar)
-  const items = [
-    ...(data.plan?.items || []).filter((i) => tasks.get(i.taskId) && tasks.get(i.taskId).status !== 'done' && i.end > now).map((i) => ({ ...i, task: tasks.get(i.taskId) })),
-    ...(data.plan?.events || []).filter((e) => e.end > now).map((e) => ({ ...e, event: true })),
-  ].sort((a, b) => a.start - b.start);
-  return { items, classes: new Map((data.classes || []).map((c) => [c.id, c])), open: (data.tasks || []).filter((t) => t.status !== 'done').length };
-}
 
 export function render(root, refresh) {
   ctx = { root, refresh };
@@ -58,25 +35,6 @@ export function render(root, refresh) {
       <div class="hcard__sub">${next.length ? 'Up next, tap to tick:' : st?.perfect ? 'Every daily habit done' : 'The rest tick on their own'}</div></div></div>
     ${next.length ? `<div class="hq">${next.map((i) => `<button class="hq__row" data-tick="${esc(i.h.id)}">${check(false)}<span>${esc(i.h.name)}${i.h.target > 1 ? ` <small>${i.n}/${i.h.target}</small>` : ''}</span></button>`).join('')}</div>` : ''}`);
 
-  // Up next (Planner)
-  const un = upNext();
-  let planBody;
-  if (!un) planBody = '<p class="hcard__sub">Open to set up your schedule.</p>';
-  else if (!un.items.length) planBody = '<p class="hcard__sub">Nothing on your calendar.</p>';
-  else {
-    const [first, ...rest] = un.items;
-    const title = (i) => i.event ? i.title : i.task.title;
-    const moreToday = (list) => list.slice(1).filter((i) => dayKey(appNow(new Date(i.start))) === today).length;
-    const when = (i) => `${dayKey(appNow(new Date(i.start))) === today ? '' : new Date(i.start).toLocaleDateString('en-US', { weekday: 'short' }) + ' '}${fmtTime(i.start)}`;
-    const mins = Math.round((first.end - first.start) / 60000);
-    const cls = first.task && un.classes.get(first.task.classId);
-    const tag = cls ? `<span class="ctag" style="--c:${esc(cls.color)}"><i></i>${esc(cls.name)}</span>` : '';
-    const sub = first.event ? (first.start <= Date.now() ? `Now · until ${fmtTime(first.end)}` : 'Event') : first.task.due ? fmtDue(first.task.due) : 'Assignment';
-    planBody = `<div class="next${first.late ? ' is-late' : ''}${first.event ? ' is-event' : ''}"><span class="next__bar"${cls ? ` style="background:${esc(cls.color)}"` : ''}></span><div>${tag}<div class="next__title">${esc(title(first))}</div><div class="hcard__sub">${sub}${first.late ? ' · ends after it\'s due' : ''}</div></div>
-      <div class="next__time"><b>${when(first)}</b>${mins} min</div></div>
-      ${rest.length ? `<div class="chips">${rest.slice(0, 1).map((i) => `<span>${when(i)} · ${esc(title(i))}</span>`).join('')}${moreToday(rest) ? `<span>${moreToday(rest)} more today</span>` : ''}</div>` : ''}`;
-  }
-  const plan = card('planner', 'Up next', 'planner', 'Plan', planBody);
 
   // Food + water
   const g = Food.getGoals();
@@ -108,7 +66,7 @@ export function render(root, refresh) {
   const journal = card('journal', 'Journal', 'quill', `${words} / ${min} words`,
     `<div class="jprompt${words ? ' is-on' : ''}">${words ? esc(Journal.getDay(today).trim().slice(0, 90)) + (Journal.getDay(today).trim().length > 90 ? '…' : '') : 'How did today go?'}</div>`);
 
-  root.innerHTML = `<div class="screen home">${habits}${plan}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
+  root.innerHTML = `<div class="screen home">${habits}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
 }
 
 export function bind(root) {

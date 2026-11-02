@@ -157,3 +157,6 @@ Pushes to `main` deploy through `.github/workflows/pages.yml` (it type-checks, t
 - `planner/src/app/Day.tsx`: one day (4 AM → 4 AM), swipe for days, "Today" button, pinch to zoom (saved in `imp_planner_zoom`), opens with now a quarter down. Tap empty space = new event there (1 hour). Hold a block to drag it minute by minute. Overlaps side by side; blocks drawn at least 5 minutes tall.
 - `EventForm.tsx` (name, day, start/end to the minute, 14 colors = 7 basics + dark versions, repeat never/daily/weekly/monthly, reminder none/at start/5/10/30, notes), `EventView.tsx` (overview; ⋯ = Edit / Delete; repeating events ask "just this one / all of them" for move and delete).
 - Data version 2: assignments became one-time events (`toV2` in model.ts), events got colors from their names (`autoColor`). No assignments, no tick circles.
+
+## Planner removed (Nov 2026)
+Events moved to Google Calendar. The Plan page, Home "Up next" card, planner day details/stats, `planner/` sources, `js/planner-auto.js` and the build step are gone. `imp_planner` stays in storage and backups (hidden). On open, `retirePlanner()` in js/app.js unregisters this phone from the old notification server once (push set to null). "Finished today's work" is a normal manual habit.

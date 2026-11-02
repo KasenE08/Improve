@@ -24,10 +24,9 @@ Open the link in Safari → Share → **Add to Home Screen**.
 - One-time copy from the old Calorie Tracker (backup file or same-browser storage), read-only.
 
 ## Phase 4
-- Planner tab: Schedule-App-Planner (auto-scheduling, drag to move, month view, falling behind, learning, settings hub) restyled in Pixel HUD.
+- Planner: removed (events now live in Google Calendar).
 - Task-start notifications through your existing free notification server.
 - "Work done on schedule" ticks when all of today's planned tasks are done.
-- One-time copy from the old planner (backup file or same-browser storage), read-only.
 
 ## Phase 5
 - Money tab: spending log, per-category monthly budgets, paychecks and savings, monthly review.
@@ -44,7 +43,6 @@ Open the link in Safari → Share → **Add to Home Screen**.
 - `assets/icons/icons.svg` icon sprite · `assets/fonts/` self-hosted fonts · `assets/app-icons/` home screen icons
 - `sw.js` offline cache · `manifest.webmanifest` install info
 - `design/` the original style samples from Part A
-- Planner source: `planner/` (TypeScript + Preact, `npm run check`, `npm run build` → `js/planner/`)
-- Tests: `node tests/logic.test.mjs`, `node tests/phase2.test.mjs`, `node tests/food-auto.test.mjs`, `node --test tests/food-logic.test.mjs`, `node tests/planner-auto.test.mjs`, `node tests/money.test.mjs`, `node tests/journal.test.mjs`
+- Tests: `node tests/logic.test.mjs`, `node tests/phase2.test.mjs`, `node tests/food-auto.test.mjs`, `node --test tests/food-logic.test.mjs`, `node tests/money.test.mjs`, `node tests/journal.test.mjs`
 
 Credits: see `CREDITS.md`.

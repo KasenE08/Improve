@@ -14,14 +14,13 @@ import { recheckJournal } from './journal/autocheck.js';
 import { recheckMoney } from './money/autocheck.js';
 import * as Profile from './screens/profile.js';
 import * as Home from './screens/home.js';
-import { recheckPlanner } from './planner-auto.js';
-import { panel, empty } from './ui.js';
 import { celebrate } from './screens/today.js';
 import { isLocked, showCountdown, wipeTestData } from './launch.js';
 import { reload as reloadFood } from './food/store.js';
+import * as store from './store.js';
 
 // One screen: Home (header + cards). Each card opens a full page with "‹ Home" at the top.
-const PAGES = { home: '', today: 'Habits', food: 'Food & water', planner: 'Plan', money: 'Money', journal: 'Journal', profile: 'You' };
+const PAGES = { home: '', today: 'Habits', food: 'Food & water', money: 'Money', journal: 'Journal', profile: 'You' };
 
 const hud = document.getElementById('hud');
 const screen = document.getElementById('screen');
@@ -47,44 +46,13 @@ function boot() {
     return t in PAGES ? t : 'home';
   }
 
-  // ---- Planner tab (built bundle, loaded on demand) ----
-  let planner = null;        // the loaded module
-  let plannerMounted = false;
-  let plannerLoad = null;
-  function loadPlanner() {
-    plannerLoad ||= import('./planner/planner.js').then((m) => {
-      planner = m;
-      // Every saved planner change: re-check "Finished today's work" and update the HUD.
-      m.start({ onChange: () => { const before = Stats.compute(); const added = recheckPlanner(); renderHud(); celebrate(before, Stats.compute(), added); } });
-      const added = recheckPlanner();
-      renderHud();
-      if (['home', 'today'].includes(currentTab())) refresh(); // show Work's tick or day off
-      if (added.length) celebrate(Stats.compute(), Stats.compute(), added);
-      return m;
-    }).catch((e) => { console.warn('Planner failed to load', e); plannerLoad = null; throw e; });
-    return plannerLoad;
-  }
-  function unmountPlanner() {
-    if (plannerMounted && planner) planner.unmount(screen);
-    plannerMounted = false;
-  }
-  function showPlanner() {
-    if (plannerMounted) return;
-    if (planner) { screen.innerHTML = ''; planner.mount(screen); plannerMounted = true; return; }
-    screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'hourglass', title: 'Loading', text: 'One moment…' }) })}</div>`;
-    loadPlanner().then(() => { if (currentTab() === 'planner') showPlanner(); })
-      .catch(() => { screen.innerHTML = `<div class="screen">${panel({ title: 'Planner', body: empty({ icon: 'info', title: 'Couldn’t load', text: 'Check your connection and reopen the app.' }) })}</div>`; });
-  }
-
   // Home shows the week header; a page shows "‹ Home" and its title
   const renderHud = () => {
     const tab = currentTab();
     hud.className = tab === 'home' ? 'hud' : 'phead';
     if (tab === 'home') drawHud(hud);
     else {
-      // The planner's settings live behind ⋯ here in the top bar (the planner listens for this event)
-      const end = tab === 'planner' ? `<button class="phead__more" data-act="planner-menu" aria-label="Planner settings">${icon('more')}</button>`
-        : tab === 'today' ? `<button class="phead__more" data-act="new-habit" aria-label="New habit">${icon('plus')}</button>`
+      const end = tab === 'today' ? `<button class="phead__more" data-act="new-habit" aria-label="New habit">${icon('plus')}</button>`
         : tab === 'food' ? `<button class="phead__more" data-act="food-menu" aria-label="Saved foods, meals and goals">${icon('more')}</button>`
         : tab === 'money' ? `<button class="phead__more" data-act="money-menu" aria-label="Budgets and paychecks">${icon('more')}</button>`
         : tab === 'journal' ? `<button class="phead__more" data-act="journal-menu" aria-label="Journal settings">${icon('more')}</button>` : '';
@@ -98,8 +66,6 @@ function boot() {
     const tab = currentTab();
     renderHud();
     Journal.flush(); // save anything still being typed before the screen changes
-    if (tab === 'planner') { screen.dataset.tab = tab; showPlanner(); return; }
-    unmountPlanner();
     screen.dataset.tab = tab;
     if (tab === 'home') Home.render(screen, refresh);
     else if (tab === 'today') Today.render(screen, refresh);
@@ -117,7 +83,6 @@ function boot() {
   Profile.bind(screen, refresh);
   bindHud(hud, { rename: () => Profile.openNameSheet(refresh), refresh });
   hud.addEventListener('click', (e) => {
-    if (e.target.closest('[data-act="planner-menu"]')) return window.dispatchEvent(new Event('improve:planner-menu'));
     if (e.target.closest('[data-act="new-habit"]')) return Today.openHabitForm(null);
     if (e.target.closest('[data-act="food-menu"]')) { if (currentTab() === 'food') Food.openMenu(); return; }
     if (e.target.closest('[data-act="money-menu"]')) { if (currentTab() === 'money') Money.openMenu(); return; }
@@ -133,10 +98,8 @@ function boot() {
     if (tab !== 'home') openedFromHome = lastTab === 'home' || (openedFromHome && lastTab === tab);
     if (lastTab === 'money' && tab !== 'money') Money.reset(); // Money opens on its main page next time
     lastTab = tab;
-    const id = takeTaskFromHash();
     refresh();
     window.scrollTo(0, 0);
-    if (id) loadPlanner().then((m) => m.openTask(id, plannerMounted)).catch(() => {});
   });
 
   // New day (or week/month) → redraw. Checked often because phones pause timers in the background.
@@ -144,12 +107,12 @@ function boot() {
   const checkDay = () => {
     const before = Stats.compute();
     const offBefore = JSON.stringify(H.getExcused());
-    const added = [...Food.recheckToday(), ...recheckPlanner(), ...recheckMoney(), ...recheckJournal()];
+    const added = [...Food.recheckToday(), ...recheckMoney(), ...recheckJournal()];
     if (dayKey() !== shownDay) { const fresh = R.sync(); refresh(); celebrate(before, Stats.compute(), [...added, ...fresh]); return; }
     const after = Stats.compute();
     if (after.total === before.total && !added.length && JSON.stringify(H.getExcused()) === offBefore) return;
     renderHud();
-    // Redraw lists that show ticks; leave Food/Money/Journal/Planner alone so typing isn't interrupted
+    // Redraw lists that show ticks; leave Food/Money/Journal alone so typing isn't interrupted
     if (['home', 'today', 'profile'].includes(currentTab())) refresh();
     celebrate(before, after, added);
   };
@@ -158,26 +121,12 @@ function boot() {
   window.addEventListener('focus', checkDay);
   window.addEventListener('pageshow', checkDay);
 
-  // Opened from a notification tap: #planner?task=ID
-  function takeTaskFromHash() {
-    const m = location.hash.match(/^#planner\?task=(.+)$/);
-    if (!m) return null;
-    history.replaceState(null, '', '#planner');
-    return decodeURIComponent(m[1]);
-  }
-  const tappedTask = takeTaskFromHash();
-
   refresh();
   if (openedWith.length) { const st = Stats.compute(); celebrate(st, st, openedWith); }
 
-  // Load the planner in the background: replans on a new day and keeps notifications in sync.
-  const plannerReady = loadPlanner().catch(() => null);
-  if (tappedTask) plannerReady.then((m) => m && m.openTask(tappedTask, plannerMounted));
-  navigator.serviceWorker?.addEventListener('message', (e) => {
-    if (e.data?.type !== 'open-task') return;
-    if (currentTab() !== 'planner') location.hash = 'planner';
-    plannerReady.then((m) => m && m.openTask(e.data.taskId, plannerMounted));
-  });
+  // The planner was removed (events moved to Google Calendar). Once: tell its notification server to
+  // forget this phone so old reminders stop. The planner's data stays in storage (and backups), hidden.
+  retirePlanner();
 }
 
 // ---- Offline support ----
@@ -207,3 +156,15 @@ try {
     setTimeout(() => done.remove(), 3500);
   }
 } catch (_) {}
+
+function retirePlanner() {
+  const data = store.get('planner', null);
+  const p = data?.push;
+  if (!p) return;
+  store.set('planner', { ...data, push: null });
+  const url = String(p.url || '').trim().replace(/\/+$/, '');
+  if (/^https:\/\//.test(url)) {
+    fetch(`${url}/unregister`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ deviceId: p.deviceId, secret: p.secret }) }).catch(() => {});
+  }
+  navigator.serviceWorker?.ready.then((r) => r.pushManager?.getSubscription()).then((s) => s?.unsubscribe()).catch(() => {});
+}

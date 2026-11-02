@@ -7,44 +7,36 @@ globalThis.localStorage = {
 const J = (p) => new URL('../js/' + p, import.meta.url).href;
 const H = await import(J('habits.js'));
 H.init();
-// The planner rule is off since schema 12 ("Finished today's work" is ticked by hand); these tests turn it on to check it
-const __hs = JSON.parse(mem.imp_habits); for (const h of __hs) if (h.id === 'work-on-schedule') Object.assign(h, { auto: 'planner:work', autoAfter: 900 }); mem.imp_habits = JSON.stringify(__hs);
-const P = await import(J('planner-auto.js'));
 let fails = 0;
 const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++; console.log('FAIL', m, a, b); } else console.log('ok', m); };
 
-const work = H.getHabits().find((h) => h.id === 'work-on-schedule');
+// A daily auto habit ("100 oz water"); the auto check is played by hand here: day off / done / not done
+const work = H.getHabits().find((h) => h.auto === 'food:water');
 const save = H.getHabits().find((h) => h.auto === 'money:save');
 const D = '2026-10-29';
-const noon = new Date(2026, 9, 29, 12); // before the 3 PM auto time
+const noon = new Date(2026, 9, 29, 12);
 const late = new Date(2026, 9, 29, 16);
 const entry = () => H.getLog()[D]?.[work.id];
-const plan = (d) => { mem.imp_planner = JSON.stringify(d); };
-const t = (h) => new Date(2026, 9, 29, h).getTime();
+const auto = (state) => { // what an auto check would do
+  if (state === 'off') H.setExcused(work, D, true);
+  else H.setPeriodDone(work, late, state === 'done', late);
+};
 
-// Nothing planned: day off
-plan({ tasks: [], blocks: [{ id: 'school' }], plan: { items: [] } });
-P.recheckPlanner(late);
-eq([!!entry(), H.isExcused(work.id, D)], [false, true], 'nothing planned: day off');
+auto('off');
+eq([!!entry(), H.isExcused(work.id, D)], [false, true], 'auto: day off');
 
-// Override beats the day off, gives full XP, before 3 PM too
+// Override beats the day off, gives full XP
 H.setOverride(work, true, noon);
-eq([entry()?.n, entry()?.xp, H.isExcused(work.id, D), H.isOverridden(work, noon)], [1, work.xp, false, true], 'override: ticked, full XP, not a day off');
-P.recheckPlanner(late);
+eq([!!entry(), entry()?.xp, H.isExcused(work.id, D), H.isOverridden(work, noon)], [true, work.xp, false, true], 'override: ticked, full XP, not a day off');
+auto('off'); auto('not');
 eq([!!entry(), H.isExcused(work.id, D)], [true, false], 'auto check cannot undo it or turn it back into a day off');
-
-// Unfinished tasks don't take it back either
-plan({ tasks: [{ id: 'a', status: 'todo' }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
-P.recheckPlanner(late);
-eq(!!entry(), true, 'unfinished task: override still stands');
 
 // Undo: tick removed, auto decides again
 H.setOverride(work, false, noon);
-P.recheckPlanner(late);
-eq([!!entry(), H.isOverridden(work, noon)], [false, false], 'back to auto: unfinished task = not done');
-plan({ tasks: [{ id: 'a', status: 'done', startedAt: t(13), completedAt: t(14) }], plan: { items: [{ taskId: 'a', start: t(13), end: t(14) }] } });
-P.recheckPlanner(late);
-eq(!!entry(), true, 'back to auto: finished task ticks it again');
+auto('not');
+eq([!!entry(), H.isOverridden(work, noon)], [false, false], 'back to auto: not done');
+auto('done');
+eq(!!entry(), true, 'back to auto: done ticks it again');
 
 // Next day it's auto again
 H.setOverride(work, true, noon);
