@@ -174,9 +174,13 @@ export function entryMoves(e) {
     case 'saving': return [[e.from || 'checking', -e.amount], [e.to || 'savings', e.amount]];
     case 'transfer': return [[e.from, -e.amount], [e.to, e.amount]];
     case 'adjust': return [[e.account, e.amount]];
+    case 'cashback': return [[e.account || 'savings', e.amount]]; // the card's cash back, deposited by the bank
     default: return [];
   }
 }
+
+// Cash back the card pays for a month's logged spending (rate % of it, rounded to the cent)
+export const cashbackFor = (state, mk) => Math.round((monthSummary(state, mk).spent * (state.settings.cashback?.rate || 0)) / 100);
 
 // → { accountId: cents }
 export function balances(state) {

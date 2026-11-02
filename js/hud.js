@@ -176,10 +176,10 @@ function dayBody(key) {
   const moves = (ms.entries || []).filter((e) => e.date === key);
   if (moves.length) {
     const catName = (id) => ms.categories.find((c) => c.id === id)?.name || 'Other';
-    const label = { expense: 'Expense', income: 'Paycheck', saving: 'To savings', transfer: 'Move', adjust: 'Balance fix' };
+    const label = { expense: 'Expense', income: 'Paycheck', saving: 'To savings', transfer: 'Move', adjust: 'Balance fix', cashback: 'Cash back' };
     const spent = moves.filter((e) => e.kind === 'expense').reduce((s, e) => s + e.amount, 0);
     const rows = moves.map((e) => `<li class="dd__row"><span class="dd__name">${esc(e.note || (e.kind === 'expense' ? catName(e.cat) : label[e.kind] || 'Entry'))}<small>${e.kind === 'expense' ? esc(catName(e.cat)) : label[e.kind] || ''}</small></span>
-      <span class="dd__val dd__money${e.kind === 'income' ? ' is-in' : ''}">${e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}${fmtMoney(Math.abs(e.amount), cur)}</span></li>`).join('');
+      <span class="dd__val dd__money${e.kind === 'income' || e.kind === 'cashback' ? ' is-in' : ''}">${e.kind === 'income' || e.kind === 'cashback' ? '+' : e.kind === 'expense' ? '−' : ''}${fmtMoney(Math.abs(e.amount), cur)}</span></li>`).join('');
     parts.push(section('Money', spent ? `${fmtMoney(spent, cur)} spent` : '', `<ul class="dd__list">${rows}</ul>`));
   }
 

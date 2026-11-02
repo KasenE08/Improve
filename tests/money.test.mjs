@@ -197,3 +197,15 @@ process.exitCode = fails ? 1 : 0;
   eq(L.reviewMonth(new Date(2027, 0, 2, 12)), '2026-12', 'Sat Jan 2: still the December review');
   eq(L.reviewMonth(new Date(2026, 10, 2, 12)), '2026-11', 'Mon Nov 2: November review');
 }
+
+// ---- Card cash back ----
+{
+  const st = { settings: { cashback: { rate: 1, account: 'savings' } }, categories: [], accounts: [{ id: 'savings', start: 1000, since: '' }, { id: 'checking', start: 0, since: '' }],
+    entries: [{ kind: 'expense', amount: 33079, date: '2026-10-15', account: 'checking' }, { kind: 'expense', amount: 500, date: '2026-11-01', account: 'checking' }] };
+  eq(L.cashbackFor(st, '2026-10'), 331, 'cash back: 1% of $330.79 = $3.31');
+  eq(L.cashbackFor({ ...st, settings: { cashback: { rate: 0 } } }, '2026-10'), 0, 'cash back off = 0');
+  st.entries.push({ kind: 'cashback', amount: 331, account: 'savings', date: '2026-11-02', at: '2026-11-02T12:00:00Z' });
+  eq(L.balances(st).savings, 1331, 'cash back deposit goes into Savings');
+  eq([L.monthSummary(st, '2026-11').spent, L.monthSummary(st, '2026-11').income], [500, 0], 'not spending, not a paycheck');
+}
+process.exitCode = fails ? 1 : 0;

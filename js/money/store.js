@@ -22,6 +22,8 @@ export const DEFAULT_SETTINGS = {
   // How each paycheck is divided between accounts (see logic.js splitPaycheck). null = from `save`.
   split: null,
   setup: false, // true once paydays are set in Money → Settings
+  // Card cash back: rate in % of spending (0 = off), paid into this account about once a month
+  cashback: { rate: 0, account: 'savings' },
 };
 
 const empty = () => ({
@@ -37,7 +39,7 @@ export function getState() {
   const s = store.get(KEY, null);
   if (!s) return empty();
   const d = DEFAULT_SETTINGS;
-  const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save } };
+  const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save }, cashback: { ...d.cashback, ...s.settings?.cashback } };
   settings.split ||= splitFromSave(settings.save);
   return { ...empty(), ...s, settings };
 }

@@ -85,3 +85,4 @@
 .mon-split__val { width: 84px; text-align: right; }
 .mon-split.is-rest b { font-size: 15px; font-weight: 600; }
 .mon-acct-add { margin-top: 8px; }
+.mon-k-cashback { color: var(--imp-good); }
