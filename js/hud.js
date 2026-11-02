@@ -5,7 +5,6 @@
 // a limit counts as done while you're at or under it). A Perfect Day (every daily habit done) is a solid circle.
 import * as H from './habits.js';
 import * as R from './rewards.js';
-import * as store from './store.js';
 import * as Food from './food/store.js';
 import * as Money from './money/store.js';
 import * as Journal from './journal/store.js';
@@ -182,13 +181,6 @@ function dayBody(key) {
     const rows = moves.map((e) => `<li class="dd__row"><span class="dd__name">${esc(e.note || (e.kind === 'expense' ? catName(e.cat) : label[e.kind] || 'Entry'))}<small>${e.kind === 'expense' ? esc(catName(e.cat)) : label[e.kind] || ''}</small></span>
       <span class="dd__val dd__money${e.kind === 'income' ? ' is-in' : ''}">${e.kind === 'income' ? '+' : e.kind === 'expense' ? '−' : ''}${fmtMoney(Math.abs(e.amount), cur)}</span></li>`).join('');
     parts.push(section('Money', spent ? `${fmtMoney(spent, cur)} spent` : '', `<ul class="dd__list">${rows}</ul>`));
-  }
-
-  // Planner: assignments finished that day
-  const planner = store.get('planner', null);
-  const finished = (planner?.tasks || []).filter((t) => t.status === 'done' && t.completedAt && dayKey(appNow(new Date(t.completedAt))) === key);
-  if (finished.length) {
-    parts.push(section('Planner', `${finished.length} done`, `<ul class="dd__list">${finished.map((t) => `<li class="dd__row is-done"><span class="dd__mark">${icon('check')}</span><span class="dd__name">${esc(t.title)}</span></li>`).join('')}</ul>`));
   }
 
   // Journal
