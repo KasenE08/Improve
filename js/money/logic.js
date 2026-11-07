@@ -133,11 +133,11 @@ export function monthSummary(state, mk) {
   const byCat = {};
   for (const e of list) if (e.kind === 'expense') byCat[e.cat] = (byCat[e.cat] || 0) + e.amount;
   return {
-    spent: sum(list.filter((e) => e.kind === 'expense')),
+    spent: sum(list.filter((e) => e.kind === 'expense')) + list.filter((e) => e.kind === 'checkin').reduce((t, e) => t + checkinResult(state, e).spent, 0),
     income: sum(list.filter((e) => e.kind === 'income')),
     saved: sum(list.filter((e) => e.kind === 'saving')),
     byCat,
-    budget: state.categories.reduce((s, c) => s + (c.budget || 0), 0),
+    budget: (state.categories || []).reduce((s, c) => s + (c.budget || 0), 0),
   };
 }
 
@@ -182,14 +182,58 @@ export function entryMoves(e) {
 // Cash back the card pays for a month's logged spending (rate % of it, rounded to the cent)
 export const cashbackFor = (state, mk) => Math.round((monthSummary(state, mk).spent * (state.settings.cashback?.rate || 0)) / 100);
 
-// → { accountId: cents }
-export function balances(state) {
+// Entries in the order they happened (a check-in sets balances, so order matters)
+const byTime = (entries) => [...(entries || [])].sort((a, b) => (a.at || '').localeCompare(b.at || ''));
+
+// → { accountId: cents }. With `before` (an entry), only what happened before that entry.
+// A check-in ({ kind: 'checkin', balances: { id: cents } }) sets each account to what the bank showed.
+export function balances(state, before = null) {
   const out = {}, since = {};
   for (const a of state.accounts || []) { out[a.id] = a.start || 0; since[a.id] = a.since || ''; }
-  for (const e of state.entries || []) {
+  for (const e of byTime(state.entries)) {
+    if (before && (e === before || (e.id && e.id === before.id))) break;
+    if (e.kind === 'checkin') {
+      for (const [id, v] of Object.entries(e.balances || {})) if (id in out && (e.at || '') >= since[id]) out[id] = v;
+      continue;
+    }
     for (const [id, d] of entryMoves(e)) if (id in out && (e.at || '') >= since[id]) out[id] += d;
   }
   return out;
+}
+
+/**
+ * What a check-in found: the banks' total vs. what Improve expected (start + paychecks, cash back, moves
+ * logged since). Less than expected = spent; more = extra money that wasn't logged.
+ * `change` = each account since the check-in before it (or since it was set up).
+ */
+export function checkinResult(state, e) {
+  const expected = balances(state, e);
+  const ids = Object.keys(e.balances || {}).filter((id) => id in expected);
+  const delta = ids.reduce((t, id) => t + (e.balances[id] - expected[id]), 0);
+  const list = byTime(state.entries);
+  const prev = list.slice(0, list.findIndex((x) => x === e || (x.id && x.id === e.id))).filter((x) => x.kind === 'checkin').pop();
+  const startOf = (id) => prev?.balances?.[id] ?? (state.accounts || []).find((a) => a.id === id)?.start ?? 0;
+  const change = Object.fromEntries(ids.map((id) => [id, e.balances[id] - startOf(id)]));
+  return { spent: Math.max(0, -delta), extra: Math.max(0, delta), change };
+}
+export const checkins = (state) => byTime(state.entries).filter((e) => e.kind === 'checkin');
+export const lastCheckin = (state) => checkins(state).pop() || null;
+/** Was there a check-in in the Mon–Sun week containing `date`? */
+export const checkedInWeek = (state, date = appNow()) => {
+  const [start, end] = periodRange('weekly', date);
+  return checkins(state).some((e) => e.date >= start && e.date <= end);
+};
+
+/** Graph: each account's balance over time, one point per check-in (plus its start and today). */
+export function balanceSeries(state, now = new Date().toISOString()) {
+  const accts = state.accounts || [];
+  const cur = balances(state);
+  return accts.map((a) => {
+    const pts = [{ at: a.since || now, v: a.start || 0 }];
+    for (const e of checkins(state)) if (a.id in (e.balances || {}) && (e.at || '') >= (a.since || '')) pts.push({ at: e.at, v: e.balances[a.id] });
+    pts.push({ at: now, v: cur[a.id] });
+    return { id: a.id, name: a.name, points: pts };
+  });
 }
 
 // Savings are one thing: your Savings account. A "saving" logged before accounts were set up is already

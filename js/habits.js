@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first full habit month (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 14;
+export const SCHEMA = 15;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -168,6 +168,11 @@ export function init() {
   // (archived: its past check-ins are kept, it just stops showing).
   if (found < 14) {
     store.set('habits', store.get('habits', []).map((h) => (h.auto === 'money:review' ? { ...h, archived: true } : h)));
+  }
+  // Schema 15: Money is a weekly check-in now (no logging each purchase), so "Log spending" becomes
+  // the weekly "Sunday money check-in", ticked by the check-in itself.
+  if (found > 0 && found < 15) {
+    store.set('habits', store.get('habits', []).map((h) => (h.id === 'log-spending' ? { ...h, name: 'Sunday money check-in', frequency: 'weekly', target: 1, auto: 'money:checkin' } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

@@ -127,7 +127,7 @@ eq(L.monthRange('2027-02'), ['2027-02-01', '2027-02-28'], 'month range');
 // ---- auto-checks through storage ----
 H.init();
 const habits = Object.fromEntries(H.getHabits().map((h) => [h.id, h.auto]));
-eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [null, 'money:save', undefined], 'fresh install: save auto, log spending manual, no budget review');
+eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], ['money:checkin', 'money:save', undefined], 'fresh install: save auto, weekly check-in auto, no budget review');
 const M = await import(J('money/store.js'));
 const A = await import(J('money/autocheck.js'));
 const done = (id, key) => !!H.getLog()[key]?.[id];
@@ -178,7 +178,7 @@ for (const k of Object.keys(mem)) delete mem[k];
 mem.imp_schema = '2';
 mem.imp_habits = JSON.stringify([{ id: 'log-spending', auto: 'money:log', xp: 5 }, { id: 'save-paycheck', auto: null, xp: 25, name: 'My save' }, { id: 'budget-review', auto: null }, { id: 'kept-word', auto: null }]);
 H.init();
-eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto]), [['log-spending', null], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['kept-word', null]], 'upgrade sets autos, keeps the rest');
+eq(JSON.parse(mem.imp_habits).filter((h) => h.id !== 'proactive').map((h) => [h.id, h.auto]), [['log-spending', 'money:checkin'], ['save-paycheck', 'money:save'], ['budget-review', 'money:review'], ['kept-word', null]], 'upgrade sets autos (log spending → weekly check-in), keeps the rest');
 eq(JSON.parse(mem.imp_habits).find((h) => h.id === 'budget-review').archived, true, 'schema 14: Budget review put away (kept, hidden)');
 eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
 
@@ -207,5 +207,23 @@ process.exitCode = fails ? 1 : 0;
   st.entries.push({ kind: 'cashback', amount: 331, account: 'savings', date: '2026-11-02', at: '2026-11-02T12:00:00Z' });
   eq(L.balances(st).savings, 1331, 'cash back deposit goes into Savings');
   eq([L.monthSummary(st, '2026-11').spent, L.monthSummary(st, '2026-11').income], [500, 0], 'not spending, not a paycheck');
+}
+process.exitCode = fails ? 1 : 0;
+
+// ---- Weekly check-in ----
+{
+  const st = { settings: { cashback: { rate: 1 } }, categories: [], accounts: [{ id: 'checking', start: 10000, since: '2026-11-01T00:00:00Z' }, { id: 'savings', start: 100000, since: '2026-11-01T00:00:00Z' }],
+    entries: [
+      { kind: 'income', amount: 40000, date: '2026-11-06', at: '2026-11-06T18:00:00Z', splits: [{ account: 'savings', amount: 34000 }, { account: 'checking', amount: 6000 }] },
+      { kind: 'checkin', date: '2026-11-08', at: '2026-11-08T18:00:00Z', balances: { checking: 7500, savings: 134000 } },
+    ] };
+  const ci = st.entries[1];
+  eq(L.checkinResult(st, ci), { spent: 8500, extra: 0, change: { checking: -2500, savings: 34000 } }, 'check-in: expected $160 checking, bank says $75 → spent $85; savings +$340');
+  eq(L.balances(st), { checking: 7500, savings: 134000 }, 'balances follow the check-in');
+  eq(L.monthSummary(st, '2026-11').spent, 8500, 'check-in spending counts for the month (cash back estimate)');
+  eq([L.checkedInWeek(st, new Date(2026, 10, 8, 12)), L.checkedInWeek(st, new Date(2026, 10, 10, 12))], [true, false], 'checked in this week, not next');
+  st.entries.push({ kind: 'income', amount: 40000, date: '2026-11-13', at: '2026-11-13T18:00:00Z', splits: [{ account: 'savings', amount: 34000 }, { account: 'checking', amount: 6000 }] });
+  eq(L.balances(st).savings, 168000, 'paychecks after a check-in add on top of it');
+  eq(L.balanceSeries(st, '2026-11-14T00:00:00Z')[1].points.map((p) => p.v), [100000, 134000, 168000], 'graph: start, each check-in, now');
 }
 process.exitCode = fails ? 1 : 0;

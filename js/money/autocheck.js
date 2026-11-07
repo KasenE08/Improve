@@ -1,12 +1,13 @@
 // Ticks the Money habits on the Today tab:
 //   money:save   (weekly)  saved what this week's paycheck calls for; a week with no payday is a week off
 //                           (no tick, no XP, streak not broken)
-//   money:review (monthly) this month's budget review is finished
+//   money:review (monthly) this month's budget review is finished (retired)
+//   money:checkin (weekly) the weekly money check-in is done
 import { appNow } from '../dates.js';
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as M from './store.js';
-import { saveStatus, reviewDone } from './logic.js';
+import { saveStatus, reviewDone, checkedInWeek } from './logic.js';
 
 // Re-checks the week / month containing `date` (today, or the date of a back-dated entry).
 // Returns bonuses newly earned (for celebrations).
@@ -19,6 +20,7 @@ export function recheckMoney(date = appNow(), now = new Date()) {
       changed = H.setExcused(h, save.start, !!save.offWeek) || changed;
       changed = H.setPeriodDone(h, date, save.hit && !save.offWeek, now) || changed;
     }
+    if (h.auto === 'money:checkin') changed = H.setPeriodDone(h, date, checkedInWeek(state, date), now) || changed;
     if (h.auto === 'money:review') changed = H.setPeriodDone(h, date, reviewDone(state, date), now) || changed;
   }
   return changed ? R.sync(date) : [];

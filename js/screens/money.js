@@ -5,10 +5,9 @@ import { recheckMoney } from '../money/autocheck.js';
 import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
 import { dayKey, fromDayKey, periodRange } from '../dates.js';
-import { esc, icon, xpbar, toast, sheet, PICKER_ICONS } from '../ui.js';
+import { esc, icon, xpbar, toast, sheet } from '../ui.js';
 
 const KIND = { expense: 'Expense', income: 'Paycheck', saving: 'To savings', transfer: 'Move' };
-const MONEY_ICONS = ['diet', 'gas', 'car', 'game', 'bag', 'cart', 'keys', 'pill', 'cash', 'bank', 'piggy', 'ticket', 'coffee', 'home', 'heart', 'style', 'people', 'book', 'music', 'star'];
 
 // page: null = the main page, 'budget' or 'settings' = a page pushed from the ⋯ menu
 const ui = { page: null, month: dayKey().slice(0, 7) };
@@ -43,7 +42,7 @@ const nav = (title) => `<div class="food-nav mon-pagenav"><button class="food-ba
 export function render(root, refresh) {
   ctx = { root, refresh };
   const s = M.getState();
-  const body = ui.page === 'budget' ? nav('Budgets') + budget(s) : ui.page === 'settings' ? nav('Paychecks & cash back') + settings(s) : main(s);
+  const body = ui.page === 'settings' ? nav('Paychecks & cash back') + settings(s) : main(s);
   root.innerHTML = `<div class="screen money">${body}</div>`;
   // Settings: put back anything typed before switching pay schedule or saving mode
   if (ui.page === 'settings' && ui.typed) {
@@ -58,28 +57,28 @@ function keepTyped() {
 export const reset = () => { ui.page = null; ui.month = today().slice(0, 7); };
 
 function openPage(page) {
-  ui.page = page; ui.cbAcct = null; ui.draft = null; ui.picking = null; ui.payFreq = null; ui.split = null; ui.typed = null;
+  ui.page = page; ui.cbAcct = null; ui.payFreq = null; ui.split = null; ui.typed = null;
   rerender();
   window.scrollTo(0, 0);
 }
 
-/** ⋯ in the top bar: budgets and paychecks (they used to be tabs). */
+/** ⋯ in the top bar: the savings goal, and paychecks & cash back. */
 export function openMenu() {
   const s = M.getState();
-  const total = s.categories.reduce((t, c) => t + (c.budget || 0), 0);
-  const row = (page, ic, title, sub) => `<button class="g-row food-menu-row" data-page="${page}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span><span class="g-sub">${esc(sub)}</span></span>${icon('next')}</button>`;
+  const g = s.settings.goal;
+  const row = (act, ic, title, sub) => `<button class="g-row food-menu-row" data-go="${act}"><span class="g-icon">${icon(ic)}</span><span class="g-main"><span class="g-title">${title}</span><span class="g-sub">${esc(sub)}</span></span>${icon('next')}</button>`;
   sheet.open({
     title: 'Money',
     body: `<div class="group">
-      ${row('budget', 'wallet', 'Budgets', total ? `${money(s, total)} a month · ${s.categories.length} categories` : `${s.categories.length} categories · no budgets yet`)}
+      ${row('goal', 'star', 'Savings goal', `${g.name} · ${money(s, g.target)}`)}
       ${row('settings', 'piggy', 'Paychecks & cash back', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${splitText(s, s.settings.split)}${s.settings.cashback?.rate ? ` · ${s.settings.cashback.rate}% cash back` : ''}` : 'Pay schedule, paycheck split, cash back')}
     </div>`,
     onMount(b) {
       b.onclick = (e) => {
-        const p = e.target.closest('[data-page]')?.dataset.page;
+        const p = e.target.closest('[data-go]')?.dataset.go;
         if (!p) return;
         sheet.close();
-        openPage(p);
+        if (p === 'goal') setTimeout(openGoal, 250); else openPage(p);
       };
     },
   });
@@ -90,49 +89,69 @@ const monthNav = () => `<div class="mon-nav"><button class="food-back" data-m="m
   <span class="mon-nav__title">${esc(L.monthLabel(ui.month))}</span>
   <button class="food-back" data-m="month" data-dir="1" aria-label="Next month" ${ui.month >= today().slice(0, 7) ? 'disabled' : ''}>${icon('next')}</button></div>`;
 
-function catRow(s, c, spent) {
-  const has = c.budget > 0;
-  const over = has && spent > c.budget;
-  const p = has ? Math.min(100, Math.round((spent / c.budget) * 100)) : 0;
-  return `<div class="mon-cat${over ? ' is-over' : ''}">${icon(c.icon, 'mon-cat__icon')}
-    <div class="mon-cat__top"><span class="mon-cat__name">${esc(c.name)}</span>
-      <span class="mon-cat__val">${money(s, spent)}${has ? ` <small>/ ${money(s, c.budget)}</small>` : ''}</span></div>
-    ${has ? xpbar(p, `imp-xpbar--sm mon-bar${over ? ' imp-xpbar--over' : ''}`) : ''}
-  </div>`;
+// The savings goal bar (e.g. the motorcycle): that account's balance toward the target
+function goalPanel(s) {
+  const g = s.settings.goal;
+  const have = L.balances(s)[g.account] ?? 0;
+  const p = g.target > 0 ? Math.min(100, Math.round((have / g.target) * 100)) : 0;
+  const left = g.target - have;
+  return `<section class="imp-panel mon-goal" data-m="goal"><div class="imp-panel__body">
+    <div class="mon-goal__top"><span class="mon-goal__name">${icon('star')}${esc(g.name)}</span><span class="mon-goal__pct">${p}%</span></div>
+    <div class="mon-goal__big">${money(s, have)} <small>of ${money(s, g.target)}</small></div>
+    ${xpbar(p, 'mon-goal__bar')}
+    <p class="mon-goal__sub">${left > 0 ? `${money(s, left)} to go · in ${esc(acctName(s, g.account))}` : 'Goal reached'}</p>
+  </div></section>`;
+}
+
+// The weekly check-in: what you spent and saved, worked out from your bank balances
+function checkinPanel(s) {
+  const last = L.lastCheckin(s);
+  const thisWeek = L.checkedInWeek(s);
+  const r = last ? L.checkinResult(s, last) : null;
+  const saved = r ? (r.change.savings ?? 0) : 0;
+  const lastLine = last
+    ? `<div class="mon-ci__stats">
+        <div><span>Spent</span><b>${money(s, r.spent)}</b></div>
+        <div><span>Savings</span><b class="${saved >= 0 ? 'mon-in' : 'mon-over'}">${saved >= 0 ? '+' : '−'}${money(s, Math.abs(saved))}</b></div>
+        ${r.extra ? `<div><span>Extra in</span><b class="mon-in">+${money(s, r.extra)}</b></div>` : ''}
+      </div>
+      <p class="mon-note">Last check-in ${shortDate(last.date)}</p>`
+    : '<p class="mon-note">Every Sunday, type in what your bank shows. Improve works out what you spent and saved.</p>';
+  return box('Weekly check-in', `<div class="mon-stack">
+      ${lastLine}
+      <button class="imp-btn ${thisWeek ? 'imp-btn--secondary' : 'imp-btn--primary'} imp-btn--block" data-m="checkin">${thisWeek ? 'Check in again' : `${icon('check')}Check in`}</button>
+      <button class="imp-btn imp-btn--secondary imp-btn--block" data-m="add" data-kind="income">${icon('plus')}Log paycheck</button>
+    </div>`, thisWeek ? `<span class="mon-done">${icon('check')}Done this week</span>` : '');
+}
+
+// Graph: one line per account, every check-in, all time
+const LINE = { checking: '#3b82f6', savings: '#22c55e' };
+const OTHER = ['#a855f7', '#f97316', '#eab308', '#ef4444'];
+function graphPanel(s) {
+  const series = L.balanceSeries(s);
+  const pts = series.flatMap((x) => x.points);
+  if (!series.length || L.checkins(s).length < 1) return box('Over time', '<p class="mon-empty">Your first check-in starts the graph.</p>');
+  const t = (p) => new Date(p.at).getTime();
+  const t0 = Math.min(...pts.map(t)), t1 = Math.max(...pts.map(t), t0 + 86400000);
+  const vmax = Math.max(...pts.map((p) => p.v), 100) * 1.1;
+  const W = 320, H = 150, P = 6;
+  const x = (p) => P + ((t(p) - t0) / (t1 - t0)) * (W - 2 * P);
+  const y = (p) => H - P - (Math.max(0, p.v) / vmax) * (H - 2 * P);
+  let o = 0;
+  const color = (id) => LINE[id] || OTHER[o++ % OTHER.length];
+  const lines = series.map((sr) => ({ ...sr, c: color(sr.id) }));
+  const grid = [0.25, 0.5, 0.75, 1].map((f) => `<line x1="0" x2="${W}" y1="${H - P - f * (H - 2 * P)}" y2="${H - P - f * (H - 2 * P)}" class="mon-graph__grid"/>`).join('');
+  const svg = `<svg class="mon-graph" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Account balances over time">${grid}
+    ${lines.map((l) => `<polyline fill="none" stroke="${l.c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" points="${l.points.map((p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(' ')}"/>`).join('')}</svg>`;
+  const fmtD = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return box('Over time', `${svg}
+    <div class="mon-graph__axis"><span>${fmtD(t0)}</span><span>Top ≈ ${money(s, Math.round(vmax))}</span><span>${fmtD(t1)}</span></div>
+    <div class="mon-graph__legend">${lines.map((l) => `<span><i style="background:${l.c}"></i>${esc(l.name)} ${money(s, l.points[l.points.length - 1].v)}</span>`).join('')}</div>`);
 }
 
 function main(s) {
-  const sum = L.monthSummary(s, ui.month);
-  const current = ui.month === today().slice(0, 7);
-  const left = sum.budget - sum.spent;
-  const over = sum.budget > 0 && left < 0;
-  const big = sum.budget
-    ? `<div class="mon-big">${money(s, Math.abs(left))}</div>
-       <div class="mon-cap">${over ? 'over budget' : 'left'} · ${money(s, sum.spent)} of ${money(s, sum.budget)} spent</div>
-       ${xpbar(Math.min(100, Math.round((sum.spent / sum.budget) * 100)), `mon-bar${over ? ' imp-xpbar--over' : ''}`)}`
-    : `<div class="mon-big">${money(s, sum.spent)}</div><div class="mon-cap">spent</div>`;
-  const top = `<section class="imp-panel"><div class="imp-panel__body">${monthNav()}
-    <div class="mon-hero${over ? ' is-over' : ''}">${big}
-      <div class="mon-mini"><span>Paychecks <b class="mon-in">+${money(s, sum.income)}</b></span>${savedMini(s)}</div></div>
-    ${current ? `<button class="imp-btn imp-btn--primary imp-btn--block mon-addbtn" data-m="add" data-kind="expense">${icon('plus')}Add</button>` : ''}
-  </div></section>`;
-
-  // Categories with a budget or spending this month (empty, unbudgeted ones stay out of the way)
-  const shown = s.categories.filter((c) => c.budget > 0 || sum.byCat[c.id]);
-  const orphan = Object.keys(sum.byCat).filter((id) => !s.categories.some((c) => c.id === id)).reduce((t, id) => t + sum.byCat[id], 0);
-  const cats = shown.map((c) => catRow(s, c, sum.byCat[c.id] || 0)).join('') + (orphan ? catRow(s, { name: 'Deleted categories', icon: 'scroll', budget: 0 }, orphan) : '');
-
-  return `${top}
-    ${current ? accountsPanel(s) : ''}
-    ${box('Budget', cats || '<p class="mon-empty">No budgets yet.</p>', '<button class="mon-link" data-m="page" data-page="budget">Edit</button>')}
-    ${history(s)}`;
-}
-
-// Savings: how much the Savings account changed this month (before accounts: savings logged)
-function savedMini(s) {
-  const has = s.accounts?.some((a) => a.id === 'savings');
-  const ch = has ? L.accountChange(s, 'savings', ui.month) : L.monthSummary(s, ui.month).saved;
-  return `<span>Saved <b>${ch >= 0 ? '+' : '−'}${money(s, Math.abs(ch))}</b></span>`;
+  if (!s.accounts?.length) return `${goalPanel(s)}${accountsPanel(s)}`;
+  return `${goalPanel(s)}${checkinPanel(s)}${accountsPanel(s)}${graphPanel(s)}${history(s)}`;
 }
 
 // ---- Accounts ----
@@ -310,14 +329,83 @@ function openCashback(e = null) {
   });
 }
 
+// Sunday check-in: type what the bank shows for each account (filled in with what Improve expects)
+function openCheckin(e = null) {
+  const s = M.getState();
+  const exp = e ? e.balances : L.balances(s);
+  sheet.open({
+    title: e ? 'Edit check-in' : 'Weekly check-in',
+    body: `<p class="mon-note">Open your bank app and type each balance. Improve works out what you spent and saved this week.</p>
+      ${s.accounts.map((a) => `<label class="imp-field"><span class="imp-label">${icon(a.icon || 'cash')} ${esc(a.name)}</span><span class="food-unit"><input class="imp-input" data-bal="${esc(a.id)}" inputmode="decimal" placeholder="${((exp[a.id] ?? 0) / 100).toFixed(2)}" value="${e && a.id in e.balances ? e.balances[a.id] / 100 : ''}"><span>${esc(s.settings.currency)}</span></span></label>`).join('')}
+      <p class="mon-note">Leave one blank if it hasn't changed.</p>
+      <p class="food-err" id="ci-err"></p>
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="ci-save">${e ? 'Save' : 'Check in'}</button>
+      ${e ? `<button class="imp-btn imp-btn--danger imp-btn--block" id="ci-del">${icon('trash')}Delete</button>` : ''}`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        if (t.id === 'ci-save') {
+          const balances = {};
+          for (const inp of b.querySelectorAll('[data-bal]')) {
+            const raw = inp.value.trim();
+            const v = raw ? L.toCents(raw) : (exp[inp.dataset.bal] ?? 0);
+            if (Number.isNaN(v)) { b.querySelector('#ci-err').textContent = 'Type the balances as numbers.'; return; }
+            balances[inp.dataset.bal] = v;
+          }
+          const entry = { ...(e || {}), kind: 'checkin', balances, amount: 0, note: '', date: e?.date || today() };
+          sheet.close();
+          changed(() => M.upsertEntry(entry), [entry.date]);
+          const saved = M.getState().entries.find((x) => x.kind === 'checkin' && x.date === entry.date && (!e || x.id === e.id));
+          if (saved) { const r = L.checkinResult(M.getState(), saved); toast(`Spent ${money(s, r.spent)} this week`); }
+        }
+        if (t.id === 'ci-del' && confirm('Delete this check-in?')) { sheet.close(); changed(() => M.deleteEntry(e.id), [e.date]); toast('Deleted'); }
+      };
+    },
+  });
+}
+
+// The savings goal (name, target, which account counts)
+function openGoal() {
+  const s = M.getState();
+  const g = s.settings.goal;
+  let acct = g.account;
+  sheet.open({
+    title: 'Savings goal',
+    body: `<label class="imp-field"><span class="imp-label">Saving for</span><input class="imp-input" id="g-name" maxlength="30" value="${esc(g.name)}"></label>
+      <label class="imp-field"><span class="imp-label">Target</span><span class="food-unit"><input class="imp-input" id="g-target" inputmode="decimal" value="${g.target / 100}"><span>${esc(s.settings.currency)}</span></span></label>
+      ${s.accounts?.length ? `<div class="imp-field"><span class="imp-label">Counts the money in</span><div class="mon-chips">${s.accounts.map((a) => `<button type="button" data-acct="${esc(a.id)}" class="mon-chip${acct === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>` : ''}
+      <button class="imp-btn imp-btn--primary imp-btn--block" id="g-save">Save</button>`,
+    onMount(b) {
+      b.onclick = (ev) => {
+        const t = ev.target.closest('button');
+        if (!t) return;
+        if (t.dataset.acct) { acct = t.dataset.acct; b.querySelectorAll('.mon-chip').forEach((x) => x.classList.toggle('is-on', x === t)); return; }
+        if (t.id !== 'g-save') return;
+        const target = L.toCents(b.querySelector('#g-target').value);
+        if (!(target > 0)) return toast('Enter a target above 0');
+        M.saveSettings({ goal: { name: b.querySelector('#g-name').value.trim() || 'Goal', target, account: acct } });
+        sheet.close(); rerender(); toast('Goal saved');
+      };
+    },
+  });
+}
+
 // History: everything logged this month, newest first, with the time it was logged
 function history(s) {
   const [start, end] = L.monthRange(ui.month);
   const list = L.inRange(s.entries, start, end).sort((a, b) => (b.date + b.at).localeCompare(a.date + a.at));
-  const cat = (id) => s.categories.find((c) => c.id === id);
+  const cat = (id) => (s.categories || []).find((c) => c.id === id);
   const days = [...new Set(list.map((e) => e.date))];
   const rows = days.map((d) => `<div class="mon-day">${d === today() ? 'Today' : shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
+    if (e.kind === 'checkin') {
+      const r = L.checkinResult(s, e);
+      const sav = r.change.savings;
+      return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon('check', 'mon-row__icon mon-k-checkin')}
+        <span class="mon-row__mid"><span class="mon-row__name">Check-in</span><span class="mon-row__sub">${esc([`Spent ${money(s, r.spent)}`, sav != null ? `Savings ${sav >= 0 ? '+' : '−'}${money(s, Math.abs(sav))}` : '', r.extra ? `Extra +${money(s, r.extra)}` : ''].filter(Boolean).join(' · '))}</span></span>
+        <span class="mon-row__amt">${money(s, Object.values(e.balances || {}).reduce((t, v) => t + v, 0))}</span></button>`;
+    }
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll', cashback: 'star' }[e.kind] || c?.icon || 'cash';
     const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
     const what = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money' : e.kind === 'cashback' ? `Into ${acctName(s, e.account || 'savings')}`
@@ -329,26 +417,9 @@ function history(s) {
       <span class="mon-row__mid"><span class="mon-row__name">${esc(title)}</span>${sub ? `<span class="mon-row__sub">${esc(sub)}</span>` : ''}</span>
       <span class="mon-row__amt mon-k-${e.kind}">${e.kind === 'expense' || e.kind === 'transfer' || e.amount < 0 ? '' : '+'}${money(s, e.amount)}</span></button>`;
   }).join('')).join('');
-  return box('History', rows || '<p class="mon-empty">Nothing logged this month.</p>', list.length ? `${list.length} ${list.length === 1 ? 'entry' : 'entries'}` : '');
+  return box('History', `${monthNav()}${rows || '<p class="mon-empty">Nothing logged this month.</p>'}`);
 }
 
-
-function budget(s) {
-  const rows = s.categories.map((c, i) => `
-    <div class="mon-bud">
-      <button class="cat-icon" data-m="pick-icon" data-i="${i}" aria-label="Change icon">${icon(c.icon)}</button>
-      <input class="imp-input" data-name="${i}" maxlength="30" value="${esc(c.name)}" aria-label="Category name">
-      <span class="food-unit mon-bud__amt"><input class="imp-input" data-budget="${i}" inputmode="decimal" placeholder="0" value="${c.budget ? c.budget / 100 : ''}" aria-label="Monthly budget"><span>/mo</span></span>
-      <button class="imp-btn imp-btn--sm imp-btn--ghost mon-del" data-m="del-cat" data-i="${i}" aria-label="Delete category">${icon('trash')}</button>
-    </div>
-    ${ui.picking === i ? `<div class="imp-icon-grid">${MONEY_ICONS.concat(PICKER_ICONS.filter((k) => !MONEY_ICONS.includes(k))).map((k) => `<button data-m="set-icon" data-i="${i}" data-icon="${k}" class="${k === c.icon ? 'is-on' : ''}">${icon(k)}</button>`).join('')}</div>` : ''}`).join('');
-  const total = s.categories.reduce((t, c) => t + (c.budget || 0), 0);
-  return box('Categories', `<div class="mon-stack">
-    <p class="mon-note">A monthly limit for each category. Leave it blank for no limit.</p>
-    ${rows}
-    <button class="imp-btn imp-btn--secondary imp-btn--block" data-m="add-cat">${icon('plus')}Add category</button>
-    <button class="imp-btn imp-btn--primary imp-btn--block" data-m="save-budget">Save budgets</button></div>`, `${money(s, total)} a month`);
-}
 
 function settings(s) {
   const p = s.settings.pay;
@@ -445,7 +516,7 @@ function openEntry(kind, e = null) {
     return `<div class="imp-field"><span class="imp-label">From</span>${chips('from', from)}</div><div class="imp-field"><span class="imp-label">To</span>${chips('to', to)}</div>`;
   };
   // "Move" needs accounts; the old "To savings" only shows without accounts (or when editing an old one)
-  const kinds = Object.entries(KIND).filter(([id]) => (id !== 'transfer' || accts.length) && (id !== 'saving' || !accts.length || cur.kind === 'saving'));
+  const kinds = Object.entries(KIND).filter(([id]) => (id !== 'expense' || cur.kind === 'expense') && (id !== 'transfer' || accts.length) && (id !== 'saving' || !accts.length || cur.kind === 'saving'));
   const body = () => `
     <div class="imp-seg">${kinds.map(([id, v]) => `<button type="button" data-k="${id}" class="${k === id ? 'is-on' : ''}">${v}</button>`).join('')}</div>
     <label class="imp-field"><span class="imp-label">Amount</span><span class="food-unit"><input class="imp-input mon-amt" id="e-amt" inputmode="decimal" placeholder="0.00" value="${cur.amount ? cur.amount / 100 : ''}" autocomplete="off"><span>${esc(s.settings.currency)}</span></span></label>
@@ -533,10 +604,6 @@ export function bind(root) {
       if (ex && !Number.isNaN(part.value)) ex.textContent = `Example: a $1,000 paycheck → ${L.splitPaycheck(sp, 100000).map((x) => `${acctName(M.getState(), x.account)} ${money(M.getState(), x.amount)}`).join(' · ')}`;
       return;
     }
-    if (ui.page !== 'budget') return;
-    const d = draft(M.getState());
-    if (t.dataset.name != null) d[+t.dataset.name].name = t.value;
-    if (t.dataset.budget != null) d[+t.dataset.budget].budget = t.value.trim() ? L.toCents(t.value) : 0;
   });
 
   root.addEventListener('click', (ev) => {
@@ -552,6 +619,7 @@ export function bind(root) {
       case 'edit': {
         const entry = s.entries.find((e) => e.id === el.dataset.id);
         if (entry?.kind === 'cashback') openCashback(entry);
+        else if (entry?.kind === 'checkin') openCheckin(entry);
         else if (entry?.kind === 'adjust') {
           if (confirm(`Remove this ${money(s, entry.amount)} balance fix?`)) { M.deleteEntry(entry.id); rerender(); toast('Removed'); }
         } else openEntry(null, entry);
@@ -559,30 +627,10 @@ export function bind(root) {
       }
       case 'acct-setup': openAccountSetup(); break;
       case 'cashback': openCashback(); break;
+      case 'checkin': openCheckin(); break;
+      case 'goal': openGoal(); break;
       case 'acct': openAccount(el.dataset.id); break;
       case 'acct-add': openAddAccount(); break;
-
-      // Budget editing works on a draft until Save
-      case 'pick-icon': draft(s); ui.picking = ui.picking === +el.dataset.i ? null : +el.dataset.i; renderDraft(); break;
-      case 'set-icon': draft(s)[+el.dataset.i].icon = el.dataset.icon; ui.picking = null; renderDraft(); break;
-      case 'add-cat': draft(s).push({ id: M.newCategoryId(), name: 'New category', icon: 'cash', budget: 0 }); renderDraft(); break;
-      case 'del-cat': {
-        const d = draft(s);
-        const c = d[+el.dataset.i];
-        if (s.entries.some((e) => e.cat === c.id) && !confirm(`"${c.name}" has logged expenses. Delete it anyway? They'll show under "Deleted categories".`)) break;
-        d.splice(+el.dataset.i, 1);
-        ui.picking = null;
-        renderDraft();
-        break;
-      }
-      case 'save-budget': {
-        const d = draft(s);
-        if (d.some((c) => Number.isNaN(c.budget) || c.budget < 0)) { toast('Check the budget amounts'); break; }
-        M.saveCategories(d.map((c) => ({ ...c, name: c.name.trim() || 'Untitled' })));
-        openPage(null);
-        toast('Budgets saved');
-        break;
-      }
 
       case 'freq': keepTyped(); ui.payFreq = el.dataset.freq; rerender(); break;
       case 'split-mode': {
@@ -598,17 +646,6 @@ export function bind(root) {
       case 'save-settings': saveSettings(s); break;
     }
   });
-}
-
-function draft(s) {
-  ui.draft ||= structuredClone(s.categories);
-  return ui.draft;
-}
-// Re-render the budget page from the draft, keeping typed values.
-function renderDraft() {
-  const real = M.getState();
-  const s = { ...real, categories: ui.draft };
-  ctx.root.innerHTML = `<div class="screen money">${nav('Budgets')}${budget(s)}</div>`;
 }
 
 function saveSettings(s) {
