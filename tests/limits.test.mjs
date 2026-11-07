@@ -87,11 +87,11 @@ eq(R.sync(at(10, 2)).length, 0, 'limit 0 with 1 use → no XP');
 
 // ---- Monthly limits wait for the first full habit month ----
 reset([{ ...fast, frequency: 'monthly', limitSince: '2026-10-26' }]);
-eq(H.step(get('fast'), 1, at(9, 28)), 0, 'monthly limit can\'t be tapped before Nov 2');
+eq(H.step(get('fast'), 1, at(9, 28)), 0, 'monthly limit can\'t be tapped before November');
 eq(H.progress(get('fast'), at(9, 28)), 0, 'no use logged');
-eq(R.sync(at(11, 6)).length, 0, 'Nov habit month (Nov 2 – Dec 6) not over on Dec 6');
-eq(R.sync(at(11, 7)).map((b) => [b.type, b.unit]), [['limit', 'month']], 'paid Mon Dec 7, credited to Dec 6');
-eq(!!limitBonus('2026-12-06'), true, 'on the month\'s last day');
+eq(R.sync(at(10, 30)).length, 0, 'November not over on Nov 30');
+eq(R.sync(at(11, 1)).map((b) => [b.type, b.unit]), [['limit', 'month']], 'paid Dec 1, credited to Nov 30');
+eq(!!limitBonus('2026-11-30'), true, 'on the month\'s last day');
 
 // ---- Daily limits + Perfect Day ----
 const soda = { ...fast, id: 'soda', name: 'Soda', frequency: 'daily', target: 1, xp: 10, limitSince: '2026-11-03' };

@@ -185,18 +185,8 @@ eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
 console.log(fails ? `${fails} FAILED` : 'all passed');
 process.exitCode = fails ? 1 : 0;
 
-// ---- Budget review habit follows the Monday-month; budgets stay calendar months ----
-{
-  const st = (doneAt) => ({ reviews: { '2026-11': { doneAt } } });
-  eq(L.reviewDone(st(new Date(2026, 11, 3, 20).toISOString()), new Date(2026, 10, 20, 12)), true, 'review on Dec 3 counts for the Nov habit month (Nov 2 – Dec 6)');
-  eq(L.reviewDone(st(new Date(2026, 11, 3, 20).toISOString()), new Date(2026, 11, 8, 12)), false, 'but not for December (Dec 7 – Jan 3)');
-  eq(L.reviewDone(st(new Date(2026, 11, 7, 2).toISOString()), new Date(2026, 11, 6, 12)), true, 'Mon Dec 7 at 2 AM still counts for November');
-  eq(L.monthRange('2026-11'), ['2026-11-01', '2026-11-30'], 'budget month stays Nov 1–30');
-  eq(L.reviewMonth(new Date(2026, 11, 1, 12)), '2026-11', 'Tue Dec 1: panel shows the November review');
-  eq(L.reviewMonth(new Date(2026, 11, 7, 12)), '2026-12', 'Mon Dec 7: December review');
-  eq(L.reviewMonth(new Date(2027, 0, 2, 12)), '2026-12', 'Sat Jan 2: still the December review');
-  eq(L.reviewMonth(new Date(2026, 10, 2, 12)), '2026-11', 'Mon Nov 2: November review');
-}
+// ---- Budget months are calendar months ----
+eq(L.monthRange('2026-11'), ['2026-11-01', '2026-11-30'], 'budget month stays Nov 1–30');
 
 // ---- Card cash back ----
 {
