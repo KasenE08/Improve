@@ -13,8 +13,8 @@ const set = (k, v) => { mem['imp_' + k] = JSON.stringify(v); };
 const get = (k) => JSON.parse(mem['imp_' + k] ?? 'null');
 
 eq(L.START, '2026-10-26', 'starts Monday Oct 26');
-eq(L.MONTHLY_START, '2026-11-02', 'monthly habits start Monday Nov 2');
-eq([L.monthlyOpen('2026-11-01'), L.monthlyOpen('2026-11-02')], [false, true], 'monthly opens Nov 2');
+eq(L.MONTHLY_START, '2026-11-01', 'monthly habits start Nov 1');
+eq([L.monthlyOpen('2026-10-31'), L.monthlyOpen('2026-11-01')], [false, true], 'monthly opens Nov 1');
 eq(L.unlockAt().getHours() * 60 + L.unlockAt().getMinutes(), 241, 'unlocks at 4:01 AM');
 
 set('habits', [{ id: 'sleep' }]); set('categories', [{ id: 'body' }]); set('profile', { name: 'KASEN' });

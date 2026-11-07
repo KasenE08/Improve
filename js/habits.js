@@ -27,7 +27,7 @@ export const isLimit = (h) => h?.kind === 'limit';
 export const isDone = (h, n) => (isLimit(h) ? n <= h.target : n >= h.target);
 export const LIMIT_MAX_USES = 99;
 
-// Monthly habits wait for the first full habit month (see launch.js)
+// Monthly habits wait for the first month after launch (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
 export const SCHEMA = 15;

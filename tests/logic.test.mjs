@@ -6,9 +6,9 @@ const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console
 eq(D.periodRange('weekly', new Date(2026, 9, 24)), ['2026-10-19', '2026-10-25'], 'week of Sat Oct 24 = Mon 19..Sun 25');
 eq(D.periodRange('weekly', new Date(2026, 9, 26)), ['2026-10-26', '2026-11-01'], 'Monday starts new week');
 eq(D.periodRange('weekly', new Date(2026, 10, 1)), ['2026-10-26', '2026-11-01'], 'Sunday belongs to prior Monday');
-eq(D.periodRange('monthly', new Date(2026, 9, 31, 23, 59)), ['2026-10-05', '2026-11-01'], 'habit month: first Monday (Oct 5) → day before next first Monday (Nov 1)');
-eq(D.periodRange('monthly', new Date(2026, 10, 2, 12)), ['2026-11-02', '2026-12-06'], 'November starts Mon Nov 2, runs 5 weeks');
-eq(D.periodRange('monthly', new Date(2028, 1, 10)), ['2028-02-07', '2028-03-05'], 'Feb 2028: Feb 7 – Mar 5');
+eq(D.periodRange('monthly', new Date(2026, 9, 31, 23, 59)), ['2026-10-01', '2026-10-31'], 'month: Oct 1 – Oct 31');
+eq(D.periodRange('monthly', new Date(2026, 10, 2, 12)), ['2026-11-01', '2026-11-30'], 'November: Nov 1 – Nov 30');
+eq(D.periodRange('monthly', new Date(2028, 1, 10)), ['2028-02-01', '2028-02-29'], 'Feb 2028 (leap year): Feb 1 – Feb 29');
 eq(D.periodRange('monthly', new Date(2027, 1, 10)), ['2027-02-01', '2027-02-28'], 'Feb 2027: Feb 1 is a Monday, Mar 1 too');
 eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnight');
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
@@ -21,11 +21,11 @@ eq(H.progress(sleep, sun), 0, 'daily resets Sun');
 for (let i = 0; i < 6; i++) H.step(lift, 1, i < 3 ? sat : sun);
 eq(H.progress(lift, sun), 5, 'lift capped at 5/week');
 eq(H.progress(lift, mon), 0, 'weekly resets Monday');
-eq(H.step(cut, 1, new Date(2026, 9, 30, 12)), 0, 'monthly habits locked before the first full habit month (Nov 2)');
+eq(H.step(cut, 1, new Date(2026, 9, 30, 12)), 0, 'monthly habits locked before November');
 H.step(cut, 1, new Date(2026, 11, 8, 12)); eq(H.progress(cut, new Date(2026, 11, 20, 12)), 1, 'monthly counts across month');
-eq(H.progress(cut, new Date(2027, 0, 3, 12)), 1, 'Sun Jan 3 is still the December habit month');
-eq(H.progress(cut, new Date(2027, 0, 4, 12)), 0, 'monthly resets on the first Monday');
-eq(H.setDone({ ...cut, auto: 'x' }, '2026-10-30', true, new Date(2026, 9, 30, 12)), false, 'auto ticks blocked for monthly before Nov 2 too');
+eq(H.progress(cut, new Date(2026, 11, 31, 12)), 1, 'Dec 31 is still December');
+eq(H.progress(cut, new Date(2027, 0, 1, 12)), 0, 'monthly resets on the 1st');
+eq(H.setDone({ ...cut, auto: 'x' }, '2026-10-30', true, new Date(2026, 9, 30, 12)), false, 'auto ticks blocked for monthly before November too');
 eq(H.xpOnDay('2026-10-24'), 30 + 120, 'XP Sat = sleep 30 + 3 lifts');
 H.step(lift, -1, mon); eq(H.progress(lift, sun), 5, 'undo Monday cannot touch last week');
 H.step(lift, -1, sun); eq(H.progress(lift, sun), 4, 'undo on Sun removes one');
@@ -38,8 +38,8 @@ eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 0, 30))), '2026-10-25', 'Mon 12:30 AM
 eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 4, 0))), '2026-10-25', 'Mon 4:00 AM still Sunday');
 eq(D.dayKey(D.appNow(new Date(2026, 9, 26, 4, 1))), '2026-10-26', 'Mon 4:01 AM is Monday');
 eq(D.periodRange('weekly', D.appNow(new Date(2026, 9, 26, 1, 0))), ['2026-10-19', '2026-10-25'], 'Mon 1 AM: still last week');
-eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 2, 2, 0))), ['2026-10-05', '2026-11-01'], 'Mon Nov 2, 2 AM: still October month');
-eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 2, 4, 1))), ['2026-11-02', '2026-12-06'], 'Mon Nov 2, 4:01 AM: November month');
+eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 2, 0))), ['2026-10-01', '2026-10-31'], 'Nov 1, 2 AM: still October (day starts 4:01 AM)');
+eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 4, 1))), ['2026-11-01', '2026-11-30'], 'Nov 1, 4:01 AM: November');
 {
   const lift = H.getHabits().find((h) => h.id === 'lift');
   const before = H.progress(lift, new Date(2026, 9, 25, 12));
@@ -48,7 +48,7 @@ eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 2, 4, 1))), ['2026-11-02
 }
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 25, 12))), '2026-10-26', 'next week starts Monday Oct 26');
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 26, 12))), '2026-11-02', 'from Monday: next is Nov 2');
-eq(D.dayKey(D.nextStart('monthly', new Date(2026, 11, 15, 12))), '2027-01-04', 'next month starts Mon Jan 4');
+eq(D.dayKey(D.nextStart('monthly', new Date(2026, 11, 15, 12))), '2027-01-01', 'next month starts Jan 1');
 
 // ---- Upgrade to schema 6 adds "Be proactive" right after "Kept my word", same worth ----
 for (const k of Object.keys(mem)) delete mem[k];

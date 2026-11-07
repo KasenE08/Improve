@@ -8,8 +8,8 @@ import { dayKey, fromDayKey, DAY_START_MIN } from './dates.js';
 import { icon } from './ui.js';
 
 export const START = '2026-10-26'; // first app day: Monday, so the first week is a full week (4:01 AM)
-// Monthly habits start with the first full habit month (Mon Nov 2 – Sun Dec 6), not a 1-week stub.
-export const MONTHLY_START = '2026-11-02';
+// Monthly habits start with the first full month after launch (November), not October's last few days.
+export const MONTHLY_START = '2026-11-01';
 export const monthlyOpen = (key = dayKey()) => key >= MONTHLY_START;
 
 export const isLocked = () => dayKey() < START;

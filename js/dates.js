@@ -46,12 +46,9 @@ export function periodRange(freq, d = appNow()) {
     return [dayKey(s), dayKey(addDays(s, 6))];
   }
   if (freq === 'monthly') {
-    // Habit months start on the month's first Monday and run until the next month's first Monday
-    let y = d.getFullYear(), m = d.getMonth();
-    if (dayKey(d) < dayKey(firstMonday(y, m))) { m -= 1; if (m < 0) { m = 11; y -= 1; } }
-    const s = firstMonday(y, m);
-    const e = addDays(firstMonday(m === 11 ? y + 1 : y, (m + 1) % 12), -1);
-    return [dayKey(s), dayKey(e)];
+    // Calendar months: the 1st through the last day (28–31 days), resetting at 4:01 AM on the 1st
+    const y = d.getFullYear(), m = d.getMonth();
+    return [dayKey(new Date(y, m, 1)), dayKey(new Date(y, m + 1, 0))];
   }
   const k = dayKey(d);
   return [k, k];
