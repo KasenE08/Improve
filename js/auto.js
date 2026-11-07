@@ -5,6 +5,7 @@ export const AUTO = {
   'food:water': 'Food: hit water goal',
   'money:save': 'Money: saved from this week\'s paycheck',
   'money:review': 'Money: monthly budget review done',
+  'money:checkin': 'Money: weekly check-in done',
   'journal:words': 'Journal: wrote enough words today',
 };
 export const isAuto = (h) => !!h && typeof h.auto === 'string' && h.auto in AUTO;

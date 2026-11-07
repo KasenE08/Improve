@@ -42,7 +42,7 @@ const rows = [
   ['kept-word', 'Kept my word', 'mind', 'daily', 1, 15],
   ['proactive', 'Be proactive', 'mind', 'daily', 1, 30],
 
-  ['log-spending', 'Log spending', 'money', 'daily', 1, 15],
+  ['log-spending', 'Sunday money check-in', 'money', 'weekly', 1, 15, 'money:checkin'],
   ['save-paycheck', 'Save set % of paycheck', 'money', 'weekly', 1, 20, 'money:save'],
   ['budget-review', 'Budget review', 'money', 'monthly', 1, 50, 'money:review'],
 

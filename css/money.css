@@ -86,3 +86,27 @@
 .mon-split.is-rest b { font-size: 15px; font-weight: 600; }
 .mon-acct-add { margin-top: 8px; }
 .mon-k-cashback { color: var(--imp-good); }
+
+/* Savings goal, weekly check-in, graph */
+.mon-goal { cursor: pointer; }
+.mon-goal__top { display: flex; justify-content: space-between; align-items: center; }
+.mon-goal__name { display: inline-flex; align-items: center; gap: 6px; font: 600 14px var(--imp-font-head); color: var(--imp-muted); }
+.mon-goal__name .imp-icon { width: 16px; height: 16px; color: var(--imp-accent); }
+.mon-goal__pct { font: 700 14px var(--imp-font-head); color: var(--imp-accent); }
+.mon-goal__big { margin: 6px 0 10px; font: 800 36px/1 var(--imp-font-body); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.mon-goal__big small { font: 500 15px var(--imp-font-head); color: var(--imp-muted); letter-spacing: 0; }
+.mon-goal__bar { height: 12px; }
+.mon-goal__sub { margin-top: 8px; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+.mon-ci__stats { display: flex; gap: 22px; }
+.mon-ci__stats div { display: grid; gap: 2px; }
+.mon-ci__stats span { font: 500 12.5px var(--imp-font-head); color: var(--imp-muted); }
+.mon-ci__stats b { font: 700 22px var(--imp-font-body); font-variant-numeric: tabular-nums; }
+.mon-done { display: inline-flex; align-items: center; gap: 4px; color: var(--imp-good); font-weight: 600; }
+.mon-done .imp-icon { width: 14px; height: 14px; }
+.mon-k-checkin { color: var(--imp-good); }
+.mon-graph { display: block; width: 100%; height: 150px; margin-top: 4px; }
+.mon-graph__grid { stroke: var(--imp-divider); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.mon-graph__axis { display: flex; justify-content: space-between; margin-top: 4px; font: 500 11.5px var(--imp-font-head); color: var(--imp-muted); }
+.mon-graph__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font: 600 13px var(--imp-font-head); }
+.mon-graph__legend span { display: inline-flex; align-items: center; gap: 6px; }
+.mon-graph__legend i { width: 10px; height: 10px; border-radius: 3px; }

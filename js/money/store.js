@@ -24,10 +24,12 @@ export const DEFAULT_SETTINGS = {
   setup: false, // true once paydays are set in Money → Settings
   // Card cash back: rate in % of spending (0 = off), paid into this account about once a month
   cashback: { rate: 0, account: 'savings' },
+  // What Savings is building toward (the bar at the top of Money)
+  goal: { name: 'Motorcycle', target: 500000, account: 'savings' },
 };
 
 const empty = () => ({
-  version: 1,
+  version: 2,
   settings: structuredClone(DEFAULT_SETTINGS),
   categories: structuredClone(DEFAULT_CATEGORIES),
   entries: [], // { id, kind: 'expense'|'income'|'saving', amount, cat?, note, date, at }
@@ -36,10 +38,17 @@ const empty = () => ({
 });
 
 export function getState() {
-  const s = store.get(KEY, null);
+  let s = store.get(KEY, null);
   if (!s) return empty();
+  // Version 2: paid weekly on Fridays (new job); the savings goal starts as a $5,000 motorcycle
+  if ((s.version || 1) < 2) {
+    const fri = new Date(); fri.setDate(fri.getDate() - ((fri.getDay() + 2) % 7)); // last Friday
+    const key = `${fri.getFullYear()}-${String(fri.getMonth() + 1).padStart(2, '0')}-${String(fri.getDate()).padStart(2, '0')}`;
+    s = { ...s, version: 2, settings: { ...s.settings, pay: { ...DEFAULT_SETTINGS.pay, ...s.settings?.pay, freq: 'weekly', anchor: key } } };
+    store.set(KEY, s);
+  }
   const d = DEFAULT_SETTINGS;
-  const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save }, cashback: { ...d.cashback, ...s.settings?.cashback } };
+  const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save }, cashback: { ...d.cashback, ...s.settings?.cashback }, goal: { ...d.goal, ...s.settings?.goal } };
   settings.split ||= splitFromSave(settings.save);
   return { ...empty(), ...s, settings };
 }

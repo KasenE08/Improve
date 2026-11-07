@@ -48,17 +48,18 @@ export function render(root, refresh) {
     `<div class="hcard__big">${water}<small>/ ${g.waterGoal} oz</small></div>
      ${g.lastWaterOz ? `<div class="chips"><button class="chip-btn is-water" data-water="${g.lastWaterOz}">+${g.lastWaterOz} oz</button></div>` : '<p class="hcard__sub">Tap to log water</p>'}`, 'hcard--water');
 
-  // Money
+  // Money: the savings goal bar, and last week's check-in
   const ms = Money.getState();
   const cur = ms.settings?.currency || '$';
-  const mk = today.slice(0, 7);
-  const sum = ML.monthSummary(ms, mk);
-  const bal = ML.balances(ms);
-  const accts = (ms.accounts || []).slice(0, 2).map((a) => `<span>${esc(a.name)} ${ML.fmtMoney(bal[a.id] || 0, cur)}</span>`).join('');
-  const money = card('money', 'Money', 'wallet', new Date().toLocaleDateString('en-US', { month: 'long' }),
-    `<div class="hcard__big${sum.budget && sum.spent > sum.budget ? ' is-over' : ''}">${ML.fmtMoney(sum.spent, cur)}<small>${sum.budget ? `of ${ML.fmtMoney(sum.budget, cur)} spent` : 'spent'}</small></div>
-     ${sum.budget ? xpbar(Math.min(100, pct(sum.spent, sum.budget)), `imp-xpbar--sm${sum.spent > sum.budget ? ' imp-xpbar--over' : ''}`) : ''}
-     ${accts ? `<div class="chips">${accts}</div>` : ''}`);
+  const goal = ms.settings.goal;
+  const have = ML.balances(ms)[goal.account] ?? 0;
+  const last = ML.lastCheckin(ms);
+  const doneWeek = ML.checkedInWeek(ms);
+  const chip = last ? `<span>Spent ${ML.fmtMoney(ML.checkinResult(ms, last).spent, cur)} last check-in</span>` : '';
+  const money = card('money', goal.name, 'star', doneWeek ? 'Checked in' : 'Check in Sunday',
+    `<div class="hcard__big">${ML.fmtMoney(have, cur)}<small>of ${ML.fmtMoney(goal.target, cur)}</small></div>
+     ${xpbar(Math.min(100, pct(have, goal.target)), 'imp-xpbar--sm')}
+     ${chip ? `<div class="chips">${chip}</div>` : ''}`);
 
   // Journal
   const words = Journal.wordCount(Journal.getDay(today));
