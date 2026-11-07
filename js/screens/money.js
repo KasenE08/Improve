@@ -262,19 +262,18 @@ function splitText(s, sp) {
   return [...parts, `rest → ${acctName(s, sp?.rest || 'checking')}`].join(' · ');
 }
 
-// One line under the accounts: next payday and how it splits. "Log" shows on payday weeks.
+// One line under the accounts: next payday and how it splits (log it with "Log paycheck" above)
 function paydayRow(s) {
   if (!s.settings.setup) {
     return `<button class="mon-row" data-m="page" data-page="settings">${icon('calendar', 'mon-row__icon')}
       <span class="mon-row__mid"><span class="mon-row__name">Set up paydays</span><span class="mon-row__sub">Pay schedule and paycheck split</span></span>${icon('next', 'mon-row__go')}</button>`;
   }
-  const st = L.saveStatus(s);
   const next = L.nextPayday(s.settings.pay, today());
   const when = next === today() ? 'today' : next ? shortDate(next) : '—';
-  const sub = st.pending ? 'Payday: log the paycheck and it splits itself' : splitText(s, s.settings.split);
+  const sub = splitText(s, s.settings.split);
   return `<div class="mon-row mon-payrow">${icon('calendar', 'mon-row__icon')}
     <span class="mon-row__mid"><span class="mon-row__name">Next payday ${esc(when)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
-    ${st.pending ? `<button class="imp-btn imp-btn--sm imp-btn--primary" data-m="add" data-kind="income">Log</button>` : ''}</div>`;
+</div>`;
 }
 
 // Card cash back: the estimate for this month so far, and a quick "Log" for the deposit when it lands
