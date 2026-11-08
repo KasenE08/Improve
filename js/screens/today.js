@@ -3,7 +3,6 @@ import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
 import { daysLeft, appNow, nextStart, dayKey, fromDayKey } from '../dates.js';
-import { monthlyOpen, MONTHLY_START } from '../launch.js';
 import { recheck } from '../food/autocheck.js';
 import { AUTO, isAuto, autoTab } from '../auto.js';
 import { recheckMoney } from '../money/autocheck.js';
@@ -22,7 +21,7 @@ const OFF_WHY = { 'money:save': 'no payday' };
 // Shown under an auto habit so its rule isn't forgotten
 const AUTO_NOTE = {}; // a short rule under an auto habit, by its auto id (none right now)
 const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
-const startLabel = fromDayKey(MONTHLY_START).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const startLabel = (h) => fromDayKey(H.startOf(h)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const AUTO_TAB = { food: 'Food', money: 'Money' };
 
 const editMode = false; // editing is a long-press now (kept so older row code reads the same)
@@ -45,7 +44,7 @@ export function render(root, refresh) {
 
   // One list at a time: Daily / Weekly / Monthly
   const statsFor = (freq) => {
-    const counted = habits.filter((h) => h.frequency === freq && !isOff(h)); // days/weeks off don't count either way
+    const counted = habits.filter((h) => h.frequency === freq && !isOff(h) && !H.notStarted(h, now)); // off or not started yet: not counted
     return { done: counted.filter((h) => H.isDone(h, prog.get(h.id))).length, total: counted.length };
   };
   const seg = `<div class="imp-seg hab-seg" role="tablist">${H.FREQS.map((f) => {
@@ -55,8 +54,8 @@ export function render(root, refresh) {
   const freq = view;
   const list = habits.filter((h) => h.frequency === freq);
   const resetDay = nextStart(freq).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const waiting = freq === 'monthly' && !monthlyOpen(dayKey(now));
-  const info = freq === 'daily' ? '' : waiting ? `Monthly habits start Mon ${startLabel}` : `${daysLeft(freq)} ${daysLeft(freq) === 1 ? 'day' : 'days'} left · resets ${resetDay}`;
+  const waiting = list.length && list.every((h) => H.notStarted(h, now)) ? list[0] : null;
+  const info = freq === 'daily' ? '' : waiting ? `${FREQ_LABEL[freq]} habits start ${startLabel(waiting)}` : `${daysLeft(freq)} ${daysLeft(freq) === 1 ? 'day' : 'days'} left · resets ${resetDay}`;
   const groups = cats.map((c) => {
     const items = list.filter((h) => h.category === c.id);
     if (!items.length) return '';
@@ -93,7 +92,7 @@ function habitRow(h, n, st, dayOff, manual) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
     return `<button class="imp-row is-waiting" data-id="${esc(h.id)}" aria-disabled="true">
     ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">Starts Mon ${startLabel}</span></span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">Starts ${startLabel(h)}</span></span>
     ${end}
   </button>`;
   }
@@ -178,7 +177,7 @@ export function bind(root) {
 function apply(id, delta) {
   const h = H.getHabits().find((x) => x.id === id);
   if (!h) return;
-  if (H.notStarted(h)) return toast(`Monthly habits start Mon ${startLabel}`);
+  if (H.notStarted(h)) return toast(`Starts ${startLabel(h)}`);
   if (H.isLimit(h)) return applyLimit(h, delta);
   if (isAuto(h)) return applyOverride(h);
   const before = Stats.compute();

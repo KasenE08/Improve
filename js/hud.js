@@ -34,7 +34,7 @@ export function dayStatus(key, ctx = context()) {
 
 /** This week's weekly habits: { done, total }. Weeks off don't count; a limit counts while you're at or under it. */
 export function weekStatus(date = appNow(), ctx = context()) {
-  const ws = ctx.habits.filter((h) => h.frequency === 'weekly' && !H.offIn(h, date, ctx.ex));
+  const ws = ctx.habits.filter((h) => h.frequency === 'weekly' && !H.offIn(h, date, ctx.ex) && !H.notStarted(h, date));
   return { done: ws.filter((h) => H.isDone(h, H.progress(h, date, ctx.log))).length, total: ws.length };
 }
 
