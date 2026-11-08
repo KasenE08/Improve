@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first month after launch (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 16;
+export const SCHEMA = 17;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -189,6 +189,18 @@ export function init() {
       h_mvn3jd67szxn: { target: 2 },
     };
     store.set('habits', store.get('habits', []).map((h) => (CUT.includes(h.id) ? { ...h, archived: true } : EDIT[h.id] ? { ...h, ...EDIT[h.id] } : h)));
+  }
+  // Schema 17: habits can have a short rule (shown under the name); the reviewed list gets its rules
+  if (found > 0 && found < 17 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    const RULES = {
+      h_mvxenssgflmz: 'No gap over 1 hr · bedtime block set',
+      'work-on-schedule': 'Phone in another room · only the task in front of me',
+      h_mw4hvp9wfrqm: 'No getting defensive · no judging',
+      h_mw4gzesuljy8: 'A real meal, not snacks pieced together',
+      h_mvs7ch6mu7ud: "Someone I don't usually talk to",
+      h_mvn3jd67szxn: 'Max 2 a week (sodium)',
+    };
+    store.set('habits', store.get('habits', []).map((h) => (RULES[h.id] && !h.rule ? { ...h, rule: RULES[h.id] } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
