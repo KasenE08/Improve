@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first month after launch (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 17;
+export const SCHEMA = 18;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -201,6 +201,11 @@ export function init() {
       h_mvn3jd67szxn: 'Max 2 a week (sodium)',
     };
     store.set('habits', store.get('habits', []).map((h) => (RULES[h.id] && !h.rule ? { ...h, rule: RULES[h.id] } : h)));
+  }
+  // Schema 18: reading and the Substack post come back (unarchived, history intact)
+  if (found > 0 && found < 18 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    const BACK = { h_mvze6zm5awsi: 'Read at least 10 pages', h_mw25rarzdrv8: 'Post daily blog on Substack' };
+    store.set('habits', store.get('habits', []).map((h) => (BACK[h.id] ? { ...h, archived: false, name: BACK[h.id] } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
