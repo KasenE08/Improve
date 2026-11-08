@@ -18,7 +18,7 @@
 import * as store from './store.js';
 import { dayKey, fromDayKey, periodRange, appNow, DAY_START_MIN } from './dates.js';
 import { DEFAULT_CATEGORIES, DEFAULT_HABITS, DEFAULT_PROFILE } from './defaults.js';
-import { monthlyOpen } from './launch.js';
+import { MONTHLY_START } from './launch.js';
 
 // Habit kinds: a goal ("do it N times", the default) or a limit ("at most N times", e.g. fast food ≤ 2 a week).
 // Taps on a limit habit only count uses (no XP); its XP comes when the period ends at or under the limit (rewards.js).
@@ -28,9 +28,11 @@ export const isDone = (h, n) => (isLimit(h) ? n <= h.target : n >= h.target);
 export const LIMIT_MAX_USES = 99;
 
 // Monthly habits wait for the first month after launch (see launch.js)
-export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
+/** The day a habit starts (greyed out until then): its own startsOn, or for monthly habits the first month. */
+export const startOf = (habit) => [habit.startsOn, habit.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop() || null;
+export const notStarted = (habit, date = appNow()) => { const s = startOf(habit); return !!s && dayKey(date) < s; };
 
-export const SCHEMA = 19;
+export const SCHEMA = 20;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -212,6 +214,10 @@ export function init() {
   if (found > 0 && found < 19 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
     store.set('habits', store.get('habits', []).map((h) => (h.archived ? h : { ...h, streakFrom: '2026-11-09' })));
   }
+  // Schema 20: the reviewed list's weekly habits start fresh with the week of Mon Nov 9 (greyed out until then)
+  if (found > 0 && found < 20 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    store.set('habits', store.get('habits', []).map((h) => (!h.archived && h.frequency === 'weekly' ? { ...h, startsOn: '2026-11-09' } : h)));
+  }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
 }
@@ -377,7 +383,7 @@ export function clearPeriodXP(habit, date = appNow()) {
 export function autoTimeReached(habit, day, now = new Date()) {
   const today = dayKey(appNow(now));
   if (day > today) return false; // a future day (e.g. food logged ahead) waits until that day comes
-  if (habit.frequency === 'monthly' && !monthlyOpen(day)) return false;
+  if (startOf(habit) && day < startOf(habit)) return false; // not started yet
   if (habit.autoAfter == null || day < today) return true;
   const late = (m) => (m < DAY_START_MIN ? m + 1440 : m);
   return late(now.getHours() * 60 + now.getMinutes()) >= late(habit.autoAfter);
