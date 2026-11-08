@@ -187,7 +187,7 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
     { id: 'h_mvxenssgflmz', name: 'Schedule tomorrow productively', category: 'mind', frequency: 'daily', target: 1, xp: 10, order: 3 },
   ]);
   H.init();
-  eq(H.getHabits().map((h) => [h.name, h.frequency, h.target]), [['7+ hrs sleep', 'daily', 1], ['Start a conversation with someone new', 'weekly', 3], ['Tomorrow fully scheduled', 'daily', 1]], 'schema 16: autopilot cut, renamed, conversation 3×/week');
+  eq(H.getHabits().map((h) => [h.name, h.frequency, h.target]), [['7+ hrs sleep', 'daily', 1], ['Start a conversation with someone new', 'weekly', 3], ['Tomorrow fully scheduled', 'daily', 1], ['One full day off my phone', 'monthly', 1]], 'schema 16–21: autopilot cut, renamed, conversation 3×/week, phone-free day added');
   eq(H.getAllHabits().find((h) => h.id === 'mobility').archived, true, 'cut habits are archived (history kept)');
 }
 
