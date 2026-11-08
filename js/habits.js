@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first month after launch (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 18;
+export const SCHEMA = 19;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -206,6 +206,11 @@ export function init() {
   if (found > 0 && found < 18 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
     const BACK = { h_mvze6zm5awsi: 'Read at least 10 pages', h_mw25rarzdrv8: 'Post daily blog on Substack' };
     store.set('habits', store.get('habits', []).map((h) => (BACK[h.id] ? { ...h, archived: false, name: BACK[h.id] } : h)));
+  }
+  // Schema 19: fresh start for the reviewed list. Streaks of the current habits count from Mon Nov 9, 2026
+  // (history, Perfect Days and totals are kept).
+  if (found > 0 && found < 19 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    store.set('habits', store.get('habits', []).map((h) => (h.archived ? h : { ...h, streakFrom: '2026-11-09' })));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

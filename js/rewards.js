@@ -52,6 +52,7 @@ function limitRun(h, d, bonus = getBonus()) {
   let n = 0;
   for (let i = 0; i < 5000; i++) {
     const [s, e] = periodRange(h.frequency, d);
+    if (h.streakFrom && s < h.streakFrom) break; // streak was reset
     if (!bonus[e]?.['limit:' + h.id]) break;
     n++;
     d = addDays(fromDayKey(s), -1);
@@ -65,10 +66,13 @@ export function streak(h, date = appNow(), counts = H.countsIndex()) {
   if (H.isLimit(h)) return { count: limitRun(h, prevPeriod(h.frequency, date)), current: false };
   const ex = H.getExcused();
   const off = (d) => H.offIn(h, d, ex); // days/weeks off are skipped
-  const current = doneIn(h, date, counts) >= h.target;
+  // A reset streak (streakFrom) only counts periods that start on or after that day
+  const counted = (d) => !h.streakFrom || periodRange(h.frequency, d)[0] >= h.streakFrom;
+  const current = counted(date) && doneIn(h, date, counts) >= h.target;
   let count = current ? 1 : 0;
   let d = prevPeriod(h.frequency, date);
   for (let i = 0; i < 5000; i++) {
+    if (!counted(d)) break;
     if (doneIn(h, d, counts) >= h.target) count++;
     else if (!off(d)) break;
     d = prevPeriod(h.frequency, d);
