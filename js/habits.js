@@ -32,7 +32,7 @@ export const LIMIT_MAX_USES = 99;
 export const startOf = (habit) => [habit.startsOn, habit.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop() || null;
 export const notStarted = (habit, date = appNow()) => { const s = startOf(habit); return !!s && dayKey(date) < s; };
 
-export const SCHEMA = 20;
+export const SCHEMA = 21;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -217,6 +217,15 @@ export function init() {
   // Schema 20: the reviewed list's weekly habits start fresh with the week of Mon Nov 9 (greyed out until then)
   if (found > 0 && found < 20 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
     store.set('habits', store.get('habits', []).map((h) => (!h.archived && h.frequency === 'weekly' ? { ...h, startsOn: '2026-11-09' } : h)));
+  }
+  // Schema 21: new monthly habit for the reviewed list: a full day off the phone
+  if (found > 0 && found < 21 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    const all = store.get('habits', []);
+    if (!all.some((h) => h.id === 'phone-free-day')) {
+      all.push({ id: 'phone-free-day', name: 'One full day off my phone', rule: 'Phone in another room all day', category: 'mind', frequency: 'monthly',
+        target: 1, xp: 40, order: all.reduce((m, h) => Math.max(m, h.order + 1), 0), archived: false, auto: null, kind: 'goal' });
+      store.set('habits', all);
+    }
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
