@@ -30,7 +30,7 @@ export const LIMIT_MAX_USES = 99;
 // Monthly habits wait for the first month after launch (see launch.js)
 export const notStarted = (habit, date = appNow()) => habit.frequency === 'monthly' && !monthlyOpen(dayKey(date));
 
-export const SCHEMA = 15;
+export const SCHEMA = 16;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -173,6 +173,22 @@ export function init() {
   // the weekly "Sunday money check-in", ticked by the check-in itself.
   if (found > 0 && found < 15) {
     store.set('habits', store.get('habits', []).map((h) => (h.id === 'log-spending' ? { ...h, name: 'Sunday money check-in', frequency: 'weekly', target: 1, auto: 'money:checkin' } : h)));
+  }
+  // Schema 16 (Nov 2026 habit review): only habits that are still a fight stay. Autopilot ones are
+  // archived (history kept), and vague ones are made specific.
+  // (Only for the list it was made for: it has the custom "Schedule tomorrow" habit.)
+  if (found > 0 && found < 16 && store.get('habits', []).some((h) => h.id === 'h_mvxenssgflmz')) {
+    const CUT = ['mobility', 'skincare', 'oral-care', 'h_mvq5mpnq4f3d', 'h_mvzh58ktl5bo', 'h_mvze6zm5awsi', 'h_mw25rarzdrv8',
+      'h_mw7e16121614', 'h_mvylw25wy5xn', 'friends', 'family', 'journal', 'water', 'calories', 'protein'];
+    const EDIT = {
+      sleep: { name: '7+ hrs sleep' },
+      h_mvs7ch6mu7ud: { name: 'Start a conversation with someone new', frequency: 'weekly', target: 3 },
+      'work-on-schedule': { name: 'Distraction-free work blocks' },
+      h_mvxenssgflmz: { name: 'Tomorrow fully scheduled' },
+      h_mw4hvp9wfrqm: { name: 'Stay humble' },
+      h_mvn3jd67szxn: { target: 2 },
+    };
+    store.set('habits', store.get('habits', []).map((h) => (CUT.includes(h.id) ? { ...h, archived: true } : EDIT[h.id] ? { ...h, ...EDIT[h.id] } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

@@ -175,3 +175,18 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   H.init();
   eq([H.getHabits()[0].name, mem.imp_food], ['Drink water!', undefined], 'schema 11: your own name kept; nothing added if not ticked');
 }
+
+// ---- Schema 16: the Nov 2026 habit review (only on the list it was made for) ----
+{
+  for (const k of Object.keys(mem)) delete mem[k];
+  mem.imp_schema = '15';
+  mem.imp_habits = JSON.stringify([
+    { id: 'mobility', name: 'Morning Stretching', category: 'body', frequency: 'daily', target: 1, xp: 10, order: 0 },
+    { id: 'sleep', name: '7–9 hrs sleep', category: 'body', frequency: 'daily', target: 1, xp: 30, order: 1 },
+    { id: 'h_mvs7ch6mu7ud', name: "Don't let social anxiety stop you", category: 'people', frequency: 'daily', target: 1, xp: 30, order: 2 },
+    { id: 'h_mvxenssgflmz', name: 'Schedule tomorrow productively', category: 'mind', frequency: 'daily', target: 1, xp: 10, order: 3 },
+  ]);
+  H.init();
+  eq(H.getHabits().map((h) => [h.name, h.frequency, h.target]), [['7+ hrs sleep', 'daily', 1], ['Start a conversation with someone new', 'weekly', 3], ['Tomorrow fully scheduled', 'daily', 1]], 'schema 16: autopilot cut, renamed, conversation 3×/week');
+  eq(H.getAllHabits().find((h) => h.id === 'mobility').archived, true, 'cut habits are archived (history kept)');
+}
