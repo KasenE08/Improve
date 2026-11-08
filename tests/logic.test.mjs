@@ -190,3 +190,17 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   eq(H.getHabits().map((h) => [h.name, h.frequency, h.target]), [['7+ hrs sleep', 'daily', 1], ['Start a conversation with someone new', 'weekly', 3], ['Tomorrow fully scheduled', 'daily', 1]], 'schema 16: autopilot cut, renamed, conversation 3×/week');
   eq(H.getAllHabits().find((h) => h.id === 'mobility').archived, true, 'cut habits are archived (history kept)');
 }
+
+// ---- A reset streak counts only from its start day ----
+{
+  const R2 = await import(new URL('../js/rewards.js', import.meta.url).href);
+  for (const k of Object.keys(mem)) delete mem[k];
+  H.init();
+  const sl = H.getHabits().find((h) => h.id === 'sleep');
+  for (const day of [5, 6, 7, 8, 9, 10]) H.step(sl, 1, new Date(2026, 10, day, 12));
+  eq(R2.streak(sl, new Date(2026, 10, 10, 12)).count, 6, 'streak before a reset: 6 days');
+  H.upsertHabit({ ...sl, streakFrom: '2026-11-09' });
+  const s2 = H.getHabits().find((h) => h.id === 'sleep');
+  eq(R2.streak(s2, new Date(2026, 10, 10, 12)).count, 2, 'reset on Nov 9: only Nov 9–10 count');
+  eq(R2.streak(s2, new Date(2026, 10, 8, 12)).count, 0, 'nothing counts before the reset');
+}
