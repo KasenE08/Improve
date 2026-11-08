@@ -254,3 +254,6 @@
 
 /* The hidden attribute always wins over component display rules */
 .imp-root [hidden] { display: none !important; }
+
+/* A habit's rule, under its name */
+.imp-row__rule { display: block; font: 500 12.5px/1.35 var(--imp-font-head); color: var(--imp-muted); margin-top: 1px; }

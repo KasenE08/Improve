@@ -82,7 +82,7 @@ function habitRow(h, n, st, dayOff, manual) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
     return `<button class="imp-row is-waiting" data-id="${esc(h.id)}">
     ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span><span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}${st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''}</span></span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}${st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''}</span></span>
     ${end}
   </button>`;
   }
@@ -93,7 +93,7 @@ function habitRow(h, n, st, dayOff, manual) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
     return `<button class="imp-row is-waiting" data-id="${esc(h.id)}" aria-disabled="true">
     ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span><span class="imp-row__sub">Starts Mon ${startLabel}</span></span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">Starts Mon ${startLabel}</span></span>
     ${end}
   </button>`;
   }
@@ -106,7 +106,7 @@ function habitRow(h, n, st, dayOff, manual) {
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
   return `<button class="imp-row${done ? ' is-done' : ''}" data-id="${esc(h.id)}" aria-pressed="${done}">
     ${check(done)}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${sub}</span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}${sub}</span>
     ${end}
   </button>`;
 }
@@ -120,7 +120,7 @@ function limitRow(h, n, st) {
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
   return `<button class="imp-row is-limit${over ? ' is-over' : ''}" data-id="${esc(h.id)}" aria-label="${esc(h.name)}: ${n} of at most ${h.target}">
     <span class="imp-check imp-limit-box${over ? ' is-over' : ''}"></span>
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}
       <span class="imp-row__sub">${n}/${h.target} max ${PERIOD_WORD[h.frequency]} · ${state}${fire}</span>
       ${limitDots(n, h.target)}</span>
     ${end}
@@ -262,6 +262,7 @@ export function openHabitForm(h) {
     title: isNew ? 'New habit' : 'Edit habit',
     body: `${undoRow}
       <label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" id="f-name" maxlength="80" value="${esc(cur.name)}" autocomplete="off"></label>
+      <label class="imp-field"><span class="imp-label">Rule (optional)</span><input class="imp-input" id="f-rule" maxlength="80" value="${esc(cur.rule || '')}" placeholder="What counts, in a few words" autocomplete="off"></label>
       <label class="imp-field"><span class="imp-label">Category</span><select class="imp-select" id="f-cat">
         ${cats.map((c) => `<option value="${esc(c.id)}"${c.id === cur.category ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
       <div class="imp-field"><span class="imp-label">Resets</span><div class="imp-seg" id="f-freq">
@@ -314,7 +315,8 @@ export function openHabitForm(h) {
         const afterVal = b.querySelector('#f-after').value;
         const autoAfter = auto && afterVal ? timeToMin(afterVal) : null;
         const id = isNew ? H.newId('h') : h.id;
-        H.upsertHabit({ id, name, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter,
+        const rule = b.querySelector('#f-rule').value.trim() || null;
+        H.upsertHabit({ id, name, rule, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter,
           kind: lim ? 'limit' : 'goal', limitSince: lim ? (limit0 && cur.limitSince) || dayKey(appNow()) : null });
         if (lim && !limit0 && !isNew) H.clearPeriodXP(H.getHabits().find((x) => x.id === id)); // its taps this period become uses, not XP
         recheckFood();
