@@ -125,6 +125,31 @@ export function streakBurst({ n, unit, lv, name, newFlame }) {
   });
 }
 
+// Perfect Day / Week / Month popup. Day: red star. Week: gold star, the 7 days light up. Month: all gold, confetti.
+const STAR_PATH = 'M12 2.5l2.9 6.1 6.6.8-4.9 4.5 1.3 6.6L12 17.2l-5.9 3.3 1.3-6.6-4.9-4.5 6.6-.8z';
+export function perfectBurst(kind, { sub = '', count = 0 } = {}) {
+  const n = { day: 10, week: 14, month: 18 }[kind];
+  const dist = { day: 70, week: 84, month: 100 }[kind];
+  const sparks = Array.from({ length: n }, (_, i) => `<i class="imp-spark" style="--a:${(360 / n) * i}deg;--d:${-dist}px"></i>`).join('');
+  const title = { day: 'Perfect Day', week: 'Perfect Week', month: 'Perfect Month' }[kind];
+  const seven = kind === 'week' ? `<div class="imp-pb__seven">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => `<i style="--i:${i}">${d}</i>`).join('')}</div>` : '';
+  const big = kind === 'month' && count ? `<p class="imp-pb__count" data-count>${count}</p>` : '';
+  let confetti = '';
+  if (kind === 'month' && !(typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+    const colors = ['#f5d061', '#e8b923', '#fff4c2', '#2563eb', '#ffffff', '#c99212'];
+    confetti = Array.from({ length: 70 }, (_, i) => `<i class="imp-confetti" style="left:${Math.random() * 100}vw;background:${colors[i % colors.length]};--dx:${Math.round((Math.random() - 0.5) * 120)}px;--r:${Math.round(Math.random() * 720)}deg;animation-duration:${(1.6 + Math.random() * 1.6).toFixed(2)}s;animation-delay:${(Math.random() * 0.5).toFixed(2)}s"></i>`).join('');
+  }
+  burst({
+    cls: 'imp-burst--perfect',
+    count: kind === 'month' ? count : 0,
+    ms: kind === 'day' ? 3500 : 5000,
+    html: `<div class="imp-burst__box imp-pb imp-pb--${kind}">
+      <div class="imp-pb__star"><i class="imp-pb__ring"></i>${sparks}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${STAR_PATH}"/></svg></div>
+      ${seven}${big}<p class="imp-burst__title">${title}</p>${sub ? `<p class="imp-burst__sub">${esc(sub)}</p>` : ''}
+      <p class="imp-burst__hint">Tap to continue</p></div>${confetti}`,
+  });
+}
+
 let toastTimer;
 export function toast(msg) {
   let t = document.querySelector('.imp-toast');

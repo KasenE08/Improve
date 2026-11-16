@@ -20,10 +20,10 @@
   --imp-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 1px 3px rgba(16, 24, 40, .06);
   --imp-shadow-lg: 0 12px 32px rgba(16, 24, 40, .14), 0 2px 6px rgba(16, 24, 40, .06);
 
-  /* Accent (red) */
-  --imp-accent: #e5484d;
-  --imp-accent-dim: #fde8e8;     /* soft red background */
-  --imp-accent-deep: #c5343a;    /* pressed */
+  /* Accent (blue) */
+  --imp-accent: #2563eb;
+  --imp-accent-dim: #e3ecfd;     /* soft blue background */
+  --imp-accent-deep: #1d4ed8;    /* pressed */
   --imp-on-accent: #ffffff;
 
   /* Text */
@@ -31,10 +31,10 @@
   --imp-muted: #6b7280;
   --imp-faint: #9ca3af;
 
-  /* Food: calories use the accent, protein is orange, water blue */
+  /* Food: calories use the accent, protein is orange, water teal */
   --imp-protein: #f97316;
   --imp-protein-deep: #c2410c;
-  --imp-water: #3b82f6;
+  --imp-water: #0d9488;
 
   /* Planner categories */
   --imp-cat-online: #3b82f6;
@@ -72,7 +72,7 @@
   --imp-steps: var(--imp-ease);
 }
 
-/* Dark: deep blue-gray layers (not flat black), softer text, a brighter red so it still pops. */
+/* Dark: deep blue-gray layers (not flat black), softer text, a brighter blue so it still pops. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
@@ -85,9 +85,9 @@
   --imp-shadow: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 1px 2px rgba(0, 0, 0, .4);
   --imp-shadow-lg: 0 20px 48px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .05);
 
-  --imp-accent: #ff5c62;
-  --imp-accent-dim: rgba(255, 92, 98, .14);
-  --imp-accent-deep: #e0454b;
+  --imp-accent: #4f8cff;
+  --imp-accent-dim: rgba(79, 140, 255, .14);
+  --imp-accent-deep: #3b76f0;
   --imp-on-accent: #ffffff;
 
   --imp-text: #eef0f4;
@@ -96,7 +96,7 @@
 
   --imp-protein: #fb923c;
   --imp-protein-deep: #ea580c;
-  --imp-water: #60a5fa;
+  --imp-water: #2dd4bf;
 
   --imp-cat-online: #60a5fa;
   --imp-cat-online-missing: #a78bfa;

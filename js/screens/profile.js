@@ -13,6 +13,7 @@ export function render(root) {
   const p = H.getProfile();
   const st = Stats.compute();
   const streaks = R.allStreaks();
+  const pc = R.perfectCounts();
   const last = Backup.lastBackup();
   const daysSince = last ? Math.floor((Date.now() - new Date(last)) / 86400000) : null;
 
@@ -27,7 +28,9 @@ export function render(root) {
       <button class="prof-me" data-act="edit-name" aria-label="Rename"><span class="prof-avatar">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span>
         <span class="prof-me__name">${esc(p.name)}</span>${icon('edit', 'prof-go')}</button>
       <div class="prof-totals">
-        <div><b>${fmt(st.perfectDays)}</b><span>Perfect days</span></div>
+        <div><b>${fmt(pc.days)}</b><span>Perfect Days</span></div>
+        <div${pc.weeks ? ' class="is-gold"' : ''}><b>${fmt(pc.weeks)}</b><span>Perfect Weeks</span></div>
+        <div${pc.months ? ' class="is-gold"' : ''}><b>${fmt(pc.months)}</b><span>Perfect Months</span></div>
         <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
         <div><b>${fmt(streaks.length)}</b><span>Streaks</span></div>
       </div>

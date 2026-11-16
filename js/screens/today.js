@@ -9,7 +9,7 @@ import { recheckMoney } from '../money/autocheck.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import { appDateFor } from '../food/logic.js';
 const recheckFood = () => { recheck(appDateFor(new Date())); recheckMoney(); recheckJournal(); };
-import { esc, icon, panel, check, pips, streakBadge, streakBurst, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
+import { esc, icon, panel, check, pips, streakBadge, streakBurst, perfectBurst, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
@@ -242,12 +242,17 @@ function applyLimit(h, delta) {
 
 // Big moments: Perfect Day, streak milestones, a limit kept. (XP and levels are hidden; the history keeps them.)
 export function celebrate(_before, _after, added) {
+  // Perfect Day / Week / Month: only the biggest one earned shows
+  const pm = added.find((b) => b.type === 'perfectMonth'), pw = added.find((b) => b.type === 'perfectWeek'), pd = added.find((b) => b.type === 'perfect');
+  const rng = (b) => `${fromDayKey(b.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${fromDayKey(b.to).getDate()}`;
+  if (pm) { const d = fromDayKey(pm.to); perfectBurst('month', { count: d.getDate(), sub: `All ${d.getDate()} days of ${d.toLocaleDateString('en-US', { month: 'long' })}` }); }
+  else if (pw) perfectBurst('week', { sub: `7 Perfect Days · ${rng(pw)}` });
+  else if (pd) perfectBurst('day', { sub: 'Every daily habit done today' });
   for (const b of added) {
     if (b.type === 'limit') {
       if (b.unit === 'day') toast(`${b.name}: stayed at ${b.n}/${b.max}`);
       else burst({ icon: 'shield', title: 'Held the line', big: `${b.n}/${b.max}`, sub: `${b.name} last ${b.unit}` });
     }
-    if (b.type === 'perfect') burst({ icon: 'star', title: 'Perfect Day', big: '', sub: 'Every daily habit done today' });
     if (b.type === 'streak') {
       const freq = { days: 'daily', weeks: 'weekly', months: 'monthly' }[b.unit] || 'daily';
       streakBurst({ n: b.n, unit: b.unit, lv: Math.max(1, R.tier(b.n, freq)), name: b.name, newFlame: R.isNewTier(b.n, freq) });
