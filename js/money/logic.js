@@ -225,13 +225,14 @@ export const checkedInWeek = (state, date = appNow()) => {
 };
 
 /** Graph: each account's balance over time, one point per check-in (plus its start and today). */
-export function balanceSeries(state, now = new Date().toISOString()) {
+// withNow: false = only real numbers (the starting balance and each check-in), no estimate for today.
+export function balanceSeries(state, now = new Date().toISOString(), { withNow = true } = {}) {
   const accts = state.accounts || [];
   const cur = balances(state);
   return accts.map((a) => {
     const pts = [{ at: a.since || now, v: a.start || 0 }];
     for (const e of checkins(state)) if (a.id in (e.balances || {}) && (e.at || '') >= (a.since || '')) pts.push({ at: e.at, v: e.balances[a.id] });
-    pts.push({ at: now, v: cur[a.id] });
+    if (withNow) pts.push({ at: now, v: cur[a.id] });
     return { id: a.id, name: a.name, points: pts };
   });
 }
