@@ -9,7 +9,7 @@ import { recheckMoney } from '../money/autocheck.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import { appDateFor } from '../food/logic.js';
 const recheckFood = () => { recheck(appDateFor(new Date())); recheckMoney(); recheckJournal(); };
-import { esc, icon, panel, check, pips, streakTag, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
+import { esc, icon, panel, check, pips, streakBadge, streakBurst, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
 
 const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
 const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
@@ -76,13 +76,26 @@ function emptyList() {
   return panel({ title: 'No habits', body: `<p class="imp-muted" style="padding:8px 0">Tap Edit → New habit to add one.</p>` });
 }
 
+// Streak badge on the right of a row (from 2 in a row), and the row's gold/silver look at the top flame level
+const hasStreak = (st) => st && st.count >= 2;
+const lvOf = (h, st) => R.tier(st.count, h.frequency);
+function badge(h, st, risk = st?.atRisk) {
+  if (!hasStreak(st)) return '';
+  return streakBadge({ count: st.count, atRisk: risk, lv: lvOf(h, st), unit: R.UNIT[h.frequency][1], warn: H.isLimit(h) ? 'stay under today' : 'do it today' });
+}
+function rowLook(h, st, risk = st?.atRisk) {
+  if (!hasStreak(st)) return '';
+  return (lvOf(h, st) >= 4 ? (risk ? ' is-silver' : ' is-gold') : '') + (risk ? ' is-risk' : '');
+}
+const missedNote = (h, st) => (hasStreak(st) && st.atRisk ? `<b class="imp-missed">${H.isLimit(h) ? 'over yesterday' : 'missed yesterday'}</b>` : '');
+
 function habitRow(h, n, st, dayOff, manual) {
   if (dayOff && !n) {
     const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-    return `<button class="imp-row is-waiting" data-id="${esc(h.id)}">
+    return `<button class="imp-row is-waiting${rowLook(h, st, false)}" data-id="${esc(h.id)}">
     ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}${st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''}</span></span>
-    ${end}
+    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}</span></span>
+    ${badge(h, st, false)}${end}
   </button>`;
   }
   if (H.isLimit(h) && !H.notStarted(h)) return limitRow(h, n, st);
@@ -97,16 +110,16 @@ function habitRow(h, n, st, dayOff, manual) {
   </button>`;
   }
   const fire = [manual ? `<span class="today-auto">${icon('edit')}Manual</span>`
-    : isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', st && st.count >= 2 ? streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : ''].filter(Boolean).join(' · ');
+    : isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', missedNote(h, st)].filter(Boolean).join(' · ');
   const note = isAuto(h) && !manual && AUTO_NOTE[h.auto] ? `<span class="imp-row__note">${AUTO_NOTE[h.auto]}</span>` : '';
   const sub = (multi
     ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
     : fire ? `<span class="imp-row__sub">${fire}</span>` : '') + note;
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-  return `<button class="imp-row${done ? ' is-done' : ''}" data-id="${esc(h.id)}" aria-pressed="${done}">
+  return `<button class="imp-row${done ? ' is-done' : ''}${rowLook(h, st)}" data-id="${esc(h.id)}" aria-pressed="${done}">
     ${check(done)}
     <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}${sub}</span>
-    ${end}
+    ${badge(h, st)}${end}
   </button>`;
 }
 
@@ -115,14 +128,14 @@ function limitRow(h, n, st) {
   const over = n > h.target;
   const left = h.target - n;
   const state = over ? `Over by ${n - h.target}` : left === 0 ? 'At the limit' : `On track · ${left} left`;
-  const fire = st && st.count >= 2 ? ' · ' + streakTag(st.count, st.current, R.UNIT[h.frequency][1]) : '';
+  const fire = missedNote(h, st) ? ' · ' + missedNote(h, st) : '';
   const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-  return `<button class="imp-row is-limit${over ? ' is-over' : ''}" data-id="${esc(h.id)}" aria-label="${esc(h.name)}: ${n} of at most ${h.target}">
+  return `<button class="imp-row is-limit${over ? ' is-over' : ''}${rowLook(h, st)}" data-id="${esc(h.id)}" aria-label="${esc(h.name)}: ${n} of at most ${h.target}">
     <span class="imp-check imp-limit-box${over ? ' is-over' : ''}"></span>
     <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}
       <span class="imp-row__sub">${n}/${h.target} max ${PERIOD_WORD[h.frequency]} · ${state}${fire}</span>
       ${limitDots(n, h.target)}</span>
-    ${end}
+    ${badge(h, st)}${end}
   </button>`;
 }
 
@@ -235,7 +248,10 @@ export function celebrate(_before, _after, added) {
       else burst({ icon: 'shield', title: 'Held the line', big: `${b.n}/${b.max}`, sub: `${b.name} last ${b.unit}` });
     }
     if (b.type === 'perfect') burst({ icon: 'star', title: 'Perfect Day', big: '', sub: 'Every daily habit done today' });
-    if (b.type === 'streak') burst({ icon: 'flame', title: `${b.n}-${b.unit.replace(/s$/, '')} streak`, big: '', sub: b.name });
+    if (b.type === 'streak') {
+      const freq = { days: 'daily', weeks: 'weekly', months: 'monthly' }[b.unit] || 'daily';
+      streakBurst({ n: b.n, unit: b.unit, lv: Math.max(1, R.tier(b.n, freq)), name: b.name, newFlame: R.isNewTier(b.n, freq) });
+    }
   }
 }
 

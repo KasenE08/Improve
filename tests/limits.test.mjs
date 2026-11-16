@@ -65,8 +65,8 @@ eq([!!limitBonus('2026-11-15'), !!limitBonus('2026-11-22'), !!limitBonus('2026-1
 // ---- Streak of weeks under the limit + milestone ----
 eq(R.streak(get('fast'), at(10, 30)).count, 3, 'streak = 3 weeks (Nov 9–29; Nov 2 week was over)');
 for (let w = 0; w < 5; w++) R.sync(at(11, 7 + w * 7));
-const b7 = Object.entries(R.getBonus()).find(([, v]) => v['streak:fast']);
-eq(b7 && [b7[0], b7[1]['streak:fast'].n, b7[1]['streak:fast'].xp], ['2026-12-27', 7, 50], '7th clean week → +50 milestone on that Sunday');
+const ms = Object.entries(R.getBonus()).filter(([, v]) => v['streak:fast']).map(([k, v]) => [k, v['streak:fast'].n, v['streak:fast'].xp]).sort();
+eq(ms, [['2026-12-06', 4, 50], ['2027-01-03', 8, 100]], 'weeks 4 and 8 → weekly milestones on those Sundays (7 is not a weekly milestone)');
 eq(R.allStreaks(at(11, 30)).find((s) => s.h.id === 'fast').count, 7, 'profile streak list shows it');
 
 // ---- Not before launch / before it became a limit ----

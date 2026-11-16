@@ -169,7 +169,7 @@ eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the 
   H.setExcused(save, '2026-11-09', true);                                            // no payday Nov 9
   H.setPeriodDone(save, new Date(2026, 10, 18, 12), true, new Date(2026, 10, 18, 12)); // payday week Nov 16
   eq(R.streak(save, new Date(2026, 10, 18, 12)).count, 2, 'saving streak skips the week off (2 payday weeks)');
-  eq(R.streak(save, new Date(2026, 10, 25, 12)), { count: 2, current: false }, 'next week not done yet: streak alive');
+  eq(R.streak(save, new Date(2026, 10, 25, 12)), { count: 2, current: false, atRisk: false }, 'next week not done yet: streak alive');
 }
 eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys');
 
