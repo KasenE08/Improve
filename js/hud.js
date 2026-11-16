@@ -43,11 +43,11 @@ function context() {
 }
 
 // A day as a progress circle. Today is filled dark; a Perfect Day is solid red.
-function dayCircle(key, st, { today, small = false } = {}) {
+function dayCircle(key, st, { today, small = false, i = 0 } = {}) {
   const p = st && st.total ? Math.round((st.done / st.total) * 100) : 0;
   const cls = ['hday', small ? 'hday--sm' : '', key === today ? 'is-today' : '', st?.perfect ? 'is-perfect' : '', st ? '' : 'is-blank'].filter(Boolean).join(' ');
   const label = st ? `${fmt(key, { weekday: 'long', month: 'short', day: 'numeric' })}: ${st.done} of ${st.total} daily habits${st.perfect ? ', Perfect Day' : ''}` : fmt(key, { weekday: 'long', month: 'short', day: 'numeric' });
-  return `<button class="${cls}" data-day="${key}" style="--p:${p}" aria-label="${esc(label)}"${st ? '' : ' disabled'}>
+  return `<button class="${cls}" data-day="${key}" style="--p:${p};--i:${i}" aria-label="${esc(label)}"${st ? '' : ' disabled'}>
     ${small ? '' : `<span class="hday__dow">${DOW[fromDayKey(key).getDay()]}</span>`}
     <span class="hday__ring"><span class="hday__num">${fromDayKey(key).getDate()}</span></span></button>`;
 }
@@ -59,6 +59,7 @@ export function renderHud(el) {
   const ws = weekStart(now);
   const days = Array.from({ length: 7 }, (_, i) => dayKey(addDays(ws, i)));
   const wk = weekStatus(now, ctx);
+  const perfectWeek = days.every((k) => ctx.bonus[k]?.perfect); // all 7 days Perfect Days: the strip turns gold
   const theme = currentTheme();
   const name = H.getProfile().name;
   el.innerHTML = `
@@ -73,7 +74,8 @@ export function renderHud(el) {
         <a class="hud__me" href="#profile" aria-label="You: ${esc(name)}">${esc((name.trim()[0] || '?').toUpperCase())}</a>
       </div>
     </div>
-    <div class="hud__week">${days.map((k) => dayCircle(k, dayStatus(k, ctx), { today })).join('')}</div>
+    <div class="hud__week${perfectWeek ? ' is-gold' : ''}">${days.map((k, i) => dayCircle(k, dayStatus(k, ctx), { today, i })).join('')}</div>
+    ${perfectWeek ? `<span class="hud__pweek">${icon('star')}Perfect Week</span>` : ''}
     ${wk.total ? `<div class="hud__wbar"><div class="hud__wtop"><span>This week</span><span><b>${wk.done}</b> of ${wk.total} weekly habits</span></div>${xpbar(pct(wk.done, wk.total), 'imp-xpbar--sm')}</div>` : ''}`;
 }
 
@@ -100,10 +102,11 @@ function monthBody(mk) {
   const mkOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const canNext = mkOf(next) <= today.slice(0, 7);
   const canPrev = mkOf(prev) >= START.slice(0, 7);
-  return `<div class="cal">
+  const perfectMonth = perfect === count; // every day of the month a Perfect Day: gold frame + label
+  return `<div class="cal${perfectMonth ? ' is-gold' : ''}">
     <div class="cal__nav">
       <button class="cal__arrow" data-cal="${mkOf(prev)}" aria-label="Previous month"${canPrev ? '' : ' disabled'}>${icon('prev')}</button>
-      <span class="cal__title">${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
+      <span class="cal__title">${first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}${perfectMonth ? `<span class="cal__pmonth">${icon('star')}Perfect Month</span>` : ''}</span>
       <button class="cal__arrow" data-cal="${mkOf(next)}" aria-label="Next month"${canNext ? '' : ' disabled'}>${icon('next')}</button>
     </div>
     <div class="cal__grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span class="cal__wd">${d}</span>`).join('')}${cells.join('')}</div>

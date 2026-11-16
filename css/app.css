@@ -285,12 +285,11 @@
 /* Missed yesterday: gray, still flame + "do it today" */
 .imp-sbadge.is-risk { flex-direction: column; align-items: flex-end; gap: 0; padding: 4px 10px; border-radius: 12px; color: var(--imp-muted); background: color-mix(in srgb, var(--imp-muted) 14%, transparent); box-shadow: none; animation: none; }
 .imp-sbadge__top { display: inline-flex; align-items: center; gap: 3px; }
-.imp-sbadge__warn { font: 700 11px var(--imp-font-head); color: var(--imp-accent); }
+.imp-sbadge__warn { font: 700 11px var(--imp-font-head); color: var(--imp-danger); }
 .imp-sbadge.is-risk .imp-flame svg { filter: grayscale(1) opacity(.55); }
 .imp-sbadge.is-risk .imp-flame__o, .imp-sbadge.is-risk .imp-flame__i { animation-play-state: paused; }
 .imp-sbadge.is-risk .imp-ember { display: none; }
-.imp-missed { color: var(--imp-accent); font-weight: 600; }
-.imp-row.is-risk.is-limit .imp-missed { color: var(--imp-danger); }
+.imp-missed { color: var(--imp-danger); font-weight: 600; }
 
 /* Top flame level: the habit turns shiny gold (silver while at risk) */
 .imp-row.is-gold, .imp-row.is-silver { margin: 0 calc(var(--imp-pad) * -1); padding-left: var(--imp-pad); padding-right: var(--imp-pad); width: calc(100% + var(--imp-pad) * 2); overflow: hidden; }
@@ -331,7 +330,60 @@
 .imp-sburst.is-gold .imp-burst__sub, .imp-sburst.is-gold .imp-burst__hint { color: #5c4300; }
 @keyframes imp-grow { from { transform: scale(.2); opacity: 0; } }
 @keyframes imp-ring { 0% { opacity: .8; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.5); } }
-@keyframes imp-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-78px) scale(.3); } }
+@keyframes imp-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(var(--d, -78px)) scale(.3); } }
 @media (prefers-reduced-motion: reduce) {
   .imp-flame__o, .imp-flame__i, .imp-ember, .imp-sbadge.t4, .imp-row.is-gold::after, .imp-sburst.is-gold::after { animation: none; }
+}
+
+/* ---- Perfect Day / Week / Month ------------------------------------------------------------- */
+:root { --imp-gold: linear-gradient(135deg, #b8860b, #f5d061 30%, #fff4c2 45%, #e8b923 65%, #c99212); --imp-gold-ink: #4a3500; }
+/* Perfect Week: the header's 7 circles turn gold */
+.hud__week.is-gold .hday__ring { background: var(--imp-gold); box-shadow: 0 4px 14px rgba(201, 146, 18, .45); }
+.hud__week.is-gold .hday__num { position: relative; overflow: hidden; background: var(--imp-gold); color: var(--imp-gold-ink); }
+.hud__week.is-gold .hday__num::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, .8) 50%, transparent 70%); transform: translateX(-130%); animation: imp-sheen2 3s ease-in-out infinite; animation-delay: calc(var(--i) * .08s); }
+.hud__week.is-gold .hday__dow { color: #b8860b; }
+.hud__week.is-gold .hday { animation: imp-flip .5s cubic-bezier(.2, 1.5, .4, 1) both; animation-delay: calc(var(--i) * .08s); }
+.hud__pweek, .cal__pmonth { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; background: var(--imp-gold); color: var(--imp-gold-ink); font: 700 12px var(--imp-font-head); }
+.hud__pweek { margin-top: 10px; }
+.hud__pweek .imp-icon, .cal__pmonth .imp-icon { width: 13px; height: 13px; }
+@keyframes imp-sheen2 { 0%, 40% { transform: translateX(-130%); } 80%, 100% { transform: translateX(130%); } }
+@keyframes imp-flip { 0% { transform: scale(.6) rotateY(90deg); } 100% { transform: none; } }
+/* Perfect Month: gold frame + label on the calendar */
+.cal.is-gold { padding: 14px 10px; border-radius: 18px; border: 3px solid transparent; background: linear-gradient(var(--imp-surface), var(--imp-surface)) padding-box, linear-gradient(135deg, #b8860b, #f5d061 25%, #fff4c2 40%, #e8b923 60%, #c99212 80%, #f7dc7a) border-box; box-shadow: 0 0 22px rgba(232, 185, 35, .35); }
+.cal__title { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.cal__pmonth { letter-spacing: .02em; }
+/* You tab totals: 5 boxes (Perfect Days/Weeks/Months, then Check-ins, Streaks) */
+.prof-totals { grid-template-columns: repeat(6, 1fr); }
+.prof-totals div { grid-column: span 2; }
+.prof-totals div:nth-child(n+4) { grid-column: span 3; }
+.prof-totals div.is-gold { background: var(--imp-gold); }
+.prof-totals div.is-gold b { color: var(--imp-gold-ink); }
+.prof-totals div.is-gold span { color: #5c4300; }
+/* Popups */
+.imp-pb { position: relative; overflow: hidden; gap: 6px; }
+.imp-pb__star { position: relative; display: grid; place-items: center; width: 110px; height: 110px; color: var(--imp-accent); }
+.imp-pb__star svg { width: 66px; height: 66px; animation: imp-spin-in .8s cubic-bezier(.2, 1.5, .4, 1) both; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .18)); }
+.imp-pb__star svg path { fill: var(--imp-accent); }
+.imp-pb__ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid currentColor; opacity: 0; animation: imp-ring 1s ease-out .2s; }
+.imp-pb .imp-spark { animation-delay: .15s; }
+.imp-pb--week .imp-pb__star { color: #e8b923; }
+.imp-pb--week .imp-pb__star svg path { fill: url(#pgold); }
+.imp-pb__seven { display: flex; gap: 6px; margin: 2px 0; }
+.imp-pb__seven i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 11px var(--imp-font-head); font-style: normal; background: var(--imp-sunken); color: var(--imp-faint); animation: imp-light-up .35s cubic-bezier(.2, 1.6, .4, 1) both; animation-delay: calc(.35s + var(--i) * .12s); }
+@keyframes imp-light-up { 0% { transform: scale(.7); } 100% { background: var(--imp-accent); color: #fff; transform: none; } }
+.imp-pb--month { background: var(--imp-gold); color: var(--imp-gold-ink); padding-top: 30px; }
+.imp-pb--month::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .7) 50%, transparent 65%); animation: imp-sheen 2.4s ease-in-out infinite; pointer-events: none; }
+.imp-pb--month .imp-pb__star { width: 130px; height: 130px; color: #fff; }
+.imp-pb--month .imp-pb__star svg { width: 84px; height: 84px; filter: drop-shadow(0 0 14px rgba(255, 255, 255, .9)); }
+.imp-pb--month .imp-pb__star svg path { fill: #fffaf0; }
+.imp-pb--month .imp-spark { width: 7px; height: 7px; background: #fff; box-shadow: 0 0 6px #fff; }
+.imp-pb--month .imp-burst__title { font-size: 28px; }
+.imp-pb--month .imp-burst__sub, .imp-pb--month .imp-burst__hint { color: #5c4300; }
+.imp-pb__count { font: 800 54px/1 var(--imp-font-head); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.imp-confetti { position: fixed; top: -12px; width: 8px; height: 12px; border-radius: 2px; opacity: .95; animation: imp-fall linear forwards; pointer-events: none; }
+@keyframes imp-fall { to { transform: translate(var(--dx), 110vh) rotate(var(--r)); } }
+@keyframes imp-spin-in { from { transform: scale(.1) rotate(-160deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .hud__week.is-gold .hday, .hud__week.is-gold .hday__num::after, .imp-pb--month::after, .imp-pb__seven i { animation: none; }
+  .imp-pb__seven i { background: var(--imp-accent); color: #fff; }
 }

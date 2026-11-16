@@ -17,6 +17,8 @@ import { dayKey, addDays, weekStart, periodRange, appNow, fromDayKey } from './d
 import { START, MONTHLY_START } from './launch.js';
 
 export const PERFECT_DAY_XP = 100;
+export const PERFECT_WEEK_XP = 300;
+export const PERFECT_MONTH_XP = 1000;
 // Streak milestones (popups) per frequency: [streak length, XP], then every `every` after the last
 export const MILESTONES = {
   daily: { at: [[3, 20], [7, 50], [14, 100], [30, 200], [50, 300], [100, 600]], every: 100 },
@@ -141,6 +143,16 @@ export function sync(date = appNow()) {
   if (perfect && !day.perfect) { day.perfect = { type: 'perfect', xp: PERFECT_DAY_XP }; added.push(day.perfect); }
   if (!perfect) delete day.perfect;
 
+  // Perfect Week: Mon–Sun all Perfect Days (earned on Sunday). Perfect Month: every day of the calendar month (earned on the last day).
+  const [ws, we] = periodRange('weekly', date);
+  if (perfect && today === we && allPerfect(bonus, ws, we)) {
+    if (!day.perfectWeek) { day.perfectWeek = { type: 'perfectWeek', xp: PERFECT_WEEK_XP, from: ws, to: we }; added.push(day.perfectWeek); }
+  } else delete day.perfectWeek;
+  const [ms, me] = periodRange('monthly', date);
+  if (perfect && today === me && allPerfect(bonus, ms, me)) {
+    if (!day.perfectMonth) { day.perfectMonth = { type: 'perfectMonth', xp: PERFECT_MONTH_XP, from: ms, to: me }; added.push(day.perfectMonth); }
+  } else delete day.perfectMonth;
+
   // Streak milestones, one per habit per period
   for (const h of habits) {
     if (H.isLimit(h)) continue; // limit milestones are added when a period is settled
@@ -160,6 +172,30 @@ export function sync(date = appNow()) {
   for (const k in bonus) if (!Object.keys(bonus[k]).length) delete bonus[k];
   saveBonus(bonus);
   return added;
+}
+
+// Every day from..to (day keys) is a Perfect Day
+export function allPerfect(bonus, from, to) {
+  for (let d = fromDayKey(from); dayKey(d) <= to; d = addDays(d, 1)) if (!bonus[dayKey(d)]?.perfect) return false;
+  return true;
+}
+
+// Totals for the You tab: Perfect Days, complete Mon–Sun weeks and complete calendar months of them
+export function perfectCounts(bonus = getBonus()) {
+  const keys = Object.keys(bonus).filter((k) => bonus[k].perfect);
+  const weeks = {}, months = {};
+  for (const k of keys) {
+    const w = periodRange('weekly', fromDayKey(k))[0];
+    weeks[w] = (weeks[w] || 0) + 1;
+    const m = k.slice(0, 7);
+    months[m] = (months[m] || 0) + 1;
+  }
+  const daysIn = (m) => { const [y, mo] = m.split('-').map(Number); return new Date(y, mo, 0).getDate(); };
+  return {
+    days: keys.length,
+    weeks: Object.values(weeks).filter((n) => n === 7).length,
+    months: Object.keys(months).filter((m) => months[m] === daysIn(m)).length,
+  };
 }
 
 // One-time upgrade from Phase 1: award Perfect Days already earned in the history
