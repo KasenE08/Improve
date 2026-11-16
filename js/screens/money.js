@@ -128,25 +128,43 @@ function checkinPanel(s) {
 const LINE = { checking: '#3b82f6', savings: '#22c55e' };
 const OTHER = ['#a855f7', '#f97316', '#eab308', '#ef4444'];
 function graphPanel(s) {
-  const series = L.balanceSeries(s);
+  // Real numbers only: each account's starting balance and what the bank showed at each check-in
+  const series = L.balanceSeries(s, undefined, { withNow: false }).filter((x) => x.points.length);
   const pts = series.flatMap((x) => x.points);
   if (!series.length || L.checkins(s).length < 1) return box('Over time', '<p class="mon-empty">Your first check-in starts the graph.</p>');
   const t = (p) => new Date(p.at).getTime();
   const t0 = Math.min(...pts.map(t)), t1 = Math.max(...pts.map(t), t0 + 86400000);
-  const vmax = Math.max(...pts.map((p) => p.v), 100) * 1.1;
-  const W = 320, H = 150, P = 6;
-  const x = (p) => P + ((t(p) - t0) / (t1 - t0)) * (W - 2 * P);
-  const y = (p) => H - P - (Math.max(0, p.v) / vmax) * (H - 2 * P);
   let o = 0;
   const color = (id) => LINE[id] || OTHER[o++ % OTHER.length];
-  const lines = series.map((sr) => ({ ...sr, c: color(sr.id) }));
-  const grid = [0.25, 0.5, 0.75, 1].map((f) => `<line x1="0" x2="${W}" y1="${H - P - f * (H - 2 * P)}" y2="${H - P - f * (H - 2 * P)}" class="mon-graph__grid"/>`).join('');
-  const svg = `<svg class="mon-graph" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Account balances over time">${grid}
-    ${lines.map((l) => `<polyline fill="none" stroke="${l.c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" points="${l.points.map((p) => `${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(' ')}"/>`).join('')}</svg>`;
+  // One small graph per account, each on its own scale, so a drop always shows as a drop (below $0 too)
+  const W = 320, H = 92, L0 = 30, R0 = 30, T0 = 18, B0 = 18;
+  const x = (p) => L0 + ((t(p) - t0) / (t1 - t0)) * (W - L0 - R0);
+  const chart = (sr) => {
+    const c = color(sr.id);
+    const vs = sr.points.map((p) => p.v);
+    let lo = Math.min(...vs), hi = Math.max(...vs);
+    if (hi - lo < 100) { const mid = (hi + lo) / 2; lo = mid - 50; hi = mid + 50; } // a steady balance draws a flat line in the middle
+    const y = (v) => T0 + (1 - (v - lo) / (hi - lo)) * (H - T0 - B0);
+    // Labels sit above each dot; when the next dot is close, its label flips below so they don't overlap
+    let lastX = -1e9, lastSide = 1;
+    const labels = sr.points.map((p) => {
+      const px = x(p);
+      const side = px - lastX < 46 ? -lastSide : 1;
+      lastX = px; lastSide = side;
+      const anchor = px < L0 + 14 ? 'start' : px > W - R0 - 14 ? 'end' : 'middle';
+      return `<text x="${px.toFixed(1)}" y="${(y(p.v) + (side > 0 ? -8 : 15)).toFixed(1)}" text-anchor="${anchor}" fill="${c}" class="mon-graph__val">${esc(money(s, p.v))}</text>`;
+    }).join('');
+    const zero = lo < 0 && hi > 0 ? `<line x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" class="mon-graph__zero"/>` : '';
+    return `<div class="mon-graph__row"><span class="mon-graph__name"><i style="background:${c}"></i>${esc(sr.name)}</span>
+      <svg class="mon-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(sr.name)} at each check-in">
+        <line x1="0" x2="${W}" y1="${H - B0 + 4}" y2="${H - B0 + 4}" class="mon-graph__grid"/>${zero}
+        <polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${sr.points.map((p) => `${x(p).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>
+        ${sr.points.map((p) => `<circle cx="${x(p).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5" fill="${c}" class="mon-graph__dot"/>`).join('')}
+        ${labels}</svg></div>`;
+  };
   const fmtD = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  return box('Over time', `${svg}
-    <div class="mon-graph__axis"><span>${fmtD(t0)}</span><span>Top ≈ ${money(s, Math.round(vmax))}</span><span>${fmtD(t1)}</span></div>
-    <div class="mon-graph__legend">${lines.map((l) => `<span><i style="background:${l.c}"></i>${esc(l.name)} ${money(s, l.points[l.points.length - 1].v)}</span>`).join('')}</div>`);
+  return box('Over time', `${series.map(chart).join('')}
+    <div class="mon-graph__axis"><span>${fmtD(t0)}</span><span>${fmtD(t1)}</span></div>`);
 }
 
 function main(s) {

@@ -104,9 +104,17 @@
 .mon-done { display: inline-flex; align-items: center; gap: 4px; color: var(--imp-good); font-weight: 600; }
 .mon-done .imp-icon { width: 14px; height: 14px; }
 .mon-k-checkin { color: var(--imp-good); }
-.mon-graph { display: block; width: 100%; height: 150px; margin-top: 4px; }
-.mon-graph__grid { stroke: var(--imp-divider); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.mon-graph { display: block; width: 100%; height: auto; margin-top: 4px; overflow: visible; }
+.mon-graph__grid { stroke: var(--imp-divider); stroke-width: 1; }
+.mon-graph__zero { stroke: var(--imp-muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.mon-graph__dot { stroke: var(--imp-surface); stroke-width: 1.5; }
+.mon-graph__val { font: 700 9.5px var(--imp-font-head); paint-order: stroke; stroke: var(--imp-surface); stroke-width: 3px; stroke-linejoin: round; font-variant-numeric: tabular-nums; }
 .mon-graph__axis { display: flex; justify-content: space-between; margin-top: 4px; font: 500 11.5px var(--imp-font-head); color: var(--imp-muted); }
 .mon-graph__legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font: 600 13px var(--imp-font-head); }
 .mon-graph__legend span { display: inline-flex; align-items: center; gap: 6px; }
 .mon-graph__legend i { width: 10px; height: 10px; border-radius: 3px; }
+
+.mon-graph__row { padding: 6px 0 2px; border-bottom: 1px solid var(--imp-divider); }
+.mon-graph__row:last-of-type { border-bottom: 0; }
+.mon-graph__name { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--imp-font-head); }
+.mon-graph__name i { width: 10px; height: 10px; border-radius: 3px; }
