@@ -5,7 +5,7 @@ import * as Stats from '../stats.js';
 import * as Backup from '../backup.js';
 import { dayKey, appNow } from '../dates.js';
 import { getRanks, saveRanks, DEFAULT_RANKS } from '../levels.js';
-import { esc, icon, panel, streakTag, sheet, toast } from '../ui.js';
+import { esc, icon, panel, streakBadge, sheet, toast } from '../ui.js';
 
 const fmt = (n) => Math.floor(n).toLocaleString('en-US');
 
@@ -17,7 +17,7 @@ export function render(root) {
   const daysSince = last ? Math.floor((Date.now() - new Date(last)) / 86400000) : null;
 
   const streakList = streaks.length
-    ? streaks.slice(0, 10).map((s) => `<div class="prof-streak"><span>${esc(s.h.name)}</span>${streakTag(s.count, s.current, R.UNIT[s.h.frequency][s.count === 1 ? 0 : 1])}</div>`).join('')
+    ? streaks.slice(0, 10).map((s) => `<div class="prof-streak${R.tier(s.count, s.h.frequency) >= 4 ? (s.atRisk ? ' is-silver' : ' is-gold') : ''}${s.atRisk ? ' is-risk' : ''}"><span>${esc(s.h.name)}</span>${streakBadge({ count: s.count, atRisk: s.atRisk, lv: Math.max(1, R.tier(s.count, s.h.frequency)), unit: R.UNIT[s.h.frequency][s.count === 1 ? 0 : 1], warn: H.isLimit(s.h) ? 'stay under today' : 'do it today' })}</div>`).join('')
     : `<p class="imp-muted prof-note">Complete a habit in back-to-back periods to start a streak.</p>`;
 
   const lastTxt = last ? (daysSince ? `${daysSince} day${daysSince === 1 ? '' : 's'} ago` : 'today') : 'never';

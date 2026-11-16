@@ -2,7 +2,9 @@
 //
 // Streak = consecutive completed periods (days for daily habits, Mon–Sun weeks
 // for weekly, months for monthly). If the current period isn't done yet the
-// streak is still alive and shows the previous run. Missing a period resets it.
+// streak is still alive and shows the previous run. Weekly and monthly: missing a
+// period resets it. Daily: one missed day doesn't count but doesn't break it either;
+// two missed days in a row do (days off are skipped, not misses).
 // No XP is ever taken away for a miss.
 //
 // Bonuses are saved in imp_bonus on the day they're earned, so later habit edits
@@ -15,14 +17,31 @@ import { dayKey, addDays, weekStart, periodRange, appNow, fromDayKey } from './d
 import { START, MONTHLY_START } from './launch.js';
 
 export const PERFECT_DAY_XP = 100;
-export const MILESTONES = [[7, 50], [30, 200], [100, 600]]; // [streak length, XP]
+// Streak milestones (popups) per frequency: [streak length, XP], then every `every` after the last
+export const MILESTONES = {
+  daily: { at: [[3, 20], [7, 50], [14, 100], [30, 200], [50, 300], [100, 600]], every: 100 },
+  weekly: { at: [[4, 50], [8, 100], [12, 200], [26, 400], [52, 800]], every: 52 },
+  monthly: { at: [[3, 100], [6, 300], [12, 800]], every: 12 },
+};
 export const UNIT = { daily: ['day', 'days'], weekly: ['week', 'weeks'], monthly: ['month', 'months'] };
 
-export function milestoneXP(n) {
-  for (const [len, xp] of MILESTONES) if (n === len) return xp;
-  if (n > 100 && n % 100 === 0) return MILESTONES[2][1]; // every 100 after that
+export function milestoneXP(n, freq = 'daily') {
+  const m = MILESTONES[freq] || MILESTONES.daily;
+  for (const [len, xp] of m.at) if (n === len) return xp;
+  const last = m.at[m.at.length - 1];
+  if (n > last[0] && n % m.every === 0) return last[1]; // every 100 days / 52 weeks / 12 months after that
   return 0;
 }
+
+// Flame level 1–4 for a streak (0 = no flame). It steps up at a milestone, so a new flame always comes with a popup.
+export const TIERS = { daily: [2, 7, 30, 100], weekly: [2, 4, 12, 52], monthly: [2, 3, 6, 12] };
+export function tier(n, freq = 'daily') {
+  const t = TIERS[freq] || TIERS.daily;
+  let lv = 0;
+  t.forEach((min, i) => { if (n >= min) lv = i + 1; });
+  return lv;
+}
+export const isNewTier = (n, freq = 'daily') => (TIERS[freq] || TIERS.daily).slice(1).includes(n);
 
 export const getBonus = () => store.get('bonus', {});
 const saveBonus = (b) => store.set('bonus', b);
@@ -47,37 +66,62 @@ function doneIn(h, d, counts) {
   return n;
 }
 
-// Consecutive limit periods that earned their XP, counting back from the period containing d
+// Limit periods that earned their XP, counting back from the period containing d.
+// Daily limits: one day over doesn't break the run, two days over in a row do.
 function limitRun(h, d, bonus = getBonus()) {
-  let n = 0;
+  const grace = h.frequency === 'daily';
+  const ex = grace ? H.getExcused() : null;
+  let n = 0, miss = 0;
   for (let i = 0; i < 5000; i++) {
     const [s, e] = periodRange(h.frequency, d);
     if (h.streakFrom && s < h.streakFrom) break; // streak was reset
-    if (!bonus[e]?.['limit:' + h.id]) break;
-    n++;
+    if (bonus[e]?.['limit:' + h.id]) { n++; miss = 0; }
+    else if (!grace) break;
+    else if (!H.offIn(h, d, ex) && ++miss >= 2) break;
     d = addDays(fromDayKey(s), -1);
   }
   return n;
 }
 
-// → { count, current: is this period already done }
+// Was the last counted day before `date` a miss? (daily only: the streak is alive but one more miss ends it)
+function missedLast(h, date, hit) {
+  const ex = H.getExcused();
+  let d = addDays(date, -1);
+  for (let i = 0; i < 400; i++) {
+    if (h.streakFrom && dayKey(d) < h.streakFrom) return false;
+    if (hit(d)) return false;
+    if (!H.offIn(h, d, ex)) return true;
+    d = addDays(d, -1);
+  }
+  return false;
+}
+
+// → { count, current: is this period already done, atRisk: daily streak alive after a missed day }
 // Limit habits: finished periods kept at or under the limit; the current one is never "done" until it ends.
 export function streak(h, date = appNow(), counts = H.countsIndex()) {
-  if (H.isLimit(h)) return { count: limitRun(h, prevPeriod(h.frequency, date)), current: false };
+  const daily = h.frequency === 'daily';
+  if (H.isLimit(h)) {
+    const bonus = getBonus();
+    const count = limitRun(h, prevPeriod(h.frequency, date), bonus);
+    const atRisk = daily && count > 0 && missedLast(h, date, (d) => !!bonus[dayKey(d)]?.['limit:' + h.id]);
+    return { count, current: false, atRisk };
+  }
   const ex = H.getExcused();
   const off = (d) => H.offIn(h, d, ex); // days/weeks off are skipped
   // A reset streak (streakFrom) only counts periods that start on or after that day
   const counted = (d) => !h.streakFrom || periodRange(h.frequency, d)[0] >= h.streakFrom;
-  const current = counted(date) && doneIn(h, date, counts) >= h.target;
-  let count = current ? 1 : 0;
+  const hit = (d) => doneIn(h, d, counts) >= h.target;
+  const current = counted(date) && hit(date);
+  let count = current ? 1 : 0, miss = 0;
   let d = prevPeriod(h.frequency, date);
   for (let i = 0; i < 5000; i++) {
     if (!counted(d)) break;
-    if (doneIn(h, d, counts) >= h.target) count++;
-    else if (!off(d)) break;
+    if (hit(d)) { count++; miss = 0; }
+    else if (!off(d) && (!daily || ++miss >= 2)) break;
     d = prevPeriod(h.frequency, d);
   }
-  return { count, current };
+  const atRisk = daily && !current && count > 0 && missedLast(h, date, hit);
+  return { count, current, atRisk };
 }
 
 // Re-check today's bonuses. Returns the bonuses newly added (for notifications).
@@ -104,7 +148,7 @@ export function sync(date = appNow()) {
     const [start] = periodRange(h.frequency, date);
     const holder = Object.keys(bonus).find((k) => k >= start && k <= today && bonus[k][id]);
     const { count, current } = streak(h, date, counts);
-    const xp = current ? milestoneXP(count) : 0;
+    const xp = current ? milestoneXP(count, h.frequency) : 0;
     if (xp && !holder) {
       day[id] = { type: 'streak', habit: h.id, name: h.name, n: count, unit: UNIT[h.frequency][1], xp, c: h.category };
       added.push(day[id]);
@@ -157,7 +201,7 @@ export function settleLimits(date = appNow(), bonus = getBonus()) {
           day[id] = { type: 'limit', habit: h.id, name: h.name, n: uses, max: h.target, unit: UNIT[h.frequency][0], xp: h.xp, c: h.category };
           added.push(day[id]);
           const run = limitRun(h, fromDayKey(e), bonus);
-          const mx = milestoneXP(run);
+          const mx = milestoneXP(run, h.frequency);
           if (mx && !day['streak:' + h.id]) {
             day['streak:' + h.id] = { type: 'streak', habit: h.id, name: h.name, n: run, unit: UNIT[h.frequency][1], xp: mx, c: h.category };
             added.push(day['streak:' + h.id]);

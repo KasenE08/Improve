@@ -71,32 +71,51 @@ const sleep = H.getHabits().find((h) => h.id === 'sleep');
 const start = new Date(2026, 10, 1, 8);
 for (let i = 0; i < 6; i++) { H.step(sleep, 1, addDays(start, i)); R.sync(addDays(start, i)); }
 eq(R.streak(sleep, addDays(start, 5)).count, 6, '6-day streak');
-eq(R.streak(sleep, addDays(start, 6)), { count: 6, current: false }, 'streak alive before today is done');
+eq(R.streak(sleep, addDays(start, 6)), { count: 6, current: false, atRisk: false }, 'streak alive before today is done');
 H.step(sleep, 1, addDays(start, 6));
 added = R.sync(addDays(start, 6));
 eq(added.map((b) => [b.type, b.n, b.xp]), [['streak', 7, 50]], '7-day milestone +50');
 eq(R.sync(addDays(start, 6)).length, 0, 'milestone not awarded twice');
 H.step(sleep, -1, addDays(start, 6)); R.sync(addDays(start, 6));
 eq(Object.values(R.getBonus()['2026-11-07'] || {}).length, 0, 'undo removes milestone');
-eq(R.streak(sleep, addDays(start, 8)).count, 0, 'missed day resets streak');
+eq(R.streak(sleep, addDays(start, 7)), { count: 6, current: false, atRisk: true }, 'one missed day: streak alive, at risk');
+eq(R.streak(sleep, addDays(start, 8)).count, 0, 'two missed days in a row reset the streak');
+
+// ---- Daily grace: one missed day doesn't count but doesn't break ----
+{
+  const g0 = new Date(2027, 1, 1, 9); // Mon Feb 1 2027
+  for (const i of [0, 1, 3, 4]) H.step(sleep, 1, addDays(g0, i)); // miss Feb 3
+  eq(R.streak(sleep, addDays(g0, 2)), { count: 2, current: false, atRisk: false }, 'not done today, yesterday done: not at risk');
+  eq(R.streak(sleep, addDays(g0, 3)).count, 3, 'missed day skipped: 3 days (doesn\'t count, doesn\'t break)');
+  eq(R.streak(sleep, addDays(g0, 4)).count, 4, 'run continues after the missed day');
+  eq(R.streak(sleep, addDays(g0, 5)), { count: 4, current: false, atRisk: false }, 'day after a done day: fine');
+  eq(R.streak(sleep, addDays(g0, 6)), { count: 4, current: false, atRisk: true }, 'missed yesterday: at risk');
+  H.step(sleep, 1, addDays(g0, 6));
+  eq(R.streak(sleep, addDays(g0, 6)), { count: 5, current: true, atRisk: false }, 'ticked today: relit, 5 days');
+  eq(R.streak(sleep, addDays(g0, 9)).count, 0, 'two misses (Feb 8–9) break it');
+  eq([R.milestoneXP(3), R.milestoneXP(14), R.milestoneXP(200), R.milestoneXP(150)], [20, 100, 600, 0], 'daily milestones 3…100, every 100');
+  eq([R.milestoneXP(7, 'weekly'), R.milestoneXP(4, 'weekly'), R.milestoneXP(104, 'weekly')], [0, 50, 800], 'weekly milestones 4…52, every 52');
+  eq([R.milestoneXP(3, 'monthly'), R.milestoneXP(24, 'monthly'), R.milestoneXP(7, 'monthly')], [100, 800, 0], 'monthly milestones 3, 6, 12, every 12');
+  eq([R.tier(2), R.tier(6), R.tier(7), R.tier(30), R.tier(100), R.tier(3, 'weekly'), R.tier(4, 'weekly'), R.tier(12, 'monthly')], [1, 1, 2, 3, 4, 1, 2, 4], 'flame levels');
+}
 
 // ---- Weekly streak milestone stays for the week ----
 const fam = H.getHabits().find((h) => h.id === 'family');
 const mon = new Date(2026, 11, 7, 9); // Monday Dec 7
-for (let w = 0; w < 7; w++) { const d = addDays(mon, w * 7 + 2); H.step(fam, 1, d); R.sync(d); }
-const lastWeekDay = addDays(mon, 6 * 7 + 2);
-eq(R.streak(fam, lastWeekDay).count, 7, '7-week streak');
-const holder = Object.keys(R.getBonus()).find((k) => R.getBonus()[k]['streak:family']);
-eq(holder, '2027-01-20', 'weekly milestone stored on completion day');
+for (let w = 0; w < 8; w++) { const d = addDays(mon, w * 7 + 2); H.step(fam, 1, d); R.sync(d); }
+const lastWeekDay = addDays(mon, 7 * 7 + 2);
+eq(R.streak(fam, lastWeekDay).count, 8, '8-week streak');
+const holder = Object.keys(R.getBonus()).find((k) => R.getBonus()[k]['streak:family']?.n === 8);
+eq(holder, '2027-01-27', 'weekly milestone stored on completion day');
 R.sync(addDays(lastWeekDay, 2));
-eq(!!R.getBonus()['2027-01-20']['streak:family'], true, 'later sync same week keeps it');
+eq(!!R.getBonus()['2027-01-27']['streak:family'], true, 'later sync same week keeps it');
 
 // ---- Monthly streak counts first-Monday months ----
 {
   const cut = H.getHabits().find((h) => h.id === 'haircut');
   for (const d of [new Date(2027, 2, 10, 12), new Date(2027, 3, 12, 12), new Date(2027, 4, 4, 12)]) H.step(cut, 1, d); // Mar 1–Apr 4, Apr 5–May 2, May 3–Jun 6
   eq(R.streak(cut, new Date(2027, 4, 20, 12)).count, 3, '3-month streak across Monday-months');
-  eq(R.streak(cut, new Date(2027, 5, 10, 12)), { count: 3, current: false }, 'next month (Jun 7–) not done yet: streak alive');
+  eq(R.streak(cut, new Date(2027, 5, 10, 12)), { count: 3, current: false, atRisk: false }, 'next month (Jun 7–) not done yet: streak alive');
 }
 
 // ---- Category meters are scaled ----

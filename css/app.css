@@ -245,3 +245,93 @@
 .upd-pop span { font: 500 13px var(--imp-font-head); opacity: .9; }
 .upd-pop.is-done { background: var(--imp-text); color: var(--imp-bg, #fff); pointer-events: none; }
 @keyframes upd-in { from { transform: translateY(-12px); opacity: 0; } }
+
+/* ---- Streaks: flame badge (4 levels), gold/silver rows, milestone popup -------------------- */
+.imp-flame { position: relative; display: inline-block; flex: none; }
+.imp-flame svg { display: block; overflow: visible; width: 15px; height: 19px; }
+.imp-flame__o { transform-origin: 50% 95%; animation: imp-flick 1.6s ease-in-out infinite; }
+.imp-flame__i { transform-origin: 50% 95%; animation: imp-flick2 .9s ease-in-out infinite; }
+@keyframes imp-flick { 0%,100% { transform: none; } 25% { transform: scale(.95,1.07) skewX(-3deg); } 50% { transform: scale(1.04,.96) skewX(2deg); } 75% { transform: scale(.97,1.05) skewX(-1deg); } }
+@keyframes imp-flick2 { 0%,100% { transform: none; } 50% { transform: scale(.88,1.12); } }
+.imp-ember { position: absolute; left: 50%; bottom: 60%; width: 3px; height: 3px; border-radius: 50%; opacity: 0; animation: imp-rise 1.4s ease-out infinite; }
+.imp-ember:nth-of-type(2) { animation-delay: .45s; --dx: 6px; }
+.imp-ember:nth-of-type(3) { animation-delay: .9s; --dx: -5px; }
+.imp-ember:nth-of-type(4) { animation-delay: .25s; --dx: -8px; }
+.imp-ember:nth-of-type(5) { animation-delay: .7s; --dx: 9px; }
+@keyframes imp-rise { 0% { opacity: 0; transform: translate(-50%, 0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 2px)), -22px) scale(.4); } }
+.t2 .imp-ember { background: #ffb020; }
+.t3 .imp-ember { background: #8fd0ff; }
+.t4 .imp-ember { background: #e3b4ff; box-shadow: 0 0 4px #c77dff; }
+
+.imp-sbadge { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 3px 10px 3px 6px; border-radius: 999px; font: 800 15px var(--imp-font-head); font-variant-numeric: tabular-nums; }
+.imp-sbadge small { font: 600 11px var(--imp-font-head); opacity: .8; margin-left: 1px; }
+.imp-sbadge.t1 { color: #e07800; background: rgba(255, 149, 0, .13); }
+.imp-sbadge.t2 { color: #e8380d; background: rgba(255, 77, 26, .14); font-size: 16px; }
+.imp-sbadge.t2 .imp-flame svg { width: 19px; height: 24px; }
+.imp-sbadge.t2 .imp-flame__o { animation-duration: 1.1s; }
+.imp-sbadge.t3 { color: #1e6bff; background: rgba(47, 123, 255, .14); font-size: 17px; box-shadow: 0 0 14px rgba(58, 139, 255, .35); }
+.imp-sbadge.t3 .imp-flame svg { width: 21px; height: 27px; filter: drop-shadow(0 0 4px rgba(60, 140, 255, .8)); }
+.imp-sbadge.t3 .imp-flame__o { animation-duration: 1s; }
+.imp-sbadge.t4 { color: #fff; background: linear-gradient(135deg, #2a0a5e, #12042a); font-size: 18px; box-shadow: 0 0 18px rgba(150, 60, 255, .7); animation: imp-pillglow 2.2s ease-in-out infinite; }
+.imp-sbadge.t4 .imp-flame svg { width: 25px; height: 32px; filter: drop-shadow(0 0 6px rgba(190, 90, 255, .95)) drop-shadow(0 0 14px rgba(140, 40, 255, .6)); }
+.imp-sbadge.t4 .imp-flame__o { animation-duration: .8s; }
+.imp-sbadge.t4 .imp-flame__i { animation-duration: .55s; }
+@keyframes imp-pillglow { 50% { box-shadow: 0 0 28px rgba(170, 80, 255, .95); } }
+:root[data-theme="dark"] .imp-sbadge.t1:not(.is-risk) { color: #ffa53a; }
+:root[data-theme="dark"] .imp-sbadge.t2:not(.is-risk) { color: #ff6a3d; }
+:root[data-theme="dark"] .imp-sbadge.t3:not(.is-risk) { color: #6aa8ff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .imp-sbadge.t1:not(.is-risk) { color: #ffa53a; } :root:not([data-theme="light"]) .imp-sbadge.t2:not(.is-risk) { color: #ff6a3d; } :root:not([data-theme="light"]) .imp-sbadge.t3:not(.is-risk) { color: #6aa8ff; } }
+
+/* Missed yesterday: gray, still flame + "do it today" */
+.imp-sbadge.is-risk { flex-direction: column; align-items: flex-end; gap: 0; padding: 4px 10px; border-radius: 12px; color: var(--imp-muted); background: color-mix(in srgb, var(--imp-muted) 14%, transparent); box-shadow: none; animation: none; }
+.imp-sbadge__top { display: inline-flex; align-items: center; gap: 3px; }
+.imp-sbadge__warn { font: 700 11px var(--imp-font-head); color: var(--imp-accent); }
+.imp-sbadge.is-risk .imp-flame svg { filter: grayscale(1) opacity(.55); }
+.imp-sbadge.is-risk .imp-flame__o, .imp-sbadge.is-risk .imp-flame__i { animation-play-state: paused; }
+.imp-sbadge.is-risk .imp-ember { display: none; }
+.imp-missed { color: var(--imp-accent); font-weight: 600; }
+.imp-row.is-risk.is-limit .imp-missed { color: var(--imp-danger); }
+
+/* Top flame level: the habit turns shiny gold (silver while at risk) */
+.imp-row.is-gold, .imp-row.is-silver { margin: 0 calc(var(--imp-pad) * -1); padding-left: var(--imp-pad); padding-right: var(--imp-pad); width: calc(100% + var(--imp-pad) * 2); overflow: hidden; }
+.imp-row.is-gold { background: linear-gradient(115deg, #b8860b 0%, #f5d061 22%, #fff4c2 38%, #e8b923 55%, #c99212 78%, #f7dc7a 100%); border-bottom-color: #c99a1e; }
+.imp-row.is-gold::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .75) 50%, transparent 65%); transform: translateX(-120%); animation: imp-sheen 3.2s ease-in-out infinite; pointer-events: none; }
+@keyframes imp-sheen { 0%, 35% { transform: translateX(-120%); } 75%, 100% { transform: translateX(120%); } }
+.imp-row.is-gold .imp-row__title, .imp-row.is-gold.is-done .imp-row__title { color: #4a3500; text-decoration-color: rgba(74, 53, 0, .45); }
+.imp-row.is-gold .imp-row__sub, .imp-row.is-gold .imp-row__rule, .imp-row.is-gold .imp-row__note { color: #6b4e00; }
+.imp-row.is-gold .imp-check { border-color: #6b4e00; }
+.imp-row.is-gold .imp-check.is-on { background: #4a3500; border-color: #4a3500; color: #ffd75e; }
+.imp-row.is-silver { background: linear-gradient(115deg, #b9bcc2, #e4e6ea 40%, #c9ccd2 70%, #dfe1e5); border-bottom-color: #b0b4ba; }
+.imp-row.is-silver .imp-row__title, .imp-row.is-silver .imp-row__sub, .imp-row.is-silver .imp-row__rule, .imp-row.is-silver .imp-row__note { color: #2b2f36; }
+.imp-row.is-silver .imp-missed { color: #c4262c; }
+.imp-row.is-silver .imp-check { border-color: #8d929a; }
+.imp-row.is-silver .imp-sbadge { color: #4b5058; background: rgba(255, 255, 255, .45); }
+.imp-row.is-silver .imp-sbadge__warn { color: #c4262c; }
+.prof-streak .imp-sbadge { flex: none; }
+.prof-streak.is-gold, .prof-streak.is-silver { margin: 0 calc(var(--imp-pad) * -1); padding-left: var(--imp-pad); padding-right: var(--imp-pad); }
+.prof-streak.is-gold { background: linear-gradient(115deg, #b8860b, #f5d061 30%, #fff4c2 45%, #e8b923 65%, #c99212); color: #4a3500; font-weight: 600; }
+.prof-streak.is-silver { background: linear-gradient(115deg, #b9bcc2, #e4e6ea 40%, #c9ccd2 70%, #dfe1e5); color: #2b2f36; }
+.prof-streak.is-silver .imp-sbadge { color: #4b5058; background: rgba(255, 255, 255, .45); }
+
+/* Milestone popup */
+.imp-sburst { position: relative; overflow: hidden; gap: 6px; padding-top: 24px; }
+.imp-sburst__flame { position: relative; display: grid; place-items: center; width: 110px; height: 110px; }
+.imp-sburst .imp-flame svg { width: 64px; height: 82px; animation: imp-grow .7s cubic-bezier(.2, 1.6, .4, 1) both; }
+.imp-sburst.t3 .imp-flame svg { filter: drop-shadow(0 0 8px rgba(60, 140, 255, .8)); }
+.imp-sburst.t4 .imp-flame svg { filter: drop-shadow(0 0 10px rgba(190, 90, 255, .95)) drop-shadow(0 0 22px rgba(140, 40, 255, .6)); }
+.imp-sburst.t1 .imp-sburst__flame { color: #ff8a00; }
+.imp-sburst.t2 .imp-sburst__flame { color: #ff4d1a; }
+.imp-sburst.t3 .imp-sburst__flame { color: #2f8bff; }
+.imp-sburst.t4 .imp-sburst__flame { color: #a53cff; }
+.imp-sburst__ring { position: absolute; inset: 0; border-radius: 50%; border: 3px solid currentColor; opacity: 0; animation: imp-ring 1s ease-out .15s; }
+.imp-spark { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0; animation: imp-spark .9s ease-out .1s forwards; }
+.imp-sburst__num { font: 800 52px/1 var(--imp-font-head); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.imp-sburst.is-gold { background: linear-gradient(135deg, #b8860b, #f5d061 30%, #fff4c2 45%, #e8b923 65%, #c99212); color: #4a3500; }
+.imp-sburst.is-gold::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .7) 50%, transparent 65%); animation: imp-sheen 2.4s ease-in-out infinite; pointer-events: none; }
+.imp-sburst.is-gold .imp-burst__sub, .imp-sburst.is-gold .imp-burst__hint { color: #5c4300; }
+@keyframes imp-grow { from { transform: scale(.2); opacity: 0; } }
+@keyframes imp-ring { 0% { opacity: .8; transform: scale(.4); } 100% { opacity: 0; transform: scale(1.5); } }
+@keyframes imp-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-78px) scale(.3); } }
+@media (prefers-reduced-motion: reduce) {
+  .imp-flame__o, .imp-flame__i, .imp-ember, .imp-sbadge.t4, .imp-row.is-gold::after, .imp-sburst.is-gold::after { animation: none; }
+}

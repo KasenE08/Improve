@@ -52,8 +52,23 @@ export function floatXP(el, amount) {
   setTimeout(() => f.remove(), 900);
 }
 
-export const streakTag = (count, current, unit) =>
-  `<span class="imp-streak${current ? '' : ' is-pending'}" title="${count} ${unit} streak">${icon('flame')}${count} ${esc(unit)}</span>`;
+// Streak flame, level 1–4 (small orange, big orange-red, blue, purple). Gradients live in index.html (#fo1–#fi4).
+const FLAME_OUT = 'M12 1C12.9 5.4 16.2 7.6 17.6 11.2c.8-1.4.9-3 .4-4.6C20.9 9.4 22.4 13.2 22.4 17.8 22.4 24.2 17.8 29 12 29S1.6 24.6 1.6 18.4c0-3.4 1.6-6.3 3.7-8.3-.1 2.1.5 3.9 2.1 5.1C6.9 9.9 9.4 5.1 12 1Z';
+const FLAME_IN = 'M12 12.6c.7 3.1 3.9 5 3.9 9.4a3.9 3.9 0 0 1-7.8 0c0-2.1 1-3.5 2-4.6.2 1.1.7 1.7 1.3 2-.3-2.3-.1-4.6.6-6.8Z';
+export const flame = (lv) => {
+  const t = Math.max(1, Math.min(4, lv));
+  const embers = t >= 2 ? '<i class="imp-ember"></i>'.repeat(t >= 4 ? 5 : 3) : '';
+  return `<span class="imp-flame" aria-hidden="true"><svg viewBox="0 0 24 30"><path class="imp-flame__o" d="${FLAME_OUT}" fill="url(#fo${t})"/><path class="imp-flame__i" d="${FLAME_IN}" fill="url(#fi${t})"/></svg>${embers}</span>`;
+};
+
+// Streak badge: { count, atRisk, lv (1–4), unit ('days'…) }. At risk = missed yesterday: gray flame + "do it today".
+export const streakBadge = ({ count, atRisk, lv, unit, warn = 'do it today' }) => {
+  const label = `${count} ${unit} streak${atRisk ? `, ${warn}` : ''}`;
+  const top = `${flame(lv)}<b>${count}</b><small>${esc(unit)}</small>`;
+  return atRisk
+    ? `<span class="imp-sbadge t${lv} is-risk" role="img" aria-label="${esc(label)}"><span class="imp-sbadge__top">${top}</span><span class="imp-sbadge__warn">${esc(warn)}</span></span>`
+    : `<span class="imp-sbadge t${lv}" role="img" aria-label="${esc(label)}">${top}</span>`;
+};
 
 export const meter = (label, p, val) =>
   `<div class="imp-meter"><span class="imp-meter__label">${esc(label)}</span>${xpbar(p, 'imp-xpbar--sm')}<span class="imp-meter__val">${val}</span></div>`;
@@ -66,8 +81,8 @@ export const attrRow = (c) =>
 
 // Big full-screen moments (level up, perfect day). Queued so they show one at a time.
 const burstQueue = [];
-export function burst({ icon: ic, title, big = '', sub = '' }) {
-  burstQueue.push({ ic, title, big, sub });
+export function burst({ icon: ic, title, big = '', sub = '', html = '', cls = '', count = 0, ms = 3500 }) {
+  burstQueue.push({ ic, title, big, sub, html, cls, count, ms });
   if (burstQueue.length === 1) showBurst();
 }
 function showBurst() {
@@ -76,13 +91,38 @@ function showBurst() {
   const el = document.createElement('div');
   el.className = 'imp-burst';
   el.setAttribute('role', 'alertdialog');
-  el.innerHTML = `<div class="imp-burst__box">${icon(b.ic, 'imp-burst__icon')}<p class="imp-burst__title">${esc(b.title)}</p>
+  el.innerHTML = b.html || `<div class="imp-burst__box">${icon(b.ic, 'imp-burst__icon')}<p class="imp-burst__title">${esc(b.title)}</p>
     ${b.big ? `<p class="imp-burst__big">${esc(b.big)}</p>` : ''}${b.sub ? `<p class="imp-burst__sub">${esc(b.sub)}</p>` : ''}
     <p class="imp-burst__hint">Tap to continue</p></div>`;
+  if (b.cls) el.classList.add(...b.cls.split(' '));
   const close = () => { el.remove(); clearTimeout(t); burstQueue.shift(); showBurst(); };
-  const t = setTimeout(close, 3500);
+  const t = setTimeout(close, b.ms);
+  // Count the big number up to the streak
+  const num = b.count && el.querySelector('[data-count]');
+  if (num) {
+    const t0 = performance.now(), dur = Math.min(900, 250 + b.count * 6);
+    const step = (now) => { const p = Math.min(1, (now - t0) / dur); num.textContent = Math.round(b.count * (1 - Math.pow(1 - p, 3))); if (p < 1 && el.isConnected) requestAnimationFrame(step); };
+    requestAnimationFrame(step);
+  }
   el.addEventListener('click', close);
   document.body.appendChild(el);
+}
+
+// Streak milestone popup: flame for the level, count-up number, sparks. Top level is gold.
+export function streakBurst({ n, unit, lv, name, newFlame }) {
+  const sparks = Array.from({ length: 12 }, (_, i) => `<i class="imp-spark" style="--a:${i * 30}deg"></i>`).join('');
+  const one = unit.replace(/s$/, '');
+  burst({
+    cls: 'imp-burst--streak',
+    count: n,
+    ms: 4500,
+    html: `<div class="imp-burst__box imp-sburst t${lv}${lv >= 4 ? ' is-gold' : ''}">
+      <div class="imp-sburst__flame"><i class="imp-sburst__ring"></i>${sparks}${flame(lv)}</div>
+      <p class="imp-sburst__num" data-count>${n}</p>
+      <p class="imp-burst__title">${n}-${esc(one)} streak${newFlame ? ' · new flame' : ''}</p>
+      <p class="imp-burst__sub">${esc(name)}</p>
+      <p class="imp-burst__hint">Tap to continue</p></div>`,
+  });
 }
 
 let toastTimer;
