@@ -93,6 +93,12 @@ eq(R.streak(sleep, addDays(start, 8)).count, 0, 'two missed days in a row reset 
   H.step(sleep, 1, addDays(g0, 6));
   eq(R.streak(sleep, addDays(g0, 6)), { count: 5, current: true, atRisk: false }, 'ticked today: relit, 5 days');
   eq(R.streak(sleep, addDays(g0, 9)).count, 0, 'two misses (Feb 8–9) break it');
+  // Grace day turned off: one miss breaks it, no "at risk"
+  H.upsertHabit({ ...sleep, grace: false });
+  const s0 = H.getHabits().find((h) => h.id === 'sleep');
+  eq(R.streak(s0, addDays(g0, 4)).count, 2, 'grace off: the Feb 3 miss breaks it (Feb 4–5 only)');
+  eq(R.streak(s0, addDays(g0, 6)), { count: 1, current: true, atRisk: false }, 'grace off: never at risk, a miss resets');
+  H.upsertHabit({ ...s0, grace: true });
   eq([R.milestoneXP(3), R.milestoneXP(14), R.milestoneXP(200), R.milestoneXP(150)], [20, 100, 600, 0], 'daily milestones 3…100, every 100');
   eq([R.milestoneXP(7, 'weekly'), R.milestoneXP(4, 'weekly'), R.milestoneXP(104, 'weekly')], [0, 50, 800], 'weekly milestones 4…52, every 52');
   eq([R.milestoneXP(3, 'monthly'), R.milestoneXP(24, 'monthly'), R.milestoneXP(7, 'monthly')], [100, 800, 0], 'monthly milestones 3, 6, 12, every 12');

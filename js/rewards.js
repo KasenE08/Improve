@@ -3,8 +3,8 @@
 // Streak = consecutive completed periods (days for daily habits, Mon–Sun weeks
 // for weekly, months for monthly). If the current period isn't done yet the
 // streak is still alive and shows the previous run. Weekly and monthly: missing a
-// period resets it. Daily: one missed day doesn't count but doesn't break it either;
-// two missed days in a row do (days off are skipped, not misses).
+// period resets it. Daily (grace day on, the default): one missed day doesn't count but doesn't
+// break it either; two missed days in a row do (days off are skipped, not misses). Grace day off: one miss resets it.
 // No XP is ever taken away for a miss.
 //
 // Bonuses are saved in imp_bonus on the day they're earned, so later habit edits
@@ -68,10 +68,13 @@ function doneIn(h, d, counts) {
   return n;
 }
 
+// Grace day (daily habits only, on unless turned off in the habit): one missed day doesn't break the streak
+export const hasGrace = (h) => h.frequency === 'daily' && h.grace !== false;
+
 // Limit periods that earned their XP, counting back from the period containing d.
-// Daily limits: one day over doesn't break the run, two days over in a row do.
+// Daily limits with a grace day: one day over doesn't break the run, two days over in a row do.
 function limitRun(h, d, bonus = getBonus()) {
-  const grace = h.frequency === 'daily';
+  const grace = hasGrace(h);
   const ex = grace ? H.getExcused() : null;
   let n = 0, miss = 0;
   for (let i = 0; i < 5000; i++) {
@@ -101,11 +104,11 @@ function missedLast(h, date, hit) {
 // → { count, current: is this period already done, atRisk: daily streak alive after a missed day }
 // Limit habits: finished periods kept at or under the limit; the current one is never "done" until it ends.
 export function streak(h, date = appNow(), counts = H.countsIndex()) {
-  const daily = h.frequency === 'daily';
+  const grace = hasGrace(h); // daily habit with the grace day on
   if (H.isLimit(h)) {
     const bonus = getBonus();
     const count = limitRun(h, prevPeriod(h.frequency, date), bonus);
-    const atRisk = daily && count > 0 && missedLast(h, date, (d) => !!bonus[dayKey(d)]?.['limit:' + h.id]);
+    const atRisk = grace && count > 0 && missedLast(h, date, (d) => !!bonus[dayKey(d)]?.['limit:' + h.id]);
     return { count, current: false, atRisk };
   }
   const ex = H.getExcused();
@@ -119,10 +122,10 @@ export function streak(h, date = appNow(), counts = H.countsIndex()) {
   for (let i = 0; i < 5000; i++) {
     if (!counted(d)) break;
     if (hit(d)) { count++; miss = 0; }
-    else if (!off(d) && (!daily || ++miss >= 2)) break;
+    else if (!off(d) && (!grace || ++miss >= 2)) break;
     d = prevPeriod(h.frequency, d);
   }
-  const atRisk = daily && !current && count > 0 && missedLast(h, date, hit);
+  const atRisk = grace && !current && count > 0 && missedLast(h, date, hit);
   return { count, current, atRisk };
 }
 

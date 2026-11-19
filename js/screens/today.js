@@ -292,6 +292,9 @@ export function openHabitForm(h) {
         <button type="button" data-k="limit" class="${limit0 ? 'is-on' : ''}">Limit · at most</button></div></div>
       <label class="imp-field"><span class="imp-label" id="f-target-l">${limit0 ? 'Max times per period' : 'Times per period'}</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="${limit0 ? 0 : 1}" max="31" value="${cur.target}"></label>
       <p class="imp-label" id="f-limit-note"${limit0 ? '' : ' hidden'}>Tap each time it happens. Staying at or under the max counts as done.</p>
+      <label class="imp-field imp-switchrow" id="f-grace-wrap"${cur.frequency === 'daily' ? '' : ' hidden'}>
+        <span class="imp-switchrow__text"><span class="imp-switchrow__title">Grace day</span><span class="imp-label">On: the streak breaks after 2 missed days in a row. Off: after 1.</span></span>
+        <input type="checkbox" class="imp-switch" id="f-grace" role="switch"${cur.grace === false ? '' : ' checked'}></label>
       <div id="f-auto-wrap"${limit0 ? ' hidden' : ''}>${autoField}</div>
       ${autoNote}
       <button class="imp-btn imp-btn--primary imp-btn--block" id="f-save">Save</button>
@@ -324,6 +327,7 @@ export function openHabitForm(h) {
         if (!btn) return;
         freq = btn.dataset.f;
         b.querySelectorAll('#f-freq button').forEach((x) => x.classList.toggle('is-on', x === btn));
+        b.querySelector('#f-grace-wrap').hidden = freq !== 'daily'; // the grace day is for daily habits only
       });
       b.querySelector('#f-save').addEventListener('click', () => {
         const name = b.querySelector('#f-name').value.trim();
@@ -337,6 +341,7 @@ export function openHabitForm(h) {
         const id = isNew ? H.newId('h') : h.id;
         const rule = b.querySelector('#f-rule').value.trim() || null;
         H.upsertHabit({ id, name, rule, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter,
+          grace: b.querySelector('#f-grace').checked,
           kind: lim ? 'limit' : 'goal', limitSince: lim ? (limit0 && cur.limitSince) || dayKey(appNow()) : null });
         if (lim && !limit0 && !isNew) H.clearPeriodXP(H.getHabits().find((x) => x.id === id)); // its taps this period become uses, not XP
         recheckFood();
