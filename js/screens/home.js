@@ -55,7 +55,7 @@ export function render(root, refresh) {
   const have = ML.balances(ms)[goal.account] ?? 0;
   const last = ML.lastCheckin(ms);
   const doneWeek = ML.checkedInWeek(ms);
-  const chip = last ? `<span>Spent ${ML.fmtMoney(ML.checkinResult(ms, last).spent, cur)} last check-in</span>` : '';
+  const chip = last ? `<span>Spent ${ML.fmtMoney(ML.weekSpent(ms, new Date(last.at)), cur)} last check-in week</span>` : '';
   const money = card('money', goal.name, 'star', doneWeek ? 'Checked in' : 'Check in Sunday',
     `<div class="hcard__big">${ML.fmtMoney(have, cur)}<small>of ${ML.fmtMoney(goal.target, cur)}</small></div>
      ${xpbar(Math.min(100, pct(have, goal.target)), 'imp-xpbar--sm')}

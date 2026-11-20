@@ -42,7 +42,7 @@ const nav = (title) => `<div class="food-nav mon-pagenav"><button class="food-ba
 export function render(root, refresh) {
   ctx = { root, refresh };
   const s = M.getState();
-  const body = ui.page === 'settings' ? nav('Paychecks & cash back') + settings(s) : main(s);
+  const body = ui.page === 'settings' ? nav('Paychecks & cash back') + settings(s) : ui.page === 'payday' ? nav('Payday') + paydayPage(s) : main(s);
   root.innerHTML = `<div class="screen money">${body}</div>`;
   // Settings: put back anything typed before switching pay schedule or saving mode
   if (ui.page === 'settings' && ui.typed) {
@@ -57,7 +57,7 @@ function keepTyped() {
 export const reset = () => { ui.page = null; ui.month = today().slice(0, 7); };
 
 function openPage(page) {
-  ui.page = page; ui.cbAcct = null; ui.payFreq = null; ui.split = null; ui.typed = null;
+  ui.page = page; ui.cbAcct = null; ui.payFreq = null; ui.split = null; ui.typed = null; ui.pd = null;
   rerender();
   window.scrollTo(0, 0);
 }
@@ -71,7 +71,7 @@ export function openMenu() {
     title: 'Money',
     body: `<div class="group">
       ${row('goal', 'star', 'Savings goal', `${g.name} · ${money(s, g.target)}`)}
-      ${row('settings', 'piggy', 'Paychecks & cash back', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${splitText(s, s.settings.split)}${s.settings.cashback?.rate ? ` · ${s.settings.cashback.rate}% cash back` : ''}` : 'Pay schedule, paycheck split, cash back')}
+      ${row('settings', 'piggy', 'Paychecks & cash back', s.settings.setup ? `${L.FREQS[s.settings.pay.freq]} · ${esc(paydayRule(s))}${s.settings.cashback?.rate ? ` · ${s.settings.cashback.rate}% cash back` : ''}` : 'Pay schedule, cash back')}
     </div>`,
     onMount(b) {
       b.onclick = (e) => {
@@ -109,9 +109,10 @@ function checkinPanel(s) {
   const thisWeek = L.checkedInWeek(s);
   const r = last ? L.checkinResult(s, last) : null;
   const saved = r ? (r.change.savings ?? 0) : 0;
+  const spent = last ? L.weekSpent(s, new Date(last.at)) : 0;
   const lastLine = last
     ? `<div class="mon-ci__stats">
-        <div><span>Spent</span><b>${money(s, r.spent)}</b></div>
+        <div><span>Spent that week</span><b>${money(s, spent)}</b></div>
         <div><span>Savings</span><b class="${saved >= 0 ? 'mon-in' : 'mon-over'}">${saved >= 0 ? '+' : '−'}${money(s, Math.abs(saved))}</b></div>
         ${r.extra ? `<div><span>Extra in</span><b class="mon-in">+${money(s, r.extra)}</b></div>` : ''}
       </div>
@@ -120,7 +121,6 @@ function checkinPanel(s) {
   return box('Weekly check-in', `<div class="mon-stack">
       ${lastLine}
       <button class="imp-btn ${thisWeek ? 'imp-btn--secondary' : 'imp-btn--primary'} imp-btn--block" data-m="checkin">${thisWeek ? 'Check in again' : `${icon('check')}Check in`}</button>
-      <button class="imp-btn imp-btn--secondary imp-btn--block" data-m="add" data-kind="income">${icon('plus')}Log paycheck</button>
     </div>`, thisWeek ? `<span class="mon-done">${icon('check')}Done this week</span>` : '');
 }
 
@@ -169,7 +169,7 @@ function graphPanel(s) {
 
 function main(s) {
   if (!s.accounts?.length) return `${goalPanel(s)}${accountsPanel(s)}`;
-  return `${goalPanel(s)}${checkinPanel(s)}${accountsPanel(s)}${graphPanel(s)}${history(s)}`;
+  return `${goalPanel(s)}${paydayCard(s)}${checkinPanel(s)}${accountsPanel(s)}${graphPanel(s)}${history(s)}`;
 }
 
 // ---- Accounts ----
@@ -183,7 +183,11 @@ function accountsPanel(s) {
   const rows = s.accounts.map((a) => `<button class="mon-row" data-m="acct" data-id="${esc(a.id)}">${icon(a.icon || 'cash', 'mon-row__icon')}
       <span class="mon-row__mid"><span class="mon-row__name">${esc(a.name)}</span></span>
       <span class="mon-row__amt${bal[a.id] < 0 ? ' mon-over' : ''}">${money(s, bal[a.id])}</span></button>`).join('');
-  return box('Accounts', `${rows}${paydayRow(s)}${cashbackRow(s)}`, `<button class="mon-link" data-m="acct-add" aria-label="Add account">${icon('plus')}Add</button>`);
+  const total = s.accounts.reduce((t, a) => t + (bal[a.id] || 0), 0);
+  const totalRow = `<div class="mon-row mon-total"><span class="mon-row__mid"><span class="mon-row__name">Total</span></span><span class="mon-row__amt">${money(s, total)}</span></div>`;
+  return box('Accounts', `${rows}${totalRow}
+    <button class="imp-btn imp-btn--secondary imp-btn--block mon-update" data-m="update-bal">${icon('bank')}Update balances</button>
+    ${paydayRow(s)}${cashbackRow(s)}`, `<button class="mon-link" data-m="acct-add" aria-label="Add account">${icon('plus')}Add</button>`);
 }
 
 function openAccountSetup() {
@@ -273,22 +277,22 @@ function openAddAccount() {
   });
 }
 
-// "Savings 85% · Car $20 · rest → Checking"
-function splitText(s, sp) {
-  const parts = (sp?.parts || []).filter((p) => p.value && p.account !== sp.rest && s.accounts?.some((a) => a.id === p.account))
-    .map((p) => `${acctName(s, p.account)} ${p.mode === 'percent' ? `${p.value}%` : money(s, p.value)}`);
-  return [...parts, `rest → ${acctName(s, sp?.rest || 'checking')}`].join(' · ');
+// "Spend 40% up to $200 · Save 40% · Invest 20%"
+function paydayRule(s) {
+  const pd = s.settings.payday;
+  const inv = L.investingId(s);
+  return `${acctName(s, 'checking')} ${pd.pct.checking}% up to ${money(s, pd.cap)} · ${acctName(s, 'savings')} ${pd.pct.savings}%${inv ? ` · ${acctName(s, inv)} ${pd.pct.investing}%` : ''}`;
 }
 
-// One line under the accounts: next payday and how it splits (log it with "Log paycheck" above)
+// One line under the accounts: next payday and how it splits (split it on the Payday page)
 function paydayRow(s) {
   if (!s.settings.setup) {
     return `<button class="mon-row" data-m="page" data-page="settings">${icon('calendar', 'mon-row__icon')}
-      <span class="mon-row__mid"><span class="mon-row__name">Set up paydays</span><span class="mon-row__sub">Pay schedule and paycheck split</span></span>${icon('next', 'mon-row__go')}</button>`;
+      <span class="mon-row__mid"><span class="mon-row__name">Set up paydays</span><span class="mon-row__sub">Pay schedule</span></span>${icon('next', 'mon-row__go')}</button>`;
   }
   const next = L.nextPayday(s.settings.pay, today());
   const when = next === today() ? 'today' : next ? shortDate(next) : '—';
-  const sub = splitText(s, s.settings.split);
+  const sub = paydayRule(s);
   return `<div class="mon-row mon-payrow">${icon('calendar', 'mon-row__icon')}
     <span class="mon-row__mid"><span class="mon-row__name">Next payday ${esc(when)}</span><span class="mon-row__sub">${esc(sub)}</span></span>
 </div>`;
@@ -347,12 +351,13 @@ function openCashback(e = null) {
 }
 
 // Sunday check-in: type what the bank shows for each account (filled in with what Improve expects)
-function openCheckin(e = null) {
+function openCheckin(e = null, source = e?.source || null) {
   const s = M.getState();
   const exp = e ? e.balances : L.balances(s);
+  const upd = source === 'update';
   sheet.open({
-    title: e ? 'Edit check-in' : 'Weekly check-in',
-    body: `<p class="mon-note">Open your bank app and type each balance. Improve works out what you spent and saved this week.</p>
+    title: e ? (source ? 'Edit balances' : 'Edit check-in') : upd ? 'Update balances' : 'Weekly check-in',
+    body: `<p class="mon-note">${upd ? 'Open Greenlight and type each balance. This re-syncs Improve with your bank (it isn\'t your Sunday check-in).' : 'Open your bank app and type each balance. Improve works out what you spent and saved this week.'}</p>
       ${s.accounts.map((a) => `<label class="imp-field"><span class="imp-label">${icon(a.icon || 'cash')} ${esc(a.name)}</span><span class="food-unit"><input class="imp-input" data-bal="${esc(a.id)}" inputmode="decimal" placeholder="${((exp[a.id] ?? 0) / 100).toFixed(2)}" value="${e && a.id in e.balances ? e.balances[a.id] / 100 : ''}"><span>${esc(s.settings.currency)}</span></span></label>`).join('')}
       <p class="mon-note">Leave one blank if it hasn't changed.</p>
       <p class="food-err" id="ci-err"></p>
@@ -370,11 +375,11 @@ function openCheckin(e = null) {
             if (Number.isNaN(v)) { b.querySelector('#ci-err').textContent = 'Type the balances as numbers.'; return; }
             balances[inp.dataset.bal] = v;
           }
-          const entry = { ...(e || {}), kind: 'checkin', balances, amount: 0, note: '', date: e?.date || today() };
+          const entry = { ...(e || {}), kind: 'checkin', balances, amount: 0, note: '', date: e?.date || today(), ...(source ? { source } : {}) };
           sheet.close();
           changed(() => M.upsertEntry(entry), [entry.date]);
           const saved = M.getState().entries.find((x) => x.kind === 'checkin' && x.date === entry.date && (!e || x.id === e.id));
-          if (saved) { const r = L.checkinResult(M.getState(), saved); toast(`Spent ${money(s, r.spent)} this week`); }
+          if (saved) toast(upd ? 'Balances updated' : `Spent ${money(s, L.weekSpent(M.getState(), new Date(saved.at)))} this week`);
         }
         if (t.id === 'ci-del' && confirm('Delete this check-in?')) { sheet.close(); changed(() => M.deleteEntry(e.id), [e.date]); toast('Deleted'); }
       };
@@ -416,6 +421,11 @@ function history(s) {
   const days = [...new Set(list.map((e) => e.date))];
   const rows = days.map((d) => `<div class="mon-day">${d === today() ? 'Today' : shortDate(d)}</div>` + list.filter((e) => e.date === d).map((e) => {
     const c = e.kind === 'expense' ? cat(e.cat) : null;
+    if (e.kind === 'checkin' && e.source) {
+      const label = { setup: 'Starting balances', payday: 'Spend balance (payday)', update: 'Balances updated' }[e.source] || 'Balances';
+      return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon('bank', 'mon-row__icon mon-k-checkin')}
+        <span class="mon-row__mid"><span class="mon-row__name">${label}</span><span class="mon-row__sub">${esc(Object.entries(e.balances || {}).map(([id, v]) => `${acctName(s, id)} ${money(s, v)}`).join(' · '))}</span></span></button>`;
+    }
     if (e.kind === 'checkin') {
       const r = L.checkinResult(s, e);
       const sav = r.change.savings;
@@ -424,7 +434,7 @@ function history(s) {
         <span class="mon-row__amt">${money(s, Object.values(e.balances || {}).reduce((t, v) => t + v, 0))}</span></button>`;
     }
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll', cashback: 'star' }[e.kind] || c?.icon || 'cash';
-    const title = e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
+    const title = e.payday ? 'Payday' : e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);
     const what = e.kind === 'adjust' ? `Matched ${acctName(s, e.account)} to bank` : e.kind === 'transfer' ? 'Moved money' : e.kind === 'cashback' ? `Into ${acctName(s, e.account || 'savings')}`
       : L.beforeTracking(s, e) ? 'Before tracking' : e.kind === 'expense' ? (e.note ? c?.name || 'Other' : '')
       : e.kind === 'income' && e.splits?.length > 1 ? e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ') : e.note ? KIND[e.kind] : '';
@@ -452,7 +462,6 @@ function settings(s) {
   return `${box('Pay schedule', `<div class="mon-stack">
       <div class="imp-seg mon-seg">${Object.entries(L.FREQS).map(([k, v]) => `<button data-m="freq" data-freq="${k}" class="${f === k ? 'is-on' : ''}">${v}</button>`).join('')}</div>
       ${fields}</div>`)}
-    ${splitBox(s)}
     ${cashbackBox(s)}
     ${box('Other', `<div class="mon-stack">
       <label class="imp-field"><span class="imp-label">Currency symbol</span><input class="imp-input" id="s-cur" maxlength="3" value="${esc(s.settings.currency)}"></label>
@@ -473,28 +482,169 @@ function cashbackBox(s) {
   </div>`);
 }
 
-// Paycheck split editor (works on a draft until Save settings)
-const splitDraft = (s) => (ui.split ||= structuredClone(s.settings.split));
-function splitBox(s) {
-  const accts = s.accounts || [];
-  if (!accts.length) {
-    return box('Paycheck split', `<div class="mon-stack"><p class="mon-note">Set up your accounts on the Money page first. Then choose how each paycheck is divided: a % or a fixed amount into any account, the rest into your spending account.</p></div>`);
-  }
-  const sp = splitDraft(s);
-  const rows = accts.filter((a) => a.id !== sp.rest).map((a) => {
-    const part = sp.parts.find((x) => x.account === a.id) || { mode: 'percent', value: 0 };
-    const val = part.value ? (part.mode === 'percent' ? part.value : part.value / 100) : '';
-    return `<div class="mon-split">${icon(a.icon || 'cash', 'mon-split__icon')}<span class="mon-split__name">${esc(a.name)}</span>
-      <div class="imp-seg mon-split__mode"><button data-m="split-mode" data-id="${esc(a.id)}" data-mode="percent" class="${part.mode === 'percent' ? 'is-on' : ''}">%</button><button data-m="split-mode" data-id="${esc(a.id)}" data-mode="amount" class="${part.mode === 'amount' ? 'is-on' : ''}">${esc(s.settings.currency)}</button></div>
-      <input class="imp-input mon-split__val" data-split="${esc(a.id)}" inputmode="decimal" placeholder="0" value="${val}" aria-label="${esc(a.name)} share"></div>`;
-  }).join('');
-  const ex = L.splitPaycheck(sp, 100000).map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ');
-  return box('Paycheck split', `<div class="mon-stack">
-    <p class="mon-note">Each paycheck is divided as it's logged. Set a % or a fixed amount for any account; leave blank for none.</p>
-    ${rows}
-    <div class="imp-field"><span class="imp-label">Rest goes to</span><div class="mon-chips">${accts.map((a) => `<button type="button" data-m="split-rest" data-id="${esc(a.id)}" class="mon-chip${sp.rest === a.id ? ' is-on' : ''}">${icon(a.icon || 'cash')}${esc(a.name)}</button>`).join('')}</div></div>
-    <p class="mon-note" id="split-ex">Example: a $1,000 paycheck → ${esc(ex)}</p>
-    <p class="mon-note">Your saving habit ticks in payday weeks once the paycheck is logged with this much set aside.</p></div>`);
+// ---------- Payday ----------
+// Each Friday: type the paycheck and the Spend (checking) balance; Improve says how much goes where in Greenlight.
+const thisWeekPaydays = (s) => { const [a, b] = periodRange('weekly'); return L.paydays(s).filter((e) => e.date >= a && e.date <= b); };
+
+// The card at the top of Money
+function paydayCard(s) {
+  const done = thisWeekPaydays(s).pop();
+  const next = L.nextPayday(s.settings.pay, today());
+  const when = next === today() ? 'today' : next ? shortDate(next) : '';
+  const sub = done
+    ? `Done ${shortDate(done.date)} · ${done.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ')}`
+    : `${when ? `Next payday ${when} · ` : ''}${paydayRule(s)}`;
+  return `<section class="imp-panel mon-paycard${done ? ' is-done' : ''}"><button class="mon-paycard__btn" data-m="page" data-page="payday">
+    ${icon(done ? 'check' : 'cash', 'mon-paycard__icon')}
+    <span class="mon-row__mid"><span class="mon-paycard__title">${done ? 'Paycheck split' : 'Split my paycheck'}</span><span class="mon-row__sub">${esc(sub)}</span></span>
+    ${icon('next', 'mon-row__go')}</button></section>`;
+}
+
+// What's typed on the Payday page (kept across re-renders), with the defaults filled in
+function paydayInputs(s) {
+  const pd = s.settings.payday;
+  const done = thisWeekPaydays(s).pop(); // already marked this week: show what was logged
+  const amtRaw = ui.pd?.['pd-amt'] ?? String((done ? done.amount : pd.last) / 100);
+  const balRaw = ui.pd?.['pd-bal'] ?? String((done ? done.payday.balance : L.balances(s).checking ?? 0) / 100);
+  return { amtRaw, balRaw, amount: L.toCents(amtRaw || '0'), bal: L.toCents(balRaw || '0') };
+}
+
+function paydayResult(s) {
+  const { amount, bal } = paydayInputs(s);
+  if (!(amount > 0) || Number.isNaN(bal)) return null;
+  const r = L.paydaySplit(amount, bal, s.settings.payday);
+  const inv = L.investingId(s);
+  return { amount, bal, r, inv, capped: r.checking < Math.round((amount * s.settings.payday.pct.checking) / 100) };
+}
+
+function paydayCards(s) {
+  const x = paydayResult(s);
+  if (!x) return '<p class="mon-empty">Type your paycheck and Spend balance.</p>';
+  const bal = L.balances(s);
+  const done = !!thisWeekPaydays(s).length && !ui.pd;
+  const card = (id, kind, amt, after) => `<div class="mon-pdcard mon-pdcard--${kind}"><span class="mon-pdcard__name">${esc(acctName(s, id))}</span>
+    <b class="mon-pdcard__amt${money(s, amt).length > 7 ? ' is-long' : ''}">${money(s, amt)}</b>${done ? '' : `<span class="mon-pdcard__after">→ ${money(s, after)}</span>`}</div>`;
+  const invBal = x.inv ? bal[x.inv] ?? 0 : 0;
+  const savAmt = x.r.savings + (x.inv ? 0 : x.r.investing);
+  const cards = card('checking', 'chk', x.r.checking, x.bal + x.r.checking) + card('savings', 'sav', savAmt, (bal.savings ?? 0) + savAmt)
+    + (x.inv ? card(x.inv, 'inv', x.r.investing, invBal + x.r.investing) : '');
+  const to = [`${money(s, savAmt)} to ${acctName(s, 'savings')}`, x.inv ? `${money(s, x.r.investing)} to ${acctName(s, x.inv)}` : ''].filter(Boolean).join(' and ');
+  const line = `${x.r.checking ? `Keep ${money(s, x.r.checking)} in ${acctName(s, 'checking')}, move` : 'Move'} ${to}.`;
+  const cap = x.capped ? ` ${acctName(s, 'checking')} is capped at ${money(s, s.settings.payday.cap)}, so the rest goes to ${acctName(s, 'savings')}${x.inv ? ` and ${acctName(s, x.inv)}` : ''}.` : '';
+  return `<div class="mon-pdcards">${cards}</div><p class="mon-pdline">${esc(line + cap)}</p>`;
+}
+
+function paydayTotalsBox(s) {
+  const x = paydayResult(s);
+  const t = L.paydayTotals(s, x?.r);
+  const inv = L.investingId(s);
+  return box('Totals', `<div class="mon-pdtot">
+      <div><span>Total saved</span><b>${money(s, t.saved)}</b></div>
+      ${inv ? `<div><span>Total invested</span><b>${money(s, t.invested)}</b></div>` : ''}
+    </div>
+    <p class="imp-label mon-pdtot__h">A year from now at this pace</p>
+    <div class="mon-pdtot">
+      <div><span>${esc(acctName(s, 'savings'))}</span><b>${money(s, t.yearSavings)}</b></div>
+      ${inv ? `<div><span>${esc(acctName(s, inv))}</span><b>${money(s, t.yearInvesting)}</b></div>` : ''}
+    </div>
+    <p class="mon-note">${t.fromPreview ? 'Pace = this paycheck\'s split, every Friday. Your logged paydays take over once you mark one done.' : `Pace = your last ${Math.min(4, t.paydays)} payday${Math.min(4, t.paydays) === 1 ? '' : 's'} (${money(s, t.pace.savings)} saved${inv ? ` · ${money(s, t.pace.investing)} invested` : ''} each), every Friday for 52 weeks.`}</p>`);
+}
+
+function paydayHistory(s) {
+  const list = L.paydays(s).reverse();
+  const rows = list.map((e) => `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon('cash', 'mon-row__icon mon-k-income')}
+      <span class="mon-row__mid"><span class="mon-row__name">${shortDate(e.date)} · ${money(s, e.amount)}</span><span class="mon-row__sub">${esc(e.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · '))}</span></span></button>`).join('');
+  return box('Paydays', rows || '<p class="mon-empty">No paydays yet. Mark one done above.</p>', list.length ? `${list.length}` : '');
+}
+
+function paydaySettingsBox(s) {
+  const pd = s.settings.payday;
+  const inv = L.investingId(s);
+  const field = (id, label, v, unit) => `<label class="imp-field"><span class="imp-label">${esc(label)}</span><span class="food-unit"><input class="imp-input" id="${id}" inputmode="decimal" value="${v}"><span>${unit}</span></span></label>`;
+  return box('Split settings', `<div class="mon-stack">
+    <div class="mon-pdset">${field('ps-chk', acctName(s, 'checking'), pd.pct.checking, '%')}${field('ps-sav', acctName(s, 'savings'), pd.pct.savings, '%')}${inv ? field('ps-inv', acctName(s, inv), pd.pct.investing, '%') : ''}</div>
+    ${field('ps-cap', `${acctName(s, 'checking')} cap`, pd.cap / 100, esc(s.settings.currency))}
+    <p class="mon-note">The %s must add up to 100. ${esc(acctName(s, 'checking'))} never goes over the cap; what it can't take goes to the others in their own ratio.</p>
+    <p class="food-err" id="ps-err"></p>
+    <button class="imp-btn imp-btn--secondary imp-btn--block" data-m="payday-save">Save split</button></div>`);
+}
+
+function paydayPage(s) {
+  const { amtRaw, balRaw } = paydayInputs(s);
+  const done = thisWeekPaydays(s).pop();
+  return `${box('This paycheck', `<div class="mon-stack">
+      <div class="imp-field-row">
+        <label class="imp-field"><span class="imp-label">Paycheck</span><span class="food-unit"><input class="imp-input mon-amt" id="pd-amt" inputmode="decimal" value="${esc(amtRaw)}" autocomplete="off"><span>${esc(s.settings.currency)}</span></span></label>
+        <label class="imp-field"><span class="imp-label">${esc(acctName(s, 'checking'))} balance now</span><span class="food-unit"><input class="imp-input mon-amt" id="pd-bal" inputmode="decimal" value="${esc(balRaw)}" autocomplete="off"><span>${esc(s.settings.currency)}</span></span></label>
+      </div>
+      <p class="mon-note">${done && !ui.pd ? 'This week\'s payday, as you logged it.' : 'Filled in from Improve. Change the balance to what Greenlight shows if you\'ve spent since.'}</p>
+      <div id="pd-out">${paydayCards(s)}</div>
+      <p class="food-err" id="pd-err"></p>
+      ${done && !ui.pd ? `<div class="mon-pddone"><span class="mon-done">${icon('check')}Marked done ${shortDate(done.date)}</span><button class="mon-link" data-m="edit" data-id="${done.id}">Undo</button></div>`
+        : `<button class="imp-btn imp-btn--primary imp-btn--block" data-m="payday-done">${icon('check')}Mark as done</button>`}</div>`)}
+    <div id="pd-tot">${paydayTotalsBox(s)}</div>
+    ${paydayHistory(s)}
+    ${paydaySettingsBox(s)}`;
+}
+
+// Typing: redraw the cards and totals only (keeps the keyboard up)
+function updatePayday() {
+  const s = M.getState();
+  const out = ctx.root.querySelector('#pd-out');
+  if (out) out.innerHTML = paydayCards(s);
+  const tot = ctx.root.querySelector('#pd-tot');
+  if (tot) tot.innerHTML = paydayTotalsBox(s);
+}
+
+function markPayday() {
+  const s = M.getState();
+  const err = ctx.root.querySelector('#pd-err');
+  const { amount, bal } = paydayInputs(s);
+  if (!(amount > 0)) { err.textContent = 'Enter the paycheck amount.'; return; }
+  if (Number.isNaN(bal)) { err.textContent = 'Enter the balance as a number.'; return; }
+  const r = L.paydaySplit(amount, bal, s.settings.payday);
+  const splits = L.paydaySplits(s, r);
+  const now = Date.now();
+  const id = now.toString(36) + Math.random().toString(36).slice(2, 7);
+  const cur = L.balances(s).checking ?? 0;
+  changed(() => {
+    // The balance you typed is the real one: record it first (spending since the last update), then the paycheck
+    let checkinId = null;
+    if (bal !== cur) {
+      checkinId = id + 'b';
+      M.upsertEntry({ id: checkinId, kind: 'checkin', source: 'payday', balances: { checking: bal }, amount: 0, note: '', date: today(), at: new Date(now).toISOString() });
+    }
+    M.upsertEntry({ id, kind: 'income', amount, note: 'Paycheck', date: today(), at: new Date(now + 1).toISOString(), splits, payday: { balance: bal, checkinId } });
+    M.saveSettings({ payday: { ...s.settings.payday, last: amount } });
+  }, [today()]);
+  ui.pd = null;
+  rerender();
+  toast('Payday logged');
+}
+
+function undoPayday(e) {
+  const s = M.getState();
+  if (!confirm(`Undo the ${shortDate(e.date)} payday (${money(s, e.amount)})? Its amounts come back off your balances.`)) return;
+  changed(() => {
+    M.deleteEntry(e.id);
+    if (e.payday?.checkinId) M.deleteEntry(e.payday.checkinId);
+  }, [e.date]);
+  toast('Payday undone');
+}
+
+function savePaydaySettings() {
+  const s = M.getState();
+  const err = ctx.root.querySelector('#ps-err');
+  const num = (id) => { const v = ctx.root.querySelector(id)?.value.trim(); return v == null ? 0 : Number(v); };
+  const pct = { checking: num('#ps-chk'), savings: num('#ps-sav'), investing: L.investingId(s) ? num('#ps-inv') : 0 };
+  if (Object.values(pct).some((v) => !Number.isFinite(v) || v < 0)) { err.textContent = 'Use numbers 0–100.'; return; }
+  const sum = pct.checking + pct.savings + pct.investing;
+  if (Math.abs(sum - 100) > 0.001) { err.textContent = `They add up to ${sum}%. Make it 100%.`; return; }
+  const cap = L.toCents(ctx.root.querySelector('#ps-cap').value || '0');
+  if (Number.isNaN(cap) || cap < 0) { err.textContent = 'Enter the cap as a number.'; return; }
+  M.saveSettings({ payday: { ...s.settings.payday, pct, cap } });
+  rerender();
+  toast('Split saved');
 }
 
 // ---------- Sheets ----------
@@ -612,14 +762,11 @@ export function bind(root) {
   root.addEventListener('input', (ev) => {
     if (!mine()) return;
     const t = ev.target;
-    if (ui.page === 'settings' && t.dataset.split != null) {
-      const sp = splitDraft(M.getState());
-      const part = sp.parts.find((x) => x.account === t.dataset.split) || sp.parts[sp.parts.push({ account: t.dataset.split, mode: 'percent', value: 0 }) - 1];
-      const raw = t.value.trim();
-      part.value = !raw ? 0 : part.mode === 'percent' ? Number(raw) : L.toCents(raw);
-      const ex = ctx.root.querySelector('#split-ex');
-      if (ex && !Number.isNaN(part.value)) ex.textContent = `Example: a $1,000 paycheck → ${L.splitPaycheck(sp, 100000).map((x) => `${acctName(M.getState(), x.account)} ${money(M.getState(), x.amount)}`).join(' · ')}`;
-      return;
+    if (ui.page === 'payday' && (t.id === 'pd-amt' || t.id === 'pd-bal')) {
+      const first = !ui.pd;
+      ui.pd = { ...(ui.pd || {}), [t.id]: t.value };
+      if (first && thisWeekPaydays(M.getState()).length) { rerender(); const el = ctx.root.querySelector('#' + t.id); el?.focus(); el?.setSelectionRange?.(el.value.length, el.value.length); } // another paycheck this week
+      else updatePayday();
     }
   });
 
@@ -635,7 +782,8 @@ export function bind(root) {
       case 'add': openEntry(el.dataset.kind); break;
       case 'edit': {
         const entry = s.entries.find((e) => e.id === el.dataset.id);
-        if (entry?.kind === 'cashback') openCashback(entry);
+        if (entry?.payday) undoPayday(entry);
+        else if (entry?.kind === 'cashback') openCashback(entry);
         else if (entry?.kind === 'checkin') openCheckin(entry);
         else if (entry?.kind === 'adjust') {
           if (confirm(`Remove this ${money(s, entry.amount)} balance fix?`)) { M.deleteEntry(entry.id); rerender(); toast('Removed'); }
@@ -645,20 +793,14 @@ export function bind(root) {
       case 'acct-setup': openAccountSetup(); break;
       case 'cashback': openCashback(); break;
       case 'checkin': openCheckin(); break;
+      case 'update-bal': openCheckin(null, 'update'); break;
+      case 'payday-done': markPayday(); break;
+      case 'payday-save': savePaydaySettings(); break;
       case 'goal': openGoal(); break;
       case 'acct': openAccount(el.dataset.id); break;
       case 'acct-add': openAddAccount(); break;
 
       case 'freq': keepTyped(); ui.payFreq = el.dataset.freq; rerender(); break;
-      case 'split-mode': {
-        keepTyped();
-        const sp = splitDraft(s);
-        const part = sp.parts.find((x) => x.account === el.dataset.id) || sp.parts[sp.parts.push({ account: el.dataset.id, mode: 'percent', value: 0 }) - 1];
-        if (part.mode !== el.dataset.mode) { part.mode = el.dataset.mode; part.value = 0; delete (ui.typed || {})[`split-${el.dataset.id}`]; }
-        rerender();
-        break;
-      }
-      case 'split-rest': keepTyped(); splitDraft(s).rest = el.dataset.id; rerender(); break;
       case 'cb-acct': keepTyped(); ui.cbAcct = el.dataset.id; rerender(); break;
       case 'save-settings': saveSettings(s); break;
     }
@@ -682,15 +824,6 @@ function saveSettings(s) {
     pay.day = num('#p-day');
     if (!(pay.day >= 1 && pay.day <= 31 && Number.isInteger(pay.day))) { err.textContent = 'Day must be 1–31.'; return; }
   }
-  let split = s.settings.split;
-  if (ui.split) {
-    const sp = ui.split;
-    const parts = sp.parts.filter((x) => x.value > 0 && x.account !== sp.rest && s.accounts.some((a) => a.id === x.account));
-    if (sp.parts.some((x) => Number.isNaN(x.value) || x.value < 0)) { err.textContent = 'Check the split amounts.'; return; }
-    const pct = parts.filter((x) => x.mode === 'percent').reduce((t, x) => t + x.value, 0);
-    if (pct > 100) { err.textContent = `The split adds up to ${pct}%. Keep it at 100% or less.`; return; }
-    split = { rest: sp.rest, parts };
-  }
   const currency = ctx.root.querySelector('#s-cur').value.trim() || '$';
   const rateRaw = ctx.root.querySelector('#cb-rate')?.value.trim() || '';
   const rate = rateRaw ? Number(rateRaw) : 0;
@@ -698,10 +831,9 @@ function saveSettings(s) {
   const cashback = { rate, account: ui.cbAcct || s.settings.cashback?.account || 'savings' };
   ui.cbAcct = null;
   ui.payFreq = null;
-  ui.split = null;
   ui.typed = null;
   ui.page = null;
-  changed(() => M.saveSettings({ pay, split, currency, cashback, setup: true }));
+  changed(() => M.saveSettings({ pay, currency, cashback, setup: true }));
   window.scrollTo(0, 0);
   toast('Settings saved');
 }

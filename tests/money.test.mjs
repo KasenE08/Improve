@@ -183,6 +183,37 @@ eq(JSON.parse(mem.imp_habits).find((h) => h.id === 'budget-review').archived, tr
 eq(JSON.parse(mem.imp_habits)[1].name, 'My save', 'upgrade keeps edits');
 
 console.log(fails ? `${fails} FAILED` : 'all passed');
+
+// ---- Payday split: 40/40/20, Spend (checking) capped at $200 ----
+{
+  const cfg = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000 };
+  eq(L.paydaySplit(22200, 0, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $0 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 15000, cfg), { checking: 5000, savings: 11467, investing: 5733 }, '$222, checking at $150 -> 50.00 / 114.67 / 57.33');
+  eq(L.paydaySplit(22200, 20000, cfg), { checking: 0, savings: 14800, investing: 7400 }, '$222, checking at $200 -> 0 / 148.00 / 74.00');
+  eq(L.paydaySplit(22200, 7611, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $76.11 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 25000, cfg).checking, 0, 'over the cap already: checking never goes below 0');
+  for (const [amt, bal] of [[22201, 0], [33333, 12345], [1, 0], [99999, 19999]]) {
+    const r = L.paydaySplit(amt, bal, cfg);
+    eq(r.checking + r.savings + r.investing, amt, 'adds up exactly: ' + amt + ' cents, checking ' + bal);
+  }
+  // Marking a payday done: balances go up by each share; totals start from the Greenlight balances
+  const st = {
+    settings: { currency: '$', split: { rest: 'checking', parts: [] }, pay: { freq: 'weekly', anchor: '2026-11-20' }, setup: true,
+      payday: { ...cfg, investing: 'inv', base: { savings: 108933, investing: 2397, at: '2026-11-20T10:00:00Z' } } },
+    accounts: [{ id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'inv', name: 'Invest', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', source: 'setup', balances: { checking: 7611, savings: 108933, inv: 2397 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' }],
+  };
+  eq(L.paydayTotals(st).saved, 108933, 'totals start from the starting balances');
+  const r = L.paydaySplit(22200, 7611, cfg);
+  st.entries.push({ kind: 'income', amount: 22200, date: '2026-11-20', at: '2026-11-20T18:00:00Z', splits: L.paydaySplits(st, r), payday: { balance: 7611 } });
+  eq(L.balances(st), { checking: 16491, savings: 117813, inv: 6837 }, 'Mark as done adds each share to its balance');
+  const t = L.paydayTotals(st);
+  eq([t.saved, t.invested], [117813, 6837], 'total saved / invested');
+  eq([t.yearSavings, t.yearInvesting], [117813 + 8880 * 52, 6837 + 4440 * 52], 'a year from now: balance + average payday share x 52');
+  eq(L.saveStatus(st, new Date(2026, 10, 20, 12)).hit, true, 'save habit ticks for the payday week');
+  eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
+  eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
+}
 process.exitCode = fails ? 1 : 0;
 
 // ---- Budget months are calendar months ----
@@ -197,6 +228,37 @@ eq(L.monthRange('2026-11'), ['2026-11-01', '2026-11-30'], 'budget month stays No
   st.entries.push({ kind: 'cashback', amount: 331, account: 'savings', date: '2026-11-02', at: '2026-11-02T12:00:00Z' });
   eq(L.balances(st).savings, 1331, 'cash back deposit goes into Savings');
   eq([L.monthSummary(st, '2026-11').spent, L.monthSummary(st, '2026-11').income], [500, 0], 'not spending, not a paycheck');
+}
+
+// ---- Payday split: 40/40/20, Spend (checking) capped at $200 ----
+{
+  const cfg = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000 };
+  eq(L.paydaySplit(22200, 0, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $0 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 15000, cfg), { checking: 5000, savings: 11467, investing: 5733 }, '$222, checking at $150 -> 50.00 / 114.67 / 57.33');
+  eq(L.paydaySplit(22200, 20000, cfg), { checking: 0, savings: 14800, investing: 7400 }, '$222, checking at $200 -> 0 / 148.00 / 74.00');
+  eq(L.paydaySplit(22200, 7611, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $76.11 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 25000, cfg).checking, 0, 'over the cap already: checking never goes below 0');
+  for (const [amt, bal] of [[22201, 0], [33333, 12345], [1, 0], [99999, 19999]]) {
+    const r = L.paydaySplit(amt, bal, cfg);
+    eq(r.checking + r.savings + r.investing, amt, 'adds up exactly: ' + amt + ' cents, checking ' + bal);
+  }
+  // Marking a payday done: balances go up by each share; totals start from the Greenlight balances
+  const st = {
+    settings: { currency: '$', split: { rest: 'checking', parts: [] }, pay: { freq: 'weekly', anchor: '2026-11-20' }, setup: true,
+      payday: { ...cfg, investing: 'inv', base: { savings: 108933, investing: 2397, at: '2026-11-20T10:00:00Z' } } },
+    accounts: [{ id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'inv', name: 'Invest', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', source: 'setup', balances: { checking: 7611, savings: 108933, inv: 2397 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' }],
+  };
+  eq(L.paydayTotals(st).saved, 108933, 'totals start from the starting balances');
+  const r = L.paydaySplit(22200, 7611, cfg);
+  st.entries.push({ kind: 'income', amount: 22200, date: '2026-11-20', at: '2026-11-20T18:00:00Z', splits: L.paydaySplits(st, r), payday: { balance: 7611 } });
+  eq(L.balances(st), { checking: 16491, savings: 117813, inv: 6837 }, 'Mark as done adds each share to its balance');
+  const t = L.paydayTotals(st);
+  eq([t.saved, t.invested], [117813, 6837], 'total saved / invested');
+  eq([t.yearSavings, t.yearInvesting], [117813 + 8880 * 52, 6837 + 4440 * 52], 'a year from now: balance + average payday share x 52');
+  eq(L.saveStatus(st, new Date(2026, 10, 20, 12)).hit, true, 'save habit ticks for the payday week');
+  eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
+  eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
 }
 process.exitCode = fails ? 1 : 0;
 
@@ -215,5 +277,36 @@ process.exitCode = fails ? 1 : 0;
   st.entries.push({ kind: 'income', amount: 40000, date: '2026-11-13', at: '2026-11-13T18:00:00Z', splits: [{ account: 'savings', amount: 34000 }, { account: 'checking', amount: 6000 }] });
   eq(L.balances(st).savings, 168000, 'paychecks after a check-in add on top of it');
   eq(L.balanceSeries(st, '2026-11-14T00:00:00Z')[1].points.map((p) => p.v), [100000, 134000, 168000], 'graph: start, each check-in, now');
+}
+
+// ---- Payday split: 40/40/20, Spend (checking) capped at $200 ----
+{
+  const cfg = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000 };
+  eq(L.paydaySplit(22200, 0, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $0 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 15000, cfg), { checking: 5000, savings: 11467, investing: 5733 }, '$222, checking at $150 -> 50.00 / 114.67 / 57.33');
+  eq(L.paydaySplit(22200, 20000, cfg), { checking: 0, savings: 14800, investing: 7400 }, '$222, checking at $200 -> 0 / 148.00 / 74.00');
+  eq(L.paydaySplit(22200, 7611, cfg), { checking: 8880, savings: 8880, investing: 4440 }, '$222, checking at $76.11 -> 88.80 / 88.80 / 44.40');
+  eq(L.paydaySplit(22200, 25000, cfg).checking, 0, 'over the cap already: checking never goes below 0');
+  for (const [amt, bal] of [[22201, 0], [33333, 12345], [1, 0], [99999, 19999]]) {
+    const r = L.paydaySplit(amt, bal, cfg);
+    eq(r.checking + r.savings + r.investing, amt, 'adds up exactly: ' + amt + ' cents, checking ' + bal);
+  }
+  // Marking a payday done: balances go up by each share; totals start from the Greenlight balances
+  const st = {
+    settings: { currency: '$', split: { rest: 'checking', parts: [] }, pay: { freq: 'weekly', anchor: '2026-11-20' }, setup: true,
+      payday: { ...cfg, investing: 'inv', base: { savings: 108933, investing: 2397, at: '2026-11-20T10:00:00Z' } } },
+    accounts: [{ id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'inv', name: 'Invest', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', source: 'setup', balances: { checking: 7611, savings: 108933, inv: 2397 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' }],
+  };
+  eq(L.paydayTotals(st).saved, 108933, 'totals start from the starting balances');
+  const r = L.paydaySplit(22200, 7611, cfg);
+  st.entries.push({ kind: 'income', amount: 22200, date: '2026-11-20', at: '2026-11-20T18:00:00Z', splits: L.paydaySplits(st, r), payday: { balance: 7611 } });
+  eq(L.balances(st), { checking: 16491, savings: 117813, inv: 6837 }, 'Mark as done adds each share to its balance');
+  const t = L.paydayTotals(st);
+  eq([t.saved, t.invested], [117813, 6837], 'total saved / invested');
+  eq([t.yearSavings, t.yearInvesting], [117813 + 8880 * 52, 6837 + 4440 * 52], 'a year from now: balance + average payday share x 52');
+  eq(L.saveStatus(st, new Date(2026, 10, 20, 12)).hit, true, 'save habit ticks for the payday week');
+  eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
+  eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
 }
 process.exitCode = fails ? 1 : 0;

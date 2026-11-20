@@ -118,3 +118,30 @@
 .mon-graph__row:last-of-type { border-bottom: 0; }
 .mon-graph__name { display: inline-flex; align-items: center; gap: 6px; font: 600 13px var(--imp-font-head); }
 .mon-graph__name i { width: 10px; height: 10px; border-radius: 3px; }
+
+/* ---- Payday ---- */
+.mon-paycard__btn { display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px var(--imp-pad); text-align: left; }
+.mon-paycard__icon { width: 40px; height: 40px; padding: 9px; flex: none; border-radius: 12px; color: var(--imp-on-accent); background: var(--imp-accent); }
+.mon-paycard.is-done .mon-paycard__icon { background: var(--imp-good); }
+.mon-paycard__title { font: 700 17px var(--imp-font-head); }
+.mon-paycard .mon-row__sub { white-space: normal; }
+.mon-pdcards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mon-pdcard { display: grid; gap: 3px; padding: 12px 10px; border-radius: 14px; background: var(--imp-sunken); border-top: 4px solid var(--c); min-width: 0; }
+.mon-pdcard--chk { --c: var(--imp-accent); }
+.mon-pdcard--sav { --c: #22c55e; }
+.mon-pdcard--inv { --c: #a855f7; }
+.mon-pdcard__name { font: 600 13px var(--imp-font-head); color: var(--imp-muted); }
+.mon-pdcard__amt { font: 800 20px/1.1 var(--imp-font-body); letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mon-pdcard__amt.is-long { font-size: 16px; }
+.mon-pddone { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 4px 0; }
+.mon-pdcard__after { font: 500 12px var(--imp-font-head); color: var(--imp-muted); font-variant-numeric: tabular-nums; }
+.mon-pdline { font: 500 15px/1.4 var(--imp-font-body); color: var(--imp-text); }
+.mon-pdtot { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 6px 0; }
+.mon-pdtot div { display: grid; gap: 2px; padding: 10px 12px; border-radius: 12px; background: var(--imp-sunken); }
+.mon-pdtot span { font: 500 12.5px var(--imp-font-head); color: var(--imp-muted); }
+.mon-pdtot b { font: 700 20px var(--imp-font-body); font-variant-numeric: tabular-nums; }
+.mon-pdtot__h { margin-top: 6px; }
+.mon-pdset { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mon-total .mon-row__name { font-weight: 700; }
+.mon-total .mon-row__amt { font-weight: 800; }
+.mon-update { margin: 8px 0 4px; }
