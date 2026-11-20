@@ -26,10 +26,14 @@ export const DEFAULT_SETTINGS = {
   cashback: { rate: 0, account: 'savings' },
   // What Savings is building toward (the bar at the top of Money)
   goal: { name: 'Motorcycle', target: 500000, account: 'savings' },
+  // Payday split (see logic.js paydaySplit): %s, the checking cap, the last paycheck typed,
+  // the investing account, and `base` = the balances the running totals start from
+  payday: null,
 };
+const PAYDAY = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000, last: 22200 };
 
 const empty = () => ({
-  version: 2,
+  version: 3,
   settings: structuredClone(DEFAULT_SETTINGS),
   categories: structuredClone(DEFAULT_CATEGORIES),
   entries: [], // { id, kind: 'expense'|'income'|'saving', amount, cat?, note, date, at }
@@ -47,9 +51,27 @@ export function getState() {
     s = { ...s, version: 2, settings: { ...s.settings, pay: { ...DEFAULT_SETTINGS.pay, ...s.settings?.pay, freq: 'weekly', anchor: key } } };
     store.set(KEY, s);
   }
+  // Version 3 (Nov 20, 2026): Greenlight. Accounts named Spend / Save / Invest, starting balances from the
+  // bank, the 40/40/20 payday split with a $200 cap. Only for this phone's data (it has the Investing account).
+  if (s.version < 3) {
+    s = { ...s, version: 3 };
+    const INV = 'a_mvr7gm5k92fu4';
+    if ((s.accounts || []).some((a) => a.id === INV)) {
+      const names = { checking: 'Spend', savings: 'Save', [INV]: 'Invest' };
+      s.accounts = s.accounts.map((a) => (names[a.id] ? { ...a, name: names[a.id] } : a));
+      const at = new Date().toISOString();
+      const now = new Date(at);
+      const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const bal = { checking: 7611, savings: 108933, [INV]: 2397 };
+      s.entries = [...(s.entries || []), { id: 'greenlight-start', kind: 'checkin', source: 'setup', balances: bal, amount: 0, note: 'Greenlight balances', date: day, at }];
+      s.settings = { ...s.settings, payday: { ...PAYDAY, investing: INV, base: { savings: bal.savings, investing: bal[INV], at } } };
+    }
+    store.set(KEY, s);
+  }
   const d = DEFAULT_SETTINGS;
   const settings = { ...d, ...s.settings, pay: { ...d.pay, ...s.settings?.pay }, save: { ...d.save, ...s.settings?.save }, cashback: { ...d.cashback, ...s.settings?.cashback }, goal: { ...d.goal, ...s.settings?.goal } };
   settings.split ||= splitFromSave(settings.save);
+  settings.payday = { ...PAYDAY, ...s.settings?.payday, pct: { ...PAYDAY.pct, ...s.settings?.payday?.pct } };
   return { ...empty(), ...s, settings };
 }
 // The old "save X% / $X per paycheck" becomes the first paycheck split: that much to Savings, the rest to Checking.

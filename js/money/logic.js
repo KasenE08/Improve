@@ -94,6 +94,58 @@ export function splitPaycheck(split, amount) {
 // Money a split puts anywhere other than the spending account (what the saving habit checks)
 export const setAside = (split, list) => list.filter((x) => x.account !== (split?.rest || 'checking')).reduce((s, x) => s + x.amount, 0);
 
+// ---- Payday (Greenlight): % split with a cap on the spending account ----
+// Checking gets the smaller of: what fills it to `cap`, or its % of the paycheck (never below $0).
+// Everything left goes to savings and investing in their own ratio (40:20 = 2:1). Amounts are cents;
+// investing is rounded and savings takes the leftover cent, so the three always add up to the paycheck.
+export const DEFAULT_PAYDAY = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000, last: 22200 };
+export function paydaySplit(amount, checkingBal, { pct, cap } = DEFAULT_PAYDAY) {
+  const want = Math.round((amount * pct.checking) / 100);
+  const room = Math.max(0, cap - checkingBal);
+  const checking = Math.max(0, Math.min(room, want, amount));
+  const left = amount - checking;
+  const ratio = pct.savings + pct.investing;
+  const investing = ratio > 0 ? Math.round((left * pct.investing) / ratio) : 0;
+  return { checking, savings: left - investing, investing };
+}
+// The account paydays put the investing share in (Settings, or the first account that isn't checking/savings)
+export function investingId(state) {
+  const accts = state.accounts || [];
+  const set = state.settings.payday?.investing;
+  if (set && accts.some((a) => a.id === set)) return set;
+  return accts.find((a) => a.id !== 'checking' && a.id !== 'savings')?.id || null;
+}
+// A payday's three amounts as split entries (no investing account yet: that share goes to savings)
+export function paydaySplits(state, r) {
+  const inv = investingId(state);
+  const out = [{ account: 'checking', amount: r.checking }, { account: 'savings', amount: r.savings + (inv ? 0 : r.investing) }];
+  if (inv) out.push({ account: inv, amount: r.investing });
+  return out.filter((x) => x.amount > 0);
+}
+export const paydays = (state) => byTime(state.entries).filter((e) => e.kind === 'income' && e.payday);
+const shareOf = (e, id) => (e.splits || []).filter((x) => x.account === id).reduce((t, x) => t + x.amount, 0);
+/**
+ * Running totals: saved / invested all-time (from the balances you started with, plus every payday's share
+ * after that) and where each account lands a year from now at the pace of your last 4 paydays.
+ * `fallback` (a split preview) sets the pace before the first payday is logged.
+ */
+export function paydayTotals(state, fallback = null) {
+  const inv = investingId(state);
+  const base = state.settings.payday?.base || { savings: 0, investing: 0, at: '' };
+  const list = paydays(state).filter((e) => (e.at || '') >= (base.at || ''));
+  const saved = base.savings + list.reduce((t, e) => t + shareOf(e, 'savings'), 0);
+  const invested = base.investing + (inv ? list.reduce((t, e) => t + shareOf(e, inv), 0) : 0);
+  const recent = list.slice(-4);
+  const avg = (id) => (recent.length ? Math.round(recent.reduce((t, e) => t + shareOf(e, id), 0) / recent.length) : 0);
+  const pace = recent.length ? { savings: avg('savings'), investing: inv ? avg(inv) : 0 } : { savings: fallback?.savings || 0, investing: fallback?.investing || 0 };
+  const bal = balances(state);
+  return {
+    saved, invested, paydays: list.length, pace, fromPreview: !recent.length,
+    yearSavings: (bal.savings ?? 0) + pace.savings * 52,
+    yearInvesting: (inv ? bal[inv] ?? 0 : 0) + pace.investing * 52,
+  };
+}
+
 export const inRange = (entries, start, end) => entries.filter((e) => e.date >= start && e.date <= end);
 export const sum = (list) => list.reduce((s, e) => s + e.amount, 0);
 
@@ -120,7 +172,7 @@ export function saveStatus(state, date = appNow()) {
   }
   const base = { judge: !!settings.setup, start, end, expected, incomes, saved };
   if (!expected.length && !incomes.length) return { ...base, offWeek: true, required: 0, pending: false, hit: true };
-  const required = incomes.reduce((s, e) => s + setAside(split, splitPaycheck(split, e.amount)), 0);
+  const required = incomes.reduce((s, e) => s + setAside(split, e.payday ? e.splits || [] : splitPaycheck(split, e.amount)), 0);
   const pending = incomes.length < expected.length; // payday came but paycheck not logged yet
   const hit = !pending && incomes.length > 0 && saved >= required;
   return { ...base, offWeek: false, required, pending, hit };
@@ -211,17 +263,24 @@ export function checkinResult(state, e) {
   const ids = Object.keys(e.balances || {}).filter((id) => id in expected);
   const delta = ids.reduce((t, id) => t + (e.balances[id] - expected[id]), 0);
   const list = byTime(state.entries);
-  const prev = list.slice(0, list.findIndex((x) => x === e || (x.id && x.id === e.id))).filter((x) => x.kind === 'checkin').pop();
-  const startOf = (id) => prev?.balances?.[id] ?? (state.accounts || []).find((a) => a.id === id)?.start ?? 0;
+  const earlier = list.slice(0, list.findIndex((x) => x === e || (x.id && x.id === e.id))).filter((x) => x.kind === 'checkin');
+  const startOf = (id) => [...earlier].reverse().find((x) => id in (x.balances || {}))?.balances[id] ?? (state.accounts || []).find((a) => a.id === id)?.start ?? 0;
   const change = Object.fromEntries(ids.map((id) => [id, e.balances[id] - startOf(id)]));
+  if (e.source === 'setup') return { spent: 0, extra: 0, change }; // starting balances, not this week's spending
   return { spent: Math.max(0, -delta), extra: Math.max(0, delta), change };
 }
 export const checkins = (state) => byTime(state.entries).filter((e) => e.kind === 'checkin');
-export const lastCheckin = (state) => checkins(state).pop() || null;
+// The last weekly (Sunday) check-in. Payday, "Update balances" and the starting balances don't count.
+export const lastCheckin = (state) => checkins(state).filter((e) => !e.source).pop() || null;
 /** Was there a check-in in the Mon–Sun week containing `date`? */
 export const checkedInWeek = (state, date = appNow()) => {
   const [start, end] = periodRange('weekly', date);
-  return checkins(state).some((e) => e.date >= start && e.date <= end);
+  return checkins(state).some((e) => !e.source && e.date >= start && e.date <= end);
+};
+/** What you spent in the Mon–Sun week containing `date`: every check-in that week (Sunday, payday, updates) */
+export const weekSpent = (state, date = appNow()) => {
+  const [start, end] = periodRange('weekly', date);
+  return checkins(state).filter((e) => e.date >= start && e.date <= end).reduce((t, e) => t + checkinResult(state, e).spent, 0);
 };
 
 /** Graph: each account's balance over time, one point per check-in (plus its start and today). */
