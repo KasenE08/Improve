@@ -137,7 +137,7 @@ function graphPanel(s) {
   let o = 0;
   const color = (id) => LINE[id] || OTHER[o++ % OTHER.length];
   // One small graph per account, each on its own scale, so a drop always shows as a drop (below $0 too)
-  const W = 320, H = 92, L0 = 30, R0 = 30, T0 = 18, B0 = 18;
+  const W = 320, H = 112, L0 = 34, R0 = 34, T0 = 30, B0 = 30;
   const x = (p) => L0 + ((t(p) - t0) / (t1 - t0)) * (W - L0 - R0);
   const chart = (sr) => {
     const c = color(sr.id);
@@ -145,19 +145,34 @@ function graphPanel(s) {
     let lo = Math.min(...vs), hi = Math.max(...vs);
     if (hi - lo < 100) { const mid = (hi + lo) / 2; lo = mid - 50; hi = mid + 50; } // a steady balance draws a flat line in the middle
     const y = (v) => T0 + (1 - (v - lo) / (hi - lo)) * (H - T0 - B0);
-    // Labels sit above each dot; when the next dot is close, its label flips below so they don't overlap
-    let lastX = -1e9, lastSide = 1;
-    const labels = sr.points.map((p) => {
-      const px = x(p);
-      const side = px - lastX < 46 ? -lastSide : 1;
-      lastX = px; lastSide = side;
-      const anchor = px < L0 + 14 ? 'start' : px > W - R0 - 14 ? 'end' : 'middle';
-      return `<text x="${px.toFixed(1)}" y="${(y(p.v) + (side > 0 ? -8 : 15)).toFixed(1)}" text-anchor="${anchor}" fill="${c}" class="mon-graph__val">${esc(money(s, p.v))}</text>`;
-    }).join('');
+    // Value labels: each one tries spots around its dot (above, below, right, left, then further out) and takes the
+    // first that stays inside the graph without touching another label or dot. Newest first, so it always gets the best spot.
+    const pos = sr.points.map((p) => ({ px: x(p), py: y(p.v), txt: money(s, p.v) }));
+    const boxes = pos.map((q) => ({ x1: q.px - 4.5, x2: q.px + 4.5, y1: q.py - 4.5, y2: q.py + 4.5 })); // the dots
+    const hit = (r) => boxes.some((o) => r.x1 < o.x2 && r.x2 > o.x1 && r.y1 < o.y2 && r.y2 > o.y1);
+    const placed = [];
+    for (let i = pos.length - 1; i >= 0; i--) {
+      const q = pos[i];
+      const w = q.txt.length * 5.6 + 2;
+      const spots = [];
+      for (const dy of [0, -11, 11, -22, 22]) {
+        spots.push(['middle', q.px, q.py - 8 + Math.min(0, dy)], ['middle', q.px, q.py + 15 + Math.max(0, dy)]);
+        spots.push(['start', q.px + 7, q.py + 3.5 + dy], ['end', q.px - 7, q.py + 3.5 + dy]);
+      }
+      for (const [anchor, tx, ty] of spots) {
+        const x1 = anchor === 'start' ? tx : anchor === 'end' ? tx - w : tx - w / 2;
+        const r = { x1, x2: x1 + w, y1: ty - 8, y2: ty + 2 };
+        if (r.x1 < 0 || r.x2 > W || r.y1 < 0 || r.y2 > H || hit(r)) continue;
+        boxes.push(r);
+        placed.push(`<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="${anchor}" fill="${c}" class="mon-graph__val">${esc(q.txt)}</text>`);
+        break;
+      }
+    }
+    const labels = placed.join('');
     const zero = lo < 0 && hi > 0 ? `<line x1="0" x2="${W}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" class="mon-graph__zero"/>` : '';
     return `<div class="mon-graph__row"><span class="mon-graph__name"><i style="background:${c}"></i>${esc(sr.name)}</span>
       <svg class="mon-graph" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(sr.name)} at each check-in">
-        <line x1="0" x2="${W}" y1="${H - B0 + 4}" y2="${H - B0 + 4}" class="mon-graph__grid"/>${zero}
+        <line x1="0" x2="${W}" y1="${H - 1}" y2="${H - 1}" class="mon-graph__grid"/>${zero}
         <polyline fill="none" stroke="${c}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${sr.points.map((p) => `${x(p).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}"/>
         ${sr.points.map((p) => `<circle cx="${x(p).toFixed(1)}" cy="${y(p.v).toFixed(1)}" r="3.5" fill="${c}" class="mon-graph__dot"/>`).join('')}
         ${labels}</svg></div>`;
@@ -368,10 +383,12 @@ function openCheckin(e = null, source = e?.source || null) {
         const t = ev.target.closest('button');
         if (!t) return;
         if (t.id === 'ci-save') {
+          // A blank account hasn't changed: it isn't stored, so it follows its balance (and any fix to an earlier entry)
           const balances = {};
           for (const inp of b.querySelectorAll('[data-bal]')) {
             const raw = inp.value.trim();
-            const v = raw ? L.toCents(raw) : (exp[inp.dataset.bal] ?? 0);
+            if (!raw) continue;
+            const v = L.toCents(raw);
             if (Number.isNaN(v)) { b.querySelector('#ci-err').textContent = 'Type the balances as numbers.'; return; }
             balances[inp.dataset.bal] = v;
           }
@@ -413,6 +430,12 @@ function openGoal() {
   });
 }
 
+// All accounts right after a check-in (an account left blank keeps what it had)
+function checkinTotal(s, e) {
+  const before = L.balances(s, e);
+  return (s.accounts || []).reduce((t, a) => t + (a.id in (e.balances || {}) ? e.balances[a.id] : before[a.id] || 0), 0);
+}
+
 // History: everything logged this month, newest first, with the time it was logged
 function history(s) {
   const [start, end] = L.monthRange(ui.month);
@@ -431,7 +454,7 @@ function history(s) {
       const sav = r.change.savings;
       return `<button class="mon-row" data-m="edit" data-id="${e.id}">${icon('check', 'mon-row__icon mon-k-checkin')}
         <span class="mon-row__mid"><span class="mon-row__name">Check-in</span><span class="mon-row__sub">${esc([`Spent ${money(s, r.spent)}`, sav != null ? `Savings ${sav >= 0 ? '+' : '−'}${money(s, Math.abs(sav))}` : '', r.extra ? `Extra +${money(s, r.extra)}` : ''].filter(Boolean).join(' · '))}</span></span>
-        <span class="mon-row__amt">${money(s, Object.values(e.balances || {}).reduce((t, v) => t + v, 0))}</span></button>`;
+        <span class="mon-row__amt">${money(s, checkinTotal(s, e))}</span></button>`;
     }
     const ic = { income: 'bank', saving: 'piggy', transfer: 'bank', adjust: 'scroll', cashback: 'star' }[e.kind] || c?.icon || 'cash';
     const title = e.payday ? 'Payday' : e.kind === 'adjust' ? 'Balance fix' : e.kind === 'transfer' ? e.note || `${acctName(s, e.from)} → ${acctName(s, e.to)}` : e.note || (e.kind === 'expense' ? c?.name || 'Expense' : KIND[e.kind]);

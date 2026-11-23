@@ -290,7 +290,11 @@ export function balanceSeries(state, now = new Date().toISOString(), { withNow =
   const cur = balances(state);
   return accts.map((a) => {
     const pts = [{ at: a.since || now, v: a.start || 0 }];
-    for (const e of checkins(state)) if (a.id in (e.balances || {}) && (e.at || '') >= (a.since || '')) pts.push({ at: e.at, v: e.balances[a.id] });
+    // An account left blank in a check-in kept its balance: plot what it had then (so fixing an earlier entry carries through)
+    for (const e of checkins(state)) {
+      if ((e.at || '') < (a.since || '')) continue;
+      pts.push({ at: e.at, v: a.id in (e.balances || {}) ? e.balances[a.id] : balances(state, e)[a.id] });
+    }
     if (withNow) pts.push({ at: now, v: cur[a.id] });
     return { id: a.id, name: a.name, points: pts };
   });

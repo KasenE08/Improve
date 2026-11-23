@@ -33,7 +33,7 @@ export const DEFAULT_SETTINGS = {
 const PAYDAY = { pct: { checking: 40, savings: 40, investing: 20 }, cap: 20000, last: 22200 };
 
 const empty = () => ({
-  version: 3,
+  version: 4,
   settings: structuredClone(DEFAULT_SETTINGS),
   categories: structuredClone(DEFAULT_CATEGORIES),
   entries: [], // { id, kind: 'expense'|'income'|'saving', amount, cat?, note, date, at }
@@ -65,6 +65,22 @@ export function getState() {
       const bal = { checking: 7611, savings: 108933, [INV]: 2397 };
       s.entries = [...(s.entries || []), { id: 'greenlight-start', kind: 'checkin', source: 'setup', balances: bal, amount: 0, note: 'Greenlight balances', date: day, at }];
       s.settings = { ...s.settings, payday: { ...PAYDAY, investing: INV, base: { savings: bal.savings, investing: bal[INV], at } } };
+    }
+    store.set(KEY, s);
+  }
+  // Version 4: check-ins used to store a blank account as the balance Improve expected at the time. Later check-ins
+  // that copied a starting balance which was then corrected follow the corrected one instead.
+  if (s.version < 4) {
+    s = { ...s, version: 4 };
+    const setup = (s.entries || []).find((e) => e.id === 'greenlight-start');
+    const ORIG = { checking: 7611, savings: 108933, a_mvr7gm5k92fu4: 2397 };
+    if (setup) {
+      s.entries = s.entries.map((e) => {
+        if (e.kind !== 'checkin' || e === setup || (e.at || '') <= (setup.at || '') || e.source === 'payday') return e;
+        const bal = { ...e.balances };
+        for (const [id, v] of Object.entries(ORIG)) if (bal[id] === v && setup.balances?.[id] !== v) delete bal[id];
+        return { ...e, balances: bal };
+      });
     }
     store.set(KEY, s);
   }
