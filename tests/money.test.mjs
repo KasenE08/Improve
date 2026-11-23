@@ -214,6 +214,15 @@ console.log(fails ? `${fails} FAILED` : 'all passed');
   eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
   eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
 }
+// ---- A blank account in a check-in follows its balance (fixing an earlier entry carries through) ----
+{
+  const st = { settings: { currency: '$' }, accounts: [{ id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', balances: { savings: 108933, checking: 7611 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' },
+      { kind: 'checkin', balances: { checking: 4594 }, date: '2026-11-22', at: '2026-11-22T10:00:00Z' }] };
+  st.entries[0].balances.savings = 108833; // fixed later
+  eq(L.balanceSeries(st, undefined, { withNow: false })[0].points.map((p) => p.v), [0, 108833, 108833], 'graph: the blank Save follows the fixed amount');
+  eq(L.balances(st).savings, 108833, 'balance follows too');
+}
 process.exitCode = fails ? 1 : 0;
 
 // ---- Budget months are calendar months ----
@@ -259,6 +268,15 @@ eq(L.monthRange('2026-11'), ['2026-11-01', '2026-11-30'], 'budget month stays No
   eq(L.saveStatus(st, new Date(2026, 10, 20, 12)).hit, true, 'save habit ticks for the payday week');
   eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
   eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
+}
+// ---- A blank account in a check-in follows its balance (fixing an earlier entry carries through) ----
+{
+  const st = { settings: { currency: '$' }, accounts: [{ id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', balances: { savings: 108933, checking: 7611 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' },
+      { kind: 'checkin', balances: { checking: 4594 }, date: '2026-11-22', at: '2026-11-22T10:00:00Z' }] };
+  st.entries[0].balances.savings = 108833; // fixed later
+  eq(L.balanceSeries(st, undefined, { withNow: false })[0].points.map((p) => p.v), [0, 108833, 108833], 'graph: the blank Save follows the fixed amount');
+  eq(L.balances(st).savings, 108833, 'balance follows too');
 }
 process.exitCode = fails ? 1 : 0;
 
@@ -308,5 +326,14 @@ process.exitCode = fails ? 1 : 0;
   eq(L.saveStatus(st, new Date(2026, 10, 20, 12)).hit, true, 'save habit ticks for the payday week');
   eq(L.checkedInWeek(st, new Date(2026, 10, 20, 12)), false, 'starting balances are not the Sunday check-in');
   eq(L.checkinResult(st, st.entries[0]).spent, 0, 'starting balances are not spending');
+}
+// ---- A blank account in a check-in follows its balance (fixing an earlier entry carries through) ----
+{
+  const st = { settings: { currency: '$' }, accounts: [{ id: 'savings', name: 'Save', start: 0, since: '2026-11-01T00:00:00Z' }, { id: 'checking', name: 'Spend', start: 0, since: '2026-11-01T00:00:00Z' }],
+    entries: [{ kind: 'checkin', balances: { savings: 108933, checking: 7611 }, date: '2026-11-20', at: '2026-11-20T10:00:00Z' },
+      { kind: 'checkin', balances: { checking: 4594 }, date: '2026-11-22', at: '2026-11-22T10:00:00Z' }] };
+  st.entries[0].balances.savings = 108833; // fixed later
+  eq(L.balanceSeries(st, undefined, { withNow: false })[0].points.map((p) => p.v), [0, 108833, 108833], 'graph: the blank Save follows the fixed amount');
+  eq(L.balances(st).savings, 108833, 'balance follows too');
 }
 process.exitCode = fails ? 1 : 0;
