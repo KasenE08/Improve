@@ -30,7 +30,7 @@ export const HABIT_CONTENT = [
   { key: 'water', name: '100oz water', category: 'diet', xp: 30, auto: 'food:water', twoMin: '80oz', full: '100oz',
     cue: '40oz water bottle always on me', craving: 'Ice cold + sparkling options; Diet Coke counts',
     response: '40oz bottle, 2.5 refills (end of school / gym / after gym)', reward: 'Completion animation per bottle + bigger at 100oz' },
-  { key: 'protein', name: '130g protein', category: 'diet', xp: 40, auto: 'food:protein', twoMin: '115g', full: '130g',
+  { key: 'protein', name: '130g protein', category: 'diet', xp: 40, auto: 'food:protein', twoMin: '105g', full: '130g',
     cue: 'Hunger (built in)', craving: 'Meal-prepped food I actually enjoy + feeling healthy while eating',
     response: 'Lunch made in the morning (10 min); cook before work and before archery', reward: 'I feel good, not gross, after eating' },
   { key: 'calories', name: '~2200 calories', category: 'diet', xp: 60, auto: 'food:calories', twoMin: '1,980–2,700',

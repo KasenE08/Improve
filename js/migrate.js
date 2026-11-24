@@ -3,7 +3,7 @@
 //   - the reviewed list gets its content (cue / craving / response / reward / 2-min / full)
 //   - habits not on the new list are removed (archived: their history stays)
 //   - each habit keeps the streak it had, frozen as its starting point (streakBase); the new rules count from today
-//   - protein goal 130 g (Minimum 115 g), water Minimum 80 oz, calories Minimum 1,980–2,700, journal Minimum 25 words
+//   - protein goal 130 g (Minimum 105 g), water Minimum 80 oz, calories Minimum 1,980–2,700, journal Minimum 25 words
 // The old streak rules live here only to work out those starting counts.
 import * as store from './store.js';
 import * as H from './habits.js';
@@ -101,7 +101,7 @@ export function migrate22(now = new Date()) {
   // Goals for the Minimum / Full levels
   const food = store.get('food', null);
   if (food) {
-    food.settings = { ...food.settings, proteinGoal: 130, proteinMin: 115, waterMin: 80, calMax: 2700 };
+    food.settings = { ...food.settings, proteinGoal: 130, proteinMin: 105, waterMin: 80, calMax: 2700 };
     store.set('food', food);
   }
   const journal = store.get('journal', null);
