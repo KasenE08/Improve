@@ -165,7 +165,9 @@ export function hitWater(oz, goal) {
 export function calLevel(eaten, g) {
   if (!(eaten > 0)) return 0;
   if (hitCalories(eaten, g.calGoal, g.calRange)) return 2;
-  return eaten <= (g.calMax || 0) ? 1 : 0;
+  // 2-min: from the bottom of the Full range up to calMax (e.g. 1,980–2,700); under that isn't done
+  const lo = g.calGoal - (g.calGoal * g.calRange) / 100;
+  return eaten >= lo && eaten <= (g.calMax || 0) ? 1 : 0;
 }
 export const proteinLevel = (eaten, g) => (eaten >= g.proteinGoal ? 2 : g.proteinMin > 0 && eaten >= g.proteinMin ? 1 : 0);
 export const waterLevel = (oz, g) => (g.waterGoal > 0 && oz >= g.waterGoal ? 2 : g.waterMin > 0 && oz >= g.waterMin ? 1 : 0);

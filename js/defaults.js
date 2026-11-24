@@ -33,7 +33,7 @@ export const HABIT_CONTENT = [
   { key: 'protein', name: '130g protein', category: 'diet', xp: 40, auto: 'food:protein', twoMin: '115g', full: '130g',
     cue: 'Hunger (built in)', craving: 'Meal-prepped food I actually enjoy + feeling healthy while eating',
     response: 'Lunch made in the morning (10 min); cook before work and before archery', reward: 'I feel good, not gross, after eating' },
-  { key: 'calories', name: '~2200 calories', category: 'diet', xp: 60, auto: 'food:calories', twoMin: '≤ 2,700 (maintenance)',
+  { key: 'calories', name: '~2200 calories', category: 'diet', xp: 60, auto: 'food:calories', twoMin: '1,980–2,700',
     full: '1,980–2,420 (2,200 ±10%)', cue: 'Hunger (built in)', craving: 'Meal-prepped food I actually enjoy + feeling healthy while eating',
     response: 'Lunch made in the morning (10 min); cook before work and before archery', reward: 'I feel good, not gross, after eating' },
   { key: 'no-tv', name: 'No Night TV', category: 'mind', xp: 60, twoMin: null, full: 'Full only', cue: 'Already set',

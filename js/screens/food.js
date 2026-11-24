@@ -147,7 +147,7 @@ function hero(day) {
       ${xpbar(Math.min(100, Math.round((oz / g.waterGoal) * 100)), 'imp-xpbar--water')}
       <div class="food-water"><span class="food-unit"><input class="imp-input" id="water-oz" type="number" inputmode="decimal" min="1" aria-label="Ounces of water" value="${esc(g.lastWaterOz ?? '')}" placeholder="oz"><span>oz</span></span>
         <button class="imp-btn imp-btn--secondary food-water-plus" data-f="water-add" aria-label="Add water">${icon('plus')}</button></div></div>
-    <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)} · 2-min ≤ ${fmt(g.calMax || 0)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinGoal)} g · 2-min ${fmt(g.proteinMin)} g`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz · 2-min ${fmt(g.waterMin || 0)} oz`)}</div>
+    <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)} · 2-min ${fmt(lo)}–${fmt(g.calMax || 0)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinGoal)} g · 2-min ${fmt(g.proteinMin)} g`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz · 2-min ${fmt(g.waterMin || 0)} oz`)}</div>
   </div>`;
 }
 
@@ -238,12 +238,12 @@ function renderGoals() {
   const g = F.getGoals();
   return `${box('Daily goals', `<div class="food-stack">
       <div class="imp-field-row">${field('g-cal', 'Calorie goal', g.calGoal, 'cal', 'numeric', 'food-c')}${field('g-range', 'Full range ±', g.calRange, '%')}</div>
-      <div class="imp-field-row">${field('g-calmax', '2-min: at most', g.calMax || 0, 'cal', 'numeric', 'food-c')}</div>
+      <div class="imp-field-row">${field('g-calmax', '2-min: up to', g.calMax || 0, 'cal', 'numeric', 'food-c')}</div>
       <div class="imp-field-row">${field('g-pro', 'Protein (Full)', g.proteinGoal, 'g', 'numeric', 'food-p')}${field('g-min', 'Protein (2-min)', g.proteinMin, 'g')}</div>
       <div class="imp-field-row">${field('g-water', 'Water (Full)', g.waterGoal, 'oz', 'numeric', 'food-w')}${field('g-wmin', 'Water (2-min)', g.waterMin || 0, 'oz')}</div>
       <p class="food-err" id="g-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-f="save-goals">Save goals</button>
-      <p class="food-note">Your calories, protein and water habits tick themselves as you log: Full at the goal (calories within the range), 2-min at the smaller number (calories at or under the 2-min cap).</p></div>`)}
+      <p class="food-note">Your calories, protein and water habits tick themselves as you log: Full at the goal (calories within the range), 2-min at the smaller number (calories from the bottom of the range up to the 2-min number).</p></div>`)}
     ${box('Copy from Calorie Tracker', `<div class="food-stack">
       <p class="food-note">One-time copy of your old app's foods, meals and log. The old app is only read, never changed.</p>
       <p class="food-note">On iPhone: open Calorie Tracker → Settings → Export backup → Save to Files. Then pick that file here.</p>
