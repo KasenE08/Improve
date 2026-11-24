@@ -41,7 +41,7 @@ export const LIMIT_MAX_USES = 99;
 export const startOf = (habit) => [habit.startsOn, habit.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop() || null;
 export const notStarted = (habit, date = appNow()) => { const s = startOf(habit); return !!s && dayKey(date) < s; };
 
-export const SCHEMA = 23;
+export const SCHEMA = 24;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -239,6 +239,12 @@ export function init() {
   // Schema 23: calories 2-min is 1,980–2,700 (under 1,980 isn't done)
   if (found > 0 && found < 23) {
     store.set('habits', store.get('habits', []).map((h) => (h.auto === 'food:calories' && h.twoMin === '≤ 2,700 (maintenance)' ? { ...h, twoMin: '1,980–2,700' } : h)));
+  }
+  // Schema 24: protein 2-min is 105 g
+  if (found > 0 && found < 24) {
+    store.set('habits', store.get('habits', []).map((h) => (h.auto === 'food:protein' && h.twoMin === '115g' ? { ...h, twoMin: '105g' } : h)));
+    const food = store.get('food', null);
+    if (food?.settings?.proteinMin === 115) store.set('food', { ...food, settings: { ...food.settings, proteinMin: 105 } });
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;

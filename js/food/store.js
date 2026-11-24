@@ -11,7 +11,7 @@ const KEY = 'food';
 //   calMax     calories Minimum: at most this many (Full = within ±calRange % of calGoal)
 //   waterMin   water Minimum (oz); waterGoal = Full
 //   waterGoal  "Hit water" = at least this many oz
-export const DEFAULT_GOALS = { calGoal: 2200, proteinGoal: 130, proteinMin: 115, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 };
+export const DEFAULT_GOALS = { calGoal: 2200, proteinGoal: 130, proteinMin: 105, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 };
 
 const empty = () => ({
   version: 1,

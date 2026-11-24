@@ -65,9 +65,9 @@ eq(Object.values(all).filter((h) => !h.archived).every((h) => h.frequency === 'd
 eq([all.sleep.name, all.sleep.rule, all.sleep.twoMin, all.sleep.full], ['Sleep', '6 hours minimum · 8 recommended', '6 hours', '8 hours'], 'Sleep gets its name, subtitle, 2-min and Full');
 eq([all['no-fap'].name, all['no-fap'].twoMin, 'grace' in all['no-fap'], 'streakFrom' in all['no-fap']], ['No Night TV', null, false, false], 'No Night TV: Full only; grace day and old resets gone');
 eq([all.lift.kind, all.lift.target, all.h_mvn3jd67szxn.kind, all.h_mvn3jd67szxn.target, all['log-spending'].days], ['lift', 5, 'fastfood', 2, 'sun'], 'Lift 5 a week, fast food 2 passes, check-in on Sundays');
-eq([all.h_mwe9ptqnyvog.name, all.h_mwe9ptqnyvog.rule, all.h_mwe9ptqnyvog.twoMin], ['130g protein', null, '115g'], 'protein → 130 g (2-min 115 g)');
+eq([all.h_mwe9ptqnyvog.name, all.h_mwe9ptqnyvog.rule, all.h_mwe9ptqnyvog.twoMin], ['130g protein', null, '105g'], 'protein → 130 g (2-min 105 g)');
 eq([all.h_mw25rarzdrv8.category, all.sleep.category], ['work', 'body'], 'categories kept');
-eq([JSON.parse(mem.imp_food).settings.proteinGoal, JSON.parse(mem.imp_food).settings.proteinMin, JSON.parse(mem.imp_food).settings.waterMin, JSON.parse(mem.imp_food).settings.calMax, JSON.parse(mem.imp_journal).settings.shortWords], [130, 115, 80, 2700, 25], 'goals: protein 130/115, water 2-min 80, calories 2-min ≤ 2700, journal 2-min 25');
+eq([JSON.parse(mem.imp_food).settings.proteinGoal, JSON.parse(mem.imp_food).settings.proteinMin, JSON.parse(mem.imp_food).settings.waterMin, JSON.parse(mem.imp_food).settings.calMax, JSON.parse(mem.imp_journal).settings.shortWords], [130, 105, 80, 2700, 25], 'goals: protein 130/105, water 2-min 80, calories 2-min ≤ 2700, journal 2-min 25');
 const st = (id, d = now) => R.streak(H.getAllHabits().find((h) => h.id === id), d).count;
 eq([st('sleep'), st('no-fap'), st('h_mwei4zi6qxno'), st('lift'), st('h_mvn3jd67szxn'), st('log-spending')], [15, 15, 15, 2, 2, 2], 'every streak kept as it was (sleep counts today again under the new rules)');
 eq(st('no-fap', at(10, 26)), 0, 'new rules from today: missing days breaks it');
