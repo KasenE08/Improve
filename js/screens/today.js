@@ -97,7 +97,7 @@ function habitRow(h, st, manual, rc) {
     ${badge(h, st)}</div>${card(h)}</div>`;
 }
 
-// Fast food: looks like Lift. The box logs a meal (it shows today's count); the line under it is the week's passes.
+// Fast food: looks like Lift. The box logs a meal (it shows today's count in blue); the line under it is the week's passes.
 function fastFoodRow(h, st, rc) {
   const now = appNow();
   const used = R.passesUsed(h, now, rc.log);
