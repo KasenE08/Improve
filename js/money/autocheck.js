@@ -1,27 +1,26 @@
-// Ticks the Money habits on the Today tab:
-//   money:save   (weekly)  saved what this week's paycheck calls for; a week with no payday is a week off
-//                           (no tick, no XP, streak not broken)
-//   money:review (monthly) this month's budget review is finished (retired)
-//   money:checkin (weekly) the weekly money check-in is done
-import { appNow } from '../dates.js';
+// Ticks the Money habits on the Today tab (both daily habits that only show on some days):
+//   money:checkin  Sundays: the weekly check-in is done (any day that week)
+//   money:save     paydays: that week's payday is marked done on the Payday page (saved what it calls for)
+import { appNow, periodRange } from '../dates.js';
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as M from './store.js';
-import { saveStatus, reviewDone, checkedInWeek } from './logic.js';
+import { saveStatus, checkedInWeek, paydaysBetween } from './logic.js';
 
 // Re-checks the week / month containing `date` (today, or the date of a back-dated entry).
 // Returns bonuses newly earned (for celebrations).
 export function recheckMoney(date = appNow(), now = new Date()) {
   const state = M.getState();
-  const save = saveStatus(state, date);
+  const [ws, we] = periodRange('weekly', date);
   let changed = false;
   for (const h of H.getHabits()) {
-    if (h.auto === 'money:save' && save.judge) {
-      changed = H.setExcused(h, save.start, !!save.offWeek) || changed;
-      changed = H.setPeriodDone(h, date, save.hit && !save.offWeek, now) || changed;
+    if (h.auto === 'money:checkin') {
+      changed = H.setDone(h, we, checkedInWeek(state, date), now) || changed; // the week's Sunday
     }
-    if (h.auto === 'money:checkin') changed = H.setPeriodDone(h, date, checkedInWeek(state, date), now) || changed;
-    if (h.auto === 'money:review') changed = H.setPeriodDone(h, date, reviewDone(state, date), now) || changed;
+    if (h.auto === 'money:save' && state.settings.setup) {
+      const save = saveStatus(state, date);
+      for (const k of paydaysBetween(state.settings.pay, ws, we)) changed = H.setDone(h, k, !!save.hit, now) || changed;
+    }
   }
   return changed ? R.sync(date) : [];
 }

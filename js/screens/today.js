@@ -1,152 +1,119 @@
-// Today tab: Daily / This Week / This Month checklists, grouped by category.
+// Habits tab: one daily list, grouped by category. A habit shows only on the days it's scheduled
+// (Sunday check-in on Sundays, Save % on paydays, Lift until 5 sessions this week).
+// Tap the box: done (habits with a 2-minute version: pick 2-min or Full). Tap the row: its cue / craving /
+// response / reward card. Hold: edit.
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
-import { daysLeft, appNow, nextStart, dayKey, fromDayKey } from '../dates.js';
+import { appNow, dayKey, fromDayKey } from '../dates.js';
 import { recheck } from '../food/autocheck.js';
 import { AUTO, isAuto, autoTab } from '../auto.js';
 import { recheckMoney } from '../money/autocheck.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import { appDateFor } from '../food/logic.js';
 const recheckFood = () => { recheck(appDateFor(new Date())); recheckMoney(); recheckJournal(); };
-import { esc, icon, panel, check, pips, streakBadge, streakBurst, perfectBurst, toast, burst, sheet, confirmBox, PICKER_ICONS } from '../ui.js';
+import { esc, icon, checkLevel, streakBadge, streakBurst, perfectBurst, toast, sheet, confirmBox, pickLevel, tickReward, PICKER_ICONS } from '../ui.js';
 
-const SECTION = { daily: 'Daily', weekly: 'This Week', monthly: 'This Month' };
-const PERIOD_WORD = { daily: 'today', weekly: 'this week', monthly: 'this month' };
-const PERIOD_END = { daily: 'day end', weekly: 'week end', monthly: 'month end' };
-const OFF_LABEL = { daily: 'Day', weekly: 'Week', monthly: 'Month' };
 // Auto habits show the icon of the tab they tick from
 const AUTO_ICON = { food: 'food', money: 'wallet', journal: 'quill' };
-const OFF_WHY = { 'money:save': 'no payday' };
-// Shown under an auto habit so its rule isn't forgotten
-const AUTO_NOTE = {}; // a short rule under an auto habit, by its auto id (none right now)
-const FREQ_LABEL = { daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
-const startLabel = (h) => fromDayKey(H.startOf(h)).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-const AUTO_TAB = { food: 'Food', money: 'Money' };
-
-const editMode = false; // editing is a long-press now (kept so older row code reads the same)
-let view = 'daily'; // which list is showing: daily | weekly | monthly
+const CARD = [['cue', 'Cue'], ['craving', 'Craving'], ['response', 'Response'], ['reward', 'Reward'], ['twoMin', '2-min'], ['full', 'Full']];
+const open = new Set(); // rows showing their card
 let ctx; // { root, refresh }
 
 export function render(root, refresh) {
   ctx = { root, refresh };
+  const now = appNow();
+  const today = dayKey(now);
   const habits = H.getHabits();
   const cats = H.getCategories();
-  const log = H.getLog();
-  const now = appNow();
-  const prog = new Map(habits.map((h) => [h.id, H.progress(h, now, log)]));
-  const counts = H.countsIndex(log);
-  const streaks = new Map(habits.map((h) => [h.id, R.streak(h, now, counts)]));
-  const ex = H.getExcused();
-  const isOff = (h) => H.offIn(h, now, ex);
+  const rc = R.makeCtx();
   const ov = H.getOverrides();
-  const row = (h) => habitRow(h, prog.get(h.id), streaks.get(h.id), isOff(h), isAuto(h) && H.isOverridden(h, now, ov));
-
-  // One list at a time: Daily / Weekly / Monthly
-  const statsFor = (freq) => {
-    const counted = habits.filter((h) => h.frequency === freq && !isOff(h) && !H.notStarted(h, now)); // off or not started yet: not counted
-    return { done: counted.filter((h) => H.isDone(h, prog.get(h.id))).length, total: counted.length };
-  };
-  const seg = `<div class="imp-seg hab-seg" role="tablist">${H.FREQS.map((f) => {
-    const st = statsFor(f);
-    return `<button role="tab" aria-selected="${f === view}" data-view="${f}" class="${f === view ? 'is-on' : ''}">${FREQ_LABEL[f]}<small>${st.done}/${st.total}</small></button>`;
-  }).join('')}</div>`;
-  const freq = view;
-  const list = habits.filter((h) => h.frequency === freq);
-  const resetDay = nextStart(freq).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const waiting = list.length && list.every((h) => H.notStarted(h, now)) ? list[0] : null;
-  const info = freq === 'daily' ? '' : waiting ? `${FREQ_LABEL[freq]} habits start ${startLabel(waiting)}` : `${daysLeft(freq)} ${daysLeft(freq) === 1 ? 'day' : 'days'} left · resets ${resetDay}`;
+  const shown = habits.filter((h) => (H.isFastFood(h) ? !H.isExcused(h.id, today, rc.ex) : R.isScheduled(h, today, rc)));
+  const row = (h) => habitRow(h, R.streak(h, now, null, rc), isAuto(h) && H.isOverridden(h, now, ov), rc);
+  const done = shown.filter((h) => (H.isFastFood(h) ? H.usesOn(h, today, rc.log) === 0 : H.levelOn(h, today, rc.log) > 0)).length;
   const groups = cats.map((c) => {
-    const items = list.filter((h) => h.category === c.id);
+    const items = shown.filter((h) => h.category === c.id);
     if (!items.length) return '';
     return `<div class="imp-panel__sub">${icon(c.icon)}${esc(c.name)}</div>` + items.map(row).join('');
   }).join('');
-  // Habits whose category was removed
-  const orphans = list.filter((h) => !cats.some((c) => c.id === h.category));
+  const orphans = shown.filter((h) => !cats.some((c) => c.id === h.category));
   const orphanHtml = orphans.length ? `<div class="imp-panel__sub">${icon('scroll')}Other</div>` + orphans.map(row).join('') : '';
-  const sections = list.length
+  const hidden = habits.length - shown.length;
+  const sections = shown.length
     ? `<section class="imp-panel hab-list"><div class="imp-panel__body">${groups + orphanHtml}</div></section>`
-    : `<p class="hab-empty">No ${FREQ_LABEL[freq].toLowerCase()} habits. Tap + to add one.</p>`;
-  const foot = `<div class="hab-foot"><span>Hold a habit to edit it</span><button class="hab-cats" data-act="cats">Edit categories</button></div>`;
-
-  root.innerHTML = `<div class="screen hab">${seg}${info ? `<p class="hab-info">${info}</p>` : ''}${sections}${foot}</div>`;
+    : '<p class="hab-empty">Nothing scheduled today. Tap + to add a habit.</p>';
+  const head = `<div class="hab-head"><span><b>${done}</b>/${shown.length} today</span>${hidden ? `<span>${hidden} not on today</span>` : ''}</div>`;
+  const foot = `<div class="hab-foot"><span>Tap a habit for its card · hold to edit</span><button class="hab-cats" data-act="cats">Edit categories</button></div>`;
+  root.innerHTML = `<div class="screen hab">${head}${sections}${foot}</div>`;
 }
 
-function emptyList() {
-  return panel({ title: 'No habits', body: `<p class="imp-muted" style="padding:8px 0">Tap Edit → New habit to add one.</p>` });
-}
-
-// Streak badge on the right of a row (from 2 in a row), and the row's gold/silver look at the top flame level
+// Streak badge on the right (from 2 in a row) and the row's gold / silver look at the top flame level
 const hasStreak = (st) => st && st.count >= 2;
-const lvOf = (h, st) => R.tier(st.count, h.frequency);
-function badge(h, st, risk = st?.atRisk) {
+const lvOf = (st) => Math.max(1, R.tier(st.count, 'daily'));
+function badge(h, st) {
   if (!hasStreak(st)) return '';
-  return streakBadge({ count: st.count, atRisk: risk, lv: lvOf(h, st), unit: R.UNIT[h.frequency][1], warn: H.isLimit(h) ? 'stay under today' : 'do it today' });
+  const warn = H.isFastFood(h) ? 'no passes left' : 'go Full today';
+  return streakBadge({ count: st.count, atRisk: st.atRisk, lv: lvOf(st), unit: R.unitOf(h)[1], warn });
 }
-function rowLook(h, st, risk = st?.atRisk) {
+function rowLook(st) {
   if (!hasStreak(st)) return '';
-  return (lvOf(h, st) >= 4 ? (risk ? ' is-silver' : ' is-gold') : '') + (risk ? ' is-risk' : '');
-}
-const missedNote = (h, st) => (hasStreak(st) && st.atRisk ? `<b class="imp-missed">${H.isLimit(h) ? 'over yesterday' : 'missed yesterday'}</b>` : '');
-
-function habitRow(h, n, st, dayOff, manual) {
-  if (dayOff && !n) {
-    const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-    return `<button class="imp-row is-waiting${rowLook(h, st, false)}" data-id="${esc(h.id)}">
-    ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">${OFF_LABEL[h.frequency]} off · ${OFF_WHY[h.auto] || 'nothing to do'}</span></span>
-    ${badge(h, st, false)}${end}
-  </button>`;
-  }
-  if (H.isLimit(h) && !H.notStarted(h)) return limitRow(h, n, st);
-  const multi = h.target > 1;
-  const done = n >= h.target;
-  if (H.notStarted(h)) {
-    const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-    return `<button class="imp-row is-waiting" data-id="${esc(h.id)}" aria-disabled="true">
-    ${check(false, '')}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}<span class="imp-row__sub">Starts ${startLabel(h)}</span></span>
-    ${end}
-  </button>`;
-  }
-  const fire = [manual ? `<span class="today-auto">${icon('edit')}Manual</span>`
-    : isAuto(h) ? `<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto${h.autoAfter != null ? ` · ${fmtClock(h.autoAfter)}+` : ''}</span>` : '', missedNote(h, st)].filter(Boolean).join(' · ');
-  const note = isAuto(h) && !manual && AUTO_NOTE[h.auto] ? `<span class="imp-row__note">${AUTO_NOTE[h.auto]}</span>` : '';
-  const sub = (multi
-    ? `<span class="imp-row__sub">${n}/${h.target} ${PERIOD_WORD[h.frequency]}${fire ? ' · ' + fire : ''}</span>${pips(Math.min(n, h.target), h.target)}`
-    : fire ? `<span class="imp-row__sub">${fire}</span>` : '') + note;
-  const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-  return `<button class="imp-row${done ? ' is-done' : ''}${rowLook(h, st)}" data-id="${esc(h.id)}" aria-pressed="${done}">
-    ${check(done)}
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}${sub}</span>
-    ${badge(h, st)}${end}
-  </button>`;
+  return (lvOf(st) >= 4 ? (st.atRisk ? ' is-silver' : ' is-gold') : '') + (st.atRisk ? ' is-risk' : '');
 }
 
-// Limit habit ("at most N"): tap counts a use. At or under the limit = done.
-function limitRow(h, n, st) {
-  const over = n > h.target;
-  const left = h.target - n;
-  const state = over ? `Over by ${n - h.target}` : left === 0 ? 'At the limit' : `On track · ${left} left`;
-  const fire = missedNote(h, st) ? ' · ' + missedNote(h, st) : '';
-  const end = editMode ? `<span class="imp-row__end">${icon('edit')}</span>` : '';
-  return `<button class="imp-row is-limit${over ? ' is-over' : ''}${rowLook(h, st)}" data-id="${esc(h.id)}" aria-label="${esc(h.name)}: ${n} of at most ${h.target}">
-    <span class="imp-check imp-limit-box${over ? ' is-over' : ''}"></span>
-    <span class="imp-row__main"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}
-      <span class="imp-row__sub">${n}/${h.target} max ${PERIOD_WORD[h.frequency]} · ${state}${fire}</span>
-      ${limitDots(n, h.target)}</span>
-    ${badge(h, st)}${end}
-  </button>`;
+function card(h) {
+  const rows = CARD.map(([k, label]) => {
+    const v = k === 'twoMin' ? (H.hasMin(h) ? h.twoMin : 'None · Full only') : h[k];
+    return v ? `<div class="hab-card__row"><dt>${label}</dt><dd>${esc(v)}</dd></div>` : '';
+  }).join('');
+  return `<dl class="hab-card"${open.has(h.id) ? '' : ' hidden'}>${rows || '<div class="hab-card__row"><dd>Hold to add a cue, craving, response and reward.</dd></div>'}</dl>`;
 }
 
-// Uses so far against the max: filled dots, red ones past the max
-function limitDots(n, max) {
-  const total = Math.min(12, Math.max(n, max));
-  if (!total) return '';
-  return `<span class="imp-pips">${Array.from({ length: total }, (_, i) => `<span class="imp-pip${i < n ? (i >= max ? ' is-over' : ' is-on') : ''}"></span>`).join('')}</span>`;
+// Lift: sessions this week as 5 dots (half dot = a 2-min session)
+function liftDots(h, now, rc) {
+  const s = R.liftDone(h, now, rc.log);
+  const ws = new Date(now); ws.setDate(ws.getDate() - ((ws.getDay() + 6) % 7));
+  const lv = [];
+  for (let i = 0; i < 7; i++) { const d = new Date(ws); d.setDate(ws.getDate() + i); const l = H.levelOn(h, dayKey(d), rc.log); if (l) lv.push(l); }
+  const t = h.target || 5;
+  const dots = Array.from({ length: Math.max(t, lv.length) }, (_, i) => `<span class="imp-pip${lv[i] === 2 ? ' is-on' : lv[i] === 1 ? ' is-half' : ''}"></span>`).join('');
+  return `<span class="hab-sub-line"><b>${s}/${t}</b> this week <span class="imp-pips">${dots}</span></span>`;
 }
 
-// ---- Interaction: tap = +1 / toggle (tap a finished one to undo one), hold = edit ----
+function habitRow(h, st, manual, rc) {
+  const now = appNow();
+  if (H.isFastFood(h)) return fastFoodRow(h, st, rc);
+  const level = st.level;
+  const auto = isAuto(h);
+  const bits = [];
+  if (manual) bits.push(`<span class="today-auto">${icon('edit')}Manual</span>`);
+  else if (auto) bits.push(`<span class="today-auto">${icon(AUTO_ICON[h.auto.split(':')[0]] || 'info')}Auto</span>`);
+  if (level === 1) bits.push('<span class="hab-tag">2-min</span>');
+  if (hasStreak(st) && st.atRisk) bits.push('<b class="imp-missed">2-min last time</b>');
+  const sub = H.isLift(h) ? liftDots(h, now, rc) + (bits.length ? `<span class="imp-row__sub">${bits.join(' · ')}</span>` : '')
+    : bits.length ? `<span class="imp-row__sub">${bits.join(' · ')}</span>` : '';
+  return `<div class="hab-item" data-item="${esc(h.id)}"><div class="imp-row hab-row${level === 2 ? ' is-done' : level === 1 ? ' is-min' : ''}${rowLook(st)}" data-id="${esc(h.id)}">
+    <button class="hab-box" data-act="check" aria-label="${esc(h.name)}: ${level === 2 ? 'done Full' : level === 1 ? 'done 2-min' : 'not done'}">${checkLevel(level)}</button>
+    <span class="imp-row__main" data-act="card"><span class="imp-row__title">${esc(h.name)}</span>${h.rule ? `<span class="imp-row__rule">${esc(h.rule)}</span>` : ''}${sub}</span>
+    ${badge(h, st)}</div>${card(h)}</div>`;
+}
+
+// Fast food: the box logs a meal; the row shows the week's passes
+function fastFoodRow(h, st, rc) {
+  const now = appNow();
+  const used = R.passesUsed(h, now, rc.log);
+  const max = h.target;
+  const today = H.usesOn(h, dayKey(now), rc.log);
+  const over = used > max;
+  const pips = Array.from({ length: Math.max(max, used) }, (_, i) => `<span class="imp-pip${i < used ? (i >= max ? ' is-over' : ' is-on') : ''}"></span>`).join('');
+  return `<div class="hab-item" data-item="${esc(h.id)}"><div class="imp-row hab-row is-ff${over ? ' is-over' : today ? '' : ' is-clean'}${rowLook(st)}" data-id="${esc(h.id)}">
+    <button class="hab-box hab-ff" data-act="meal" aria-label="Log a fast food meal">${today ? `<span class="hab-ff__n">${today}</span>` : icon('plus')}</button>
+    <span class="imp-row__main" data-act="card"><span class="imp-row__title">${esc(h.name)}</span>
+      <span class="hab-sub-line">Passes used <b>${Math.min(used, 99)}/${max}</b> this week <span class="imp-pips">${pips}</span></span>
+      <span class="imp-row__sub">${over ? '<b class="imp-missed">Over: streak reset</b>' : today ? `${today} today · streak holds` : 'None today'}</span></span>
+    ${badge(h, st)}</div>${card(h)}</div>`;
+}
+
+// ---- Interaction: tap the box = done (2-min / Full), tap the row = card, hold = edit ----
 const HOLD_MS = 450;
 let holdTimer = null, held = false, startXY = null;
 
@@ -155,7 +122,7 @@ export function bind(root) {
   root.addEventListener('pointerdown', (e) => {
     if (!mine()) return;
     const r = e.target.closest('.imp-row[data-id]');
-    if (!r) return;
+    if (!r || e.target.closest('.hab-pick')) return;
     held = false;
     startXY = [e.clientX, e.clientY];
     clearTimeout(holdTimer);
@@ -175,87 +142,96 @@ export function bind(root) {
 
   root.addEventListener('click', (e) => {
     if (!mine()) return;
-    const v = e.target.closest('[data-view]')?.dataset.view;
-    if (v) { view = v; return ctx.refresh(); }
-    const act = e.target.closest('[data-act]')?.dataset.act;
-    if (act === 'cats') return openCategories();
-
+    if (e.target.closest('[data-act="cats"]')) return openCategories();
     const r = e.target.closest('.imp-row[data-id]');
-    if (!r) return;
+    if (!r || e.target.closest('.hab-pick')) return;
     if (held) { held = false; return; } // the long-press opened the editor
-    apply(r.dataset.id, +1);
+    const h = H.getHabits().find((x) => x.id === r.dataset.id);
+    if (!h) return;
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'meal') return logMeal(h);
+    if (act === 'check') return tapBox(h, r);
+    toggleCard(h.id, r); // anywhere else on the row
   });
 }
 
-function apply(id, delta) {
-  const h = H.getHabits().find((x) => x.id === id);
-  if (!h) return;
-  if (H.notStarted(h)) return toast(`Starts ${startLabel(h)}`);
-  if (H.isLimit(h)) return applyLimit(h, delta);
-  if (isAuto(h)) return applyOverride(h);
+function toggleCard(id, r) {
+  const c = r.parentElement.querySelector('.hab-card');
+  if (open.has(id)) open.delete(id); else open.add(id);
+  if (c) c.hidden = !open.has(id);
+  r.classList.toggle('is-open', open.has(id));
+}
+
+// Box tap: habits with a 2-minute version (and auto habits) ask 2-min or Full; the rest toggle Full / undo
+async function tapBox(h, r) {
+  const today = dayKey(appNow());
+  const level = H.levelOn(h, today);
+  const auto = isAuto(h);
+  if (!H.hasMin(h) && !auto) return setLevel(h, level ? 0 : H.FULL, r);
+  const v = await pickLevel(r, { level, hasMin: H.hasMin(h), auto, overridden: auto && H.isOverridden(h) });
+  if (!v) return;
+  if (v === 'auto') return handBack(h);
+  setLevel(h, v === 'undo' ? 0 : v === 'min' ? H.MIN : H.FULL, r);
+}
+
+function setLevel(h, level, r) {
   const before = Stats.compute();
-  const n0 = H.progress(h);
-  if (delta > 0 && n0 >= h.target) H.step(h, -1); // tap on a finished habit undoes one
-  else H.step(h, delta);
-  if (H.progress(h) === n0) {
-    if (delta > 0) toast('Nothing to change');
-    return;
-  }
+  const today = dayKey(appNow());
+  const from = H.levelOn(h, today);
+  if (from === level) return;
+  if (isAuto(h)) {
+    if (level) H.setOverride(h, true, appNow(), level); // ticked by hand: the auto-check leaves it alone today
+    else { H.setOverride(h, false); recheckFood(); }
+  } else H.setLevel(h, today, level);
   const added = R.sync();
+  const box = r?.querySelector('.hab-box');
   ctx.refresh();
+  if (level > from) {
+    const fresh = ctx.root.querySelector(`.imp-row[data-id="${CSS.escape(h.id)}"] .hab-box`) || box;
+    tickReward(fresh, level);
+  }
   celebrate(before, Stats.compute(), added);
 }
 
-// Auto habits: tap to tick it yourself for this period (override), tap again to hand it back to auto
-let overrideOpen = false;
-async function applyOverride(h) {
-  if (overrideOpen) return;
-  overrideOpen = true;
-  const on = H.isOverridden(h);
-  const word = PERIOD_WORD[h.frequency];
-  const ok = await confirmBox(on
-    ? { title: 'Back to auto?', text: `Removes your manual tick. The ${autoTab(h)} tab decides ${word} again.`, ok: 'Back to auto', icon: 'info' }
-    : { title: 'Tick it yourself?', text: `Auto from the ${autoTab(h)} tab. Counts as done ${word}, and the auto check won't undo it.`, ok: 'Tick it', icon: 'check' });
-  overrideOpen = false;
+async function handBack(h) {
+  const ok = await confirmBox({ title: 'Back to auto?', text: `Removes your manual tick. The ${autoTab(h)} tab decides today again.`, ok: 'Back to auto', icon: 'info' });
   if (!ok) return;
   const before = Stats.compute();
-  H.setOverride(h, !on);
-  if (on) recheckFood(); // let auto put it back if it's earned
+  H.setOverride(h, false);
+  recheckFood();
   const added = R.sync();
   ctx.refresh();
   celebrate(before, Stats.compute(), added);
 }
 
-function applyLimit(h, delta) {
+// Fast food: one more meal (a pass). Going past the week's passes resets the streak, so it asks first.
+async function logMeal(h) {
+  const used = R.passesUsed(h);
+  if (used >= h.target) {
+    const ok = await confirmBox({ title: `Pass ${used + 1}?`, text: `You've used ${used}/${h.target} this week. Going over resets the streak to 0.`, ok: 'Log it', icon: 'info' });
+    if (!ok) return;
+  }
   const before = Stats.compute();
-  const n0 = H.progress(h);
-  H.step(h, delta);
-  const n1 = H.progress(h);
-  if (n0 === n1) return;
+  H.step(h, +1);
   const added = R.sync();
   ctx.refresh();
-  if (n1 > h.target && n0 <= h.target) toast(`Over the limit ${PERIOD_WORD[h.frequency]}`);
-  else if (n1 <= h.target && n0 > h.target) toast('Back on track');
-  else toast(`${n1}/${h.target} ${PERIOD_WORD[h.frequency]}`);
+  const u = R.passesUsed(h);
+  toast(u > h.target ? 'Over the passes: streak reset' : `Pass ${u}/${h.target} used`);
   celebrate(before, Stats.compute(), added);
 }
 
-// Big moments: Perfect Day, streak milestones, a limit kept. (XP and levels are hidden; the history keeps them.)
+// Big moments: Perfect Day / Week / Month and streak milestones. (XP and levels are hidden; the history keeps them.)
 export function celebrate(_before, _after, added) {
   // Perfect Day / Week / Month: only the biggest one earned shows
   const pm = added.find((b) => b.type === 'perfectMonth'), pw = added.find((b) => b.type === 'perfectWeek'), pd = added.find((b) => b.type === 'perfect');
   const rng = (b) => `${fromDayKey(b.from).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}–${fromDayKey(b.to).getDate()}`;
   if (pm) { const d = fromDayKey(pm.to); perfectBurst('month', { count: d.getDate(), sub: `All ${d.getDate()} days of ${d.toLocaleDateString('en-US', { month: 'long' })}` }); }
   else if (pw) perfectBurst('week', { sub: `7 Perfect Days · ${rng(pw)}` });
-  else if (pd) perfectBurst('day', { sub: 'Every daily habit done today' });
+  else if (pd) perfectBurst('day', { sub: 'Every habit done Full today' });
   for (const b of added) {
-    if (b.type === 'limit') {
-      if (b.unit === 'day') toast(`${b.name}: stayed at ${b.n}/${b.max}`);
-      else burst({ icon: 'shield', title: 'Held the line', big: `${b.n}/${b.max}`, sub: `${b.name} last ${b.unit}` });
-    }
     if (b.type === 'streak') {
-      const freq = { days: 'daily', weeks: 'weekly', months: 'monthly' }[b.unit] || 'daily';
-      streakBurst({ n: b.n, unit: b.unit, lv: Math.max(1, R.tier(b.n, freq)), name: b.name, newFlame: R.isNewTier(b.n, freq) });
+      const unit = b.unit === 'sessions' ? 'sessions' : 'days';
+      streakBurst({ n: b.n, unit, lv: Math.max(1, R.tier(b.n, 'daily')), name: b.name, newFlame: R.isNewTier(b.n, 'daily') });
     }
   }
 }
@@ -264,39 +240,33 @@ export function celebrate(_before, _after, added) {
 export function openHabitForm(h) {
   const isNew = !h;
   const cats = H.getCategories();
-  const cur = h || { name: '', category: cats[0]?.id, frequency: 'daily', target: 1, xp: 10 };
-  const limit0 = H.isLimit(cur);
-  const autoNote = cur.auto && !AUTO[cur.auto] ? `<p class="imp-label">Will auto-check from the ${AUTO_TAB[cur.auto.split(':')[0]] || 'other'} tab in a later phase. Manual for now.</p>` : '';
+  const cur = h || { name: '', category: cats[0]?.id, frequency: 'daily', target: 1, xp: 10, kind: 'goal', days: 'daily' };
+  const special = H.isLift(cur) ? 'Sessions per week' : H.isFastFood(cur) ? 'Passes per week' : null;
   const autoField = `<label class="imp-field"><span class="imp-label">Auto-check</span><select class="imp-select" id="f-auto">
         <option value="">Off (tap to check)</option>
-        ${Object.entries(AUTO).map(([k, v]) => `<option value="${k}"${cur.auto === k ? ' selected' : ''}>${v}</option>`).join('')}
-        ${cur.auto && !AUTO[cur.auto] ? `<option value="${esc(cur.auto)}" selected>Later phase (${esc(cur.auto)})</option>` : ''}</select></label>
+        ${Object.entries(AUTO).filter(([k]) => k !== 'money:review').map(([k, v]) => `<option value="${k}"${cur.auto === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>
       <label class="imp-field" id="f-after-wrap"${cur.auto ? '' : ' hidden'}><span class="imp-label">Only tick after (optional)</span>
         <input class="imp-input" id="f-after" type="time" value="${cur.autoAfter == null ? '' : minToTime(cur.autoAfter)}"></label>`;
-  // Multi-step habits and limits: undo one from here (a tap on a finished one also undoes one)
-  const nNow = h ? H.progress(h) : 0;
-  const undoRow = h && nNow > 0 && (h.target > 1 || H.isLimit(h))
-    ? `<div class="hab-undo"><span>${H.isLimit(h) ? `${nNow} ${nNow === 1 ? 'time' : 'times'}` : `${nNow}/${h.target}`} ${PERIOD_WORD[h.frequency]}</span><button type="button" class="imp-btn imp-btn--secondary imp-btn--sm" id="f-undo">Undo one</button></div>`
-    : '';
+  const ffUndo = h && H.isFastFood(h) && R.passesUsed(h) > 0
+    ? `<div class="hab-undo"><span>${R.passesUsed(h)} this week</span><button type="button" class="imp-btn imp-btn--secondary imp-btn--sm" id="f-undo">Undo one meal</button></div>` : '';
+  const text = (id, label, v, ph = '') => `<label class="imp-field"><span class="imp-label">${label}</span><textarea class="imp-input hab-ta" id="${id}" rows="2" maxlength="240" placeholder="${esc(ph)}">${esc(v || '')}</textarea></label>`;
+  const daysSel = `<label class="imp-field"><span class="imp-label">Shows</span><select class="imp-select" id="f-days">
+      ${[['daily', 'Every day'], ['sun', 'Sundays'], ['payday', 'Paydays']].map(([k, v]) => `<option value="${k}"${(cur.days || 'daily') === k ? ' selected' : ''}>${v}</option>`).join('')}</select></label>`;
   sheet.open({
     title: isNew ? 'New habit' : 'Edit habit',
-    body: `${undoRow}
+    body: `${ffUndo}
       <label class="imp-field"><span class="imp-label">Name</span><input class="imp-input" id="f-name" maxlength="80" value="${esc(cur.name)}" autocomplete="off"></label>
-      <label class="imp-field"><span class="imp-label">Rule (optional)</span><input class="imp-input" id="f-rule" maxlength="80" value="${esc(cur.rule || '')}" placeholder="What counts, in a few words" autocomplete="off"></label>
+      <label class="imp-field"><span class="imp-label">Subtitle (optional)</span><input class="imp-input" id="f-rule" maxlength="80" value="${esc(cur.rule || '')}" placeholder="Shown under the name" autocomplete="off"></label>
       <label class="imp-field"><span class="imp-label">Category</span><select class="imp-select" id="f-cat">
         ${cats.map((c) => `<option value="${esc(c.id)}"${c.id === cur.category ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select></label>
-      <div class="imp-field"><span class="imp-label">Resets</span><div class="imp-seg" id="f-freq">
-        ${H.FREQS.map((f) => `<button type="button" data-f="${f}" class="${f === cur.frequency ? 'is-on' : ''}">${FREQ_LABEL[f]}</button>`).join('')}</div></div>
-      <div class="imp-field"><span class="imp-label">Type</span><div class="imp-seg" id="f-kind">
-        <button type="button" data-k="goal" class="${limit0 ? '' : 'is-on'}">Goal · do it</button>
-        <button type="button" data-k="limit" class="${limit0 ? 'is-on' : ''}">Limit · at most</button></div></div>
-      <label class="imp-field"><span class="imp-label" id="f-target-l">${limit0 ? 'Max times per period' : 'Times per period'}</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="${limit0 ? 0 : 1}" max="31" value="${cur.target}"></label>
-      <p class="imp-label" id="f-limit-note"${limit0 ? '' : ' hidden'}>Tap each time it happens. Staying at or under the max counts as done.</p>
-      <label class="imp-field imp-switchrow" id="f-grace-wrap"${cur.frequency === 'daily' ? '' : ' hidden'}>
-        <span class="imp-switchrow__text"><span class="imp-switchrow__title">Grace day</span><span class="imp-label">On: the streak breaks after 2 missed days in a row. Off: after 1.</span></span>
-        <input type="checkbox" class="imp-switch" id="f-grace" role="switch"${cur.grace === false ? '' : ' checked'}></label>
-      <div id="f-auto-wrap"${limit0 ? ' hidden' : ''}>${autoField}</div>
-      ${autoNote}
+      ${special ? `<label class="imp-field"><span class="imp-label">${special}</span><input class="imp-input" id="f-target" type="number" inputmode="numeric" min="1" max="14" value="${cur.target}"></label>` : daysSel}
+      ${text('f-twomin', '2-min version (blank = Full only)', cur.twoMin, 'e.g. 2 pages')}
+      ${text('f-full', 'Full', cur.full, 'e.g. 10 pages')}
+      ${text('f-cue', 'Cue', cur.cue, 'What reminds you')}
+      ${text('f-craving', 'Craving', cur.craving, 'Why you want it')}
+      ${text('f-response', 'Response', cur.response, 'How it stays easy')}
+      ${text('f-reward', 'Reward', cur.reward, 'What you get')}
+      ${special ? '' : `<div id="f-auto-wrap">${autoField}</div>`}
       <button class="imp-btn imp-btn--primary imp-btn--block" id="f-save">Save</button>
       ${isNew ? '' : '<button class="imp-btn imp-btn--danger imp-btn--block" id="f-del">' + icon('trash') + 'Delete habit</button>'}`,
     onMount(b) {
@@ -305,45 +275,26 @@ export function openHabitForm(h) {
         R.sync();
         sheet.close();
         ctx.refresh();
-        toast('Undid one');
-      });
-      let freq = cur.frequency;
-      let kind = limit0 ? 'limit' : 'goal';
-      b.querySelector('#f-kind').addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-k]');
-        if (!btn) return;
-        kind = btn.dataset.k;
-        const lim = kind === 'limit';
-        b.querySelectorAll('#f-kind button').forEach((x) => x.classList.toggle('is-on', x === btn));
-        b.querySelector('#f-target-l').textContent = lim ? 'Max times per period' : 'Times per period';
-        b.querySelector('#f-target').min = lim ? 0 : 1;
-        b.querySelector('#f-limit-note').hidden = !lim;
-        b.querySelector('#f-auto-wrap').hidden = lim;
+        toast('Undid one meal');
       });
       // The time option only applies to auto-checked habits
-      b.querySelector('#f-auto').addEventListener('change', (e) => { b.querySelector('#f-after-wrap').hidden = !e.target.value; });
-      b.querySelector('#f-freq').addEventListener('click', (e) => {
-        const btn = e.target.closest('[data-f]');
-        if (!btn) return;
-        freq = btn.dataset.f;
-        b.querySelectorAll('#f-freq button').forEach((x) => x.classList.toggle('is-on', x === btn));
-        b.querySelector('#f-grace-wrap').hidden = freq !== 'daily'; // the grace day is for daily habits only
-      });
+      b.querySelector('#f-auto')?.addEventListener('change', (e) => { b.querySelector('#f-after-wrap').hidden = !e.target.value; });
       b.querySelector('#f-save').addEventListener('click', () => {
         const name = b.querySelector('#f-name').value.trim();
         if (!name) { toast('Name needed'); return b.querySelector('#f-name').focus(); }
-        const lim = kind === 'limit';
-        const target = clampInt(b.querySelector('#f-target').value, lim ? 0 : 1, 31, lim ? 2 : 1);
+        const val = (id) => b.querySelector(id)?.value.trim() || null;
         const xp = Number.isFinite(cur.xp) ? cur.xp : 10; // XP is hidden; the stored value is kept
-        const auto = lim ? null : b.querySelector('#f-auto').value || null;
-        const afterVal = b.querySelector('#f-after').value;
+        const auto = special ? null : b.querySelector('#f-auto').value || null;
+        const afterVal = b.querySelector('#f-after')?.value;
         const autoAfter = auto && afterVal ? timeToMin(afterVal) : null;
         const id = isNew ? H.newId('h') : h.id;
-        const rule = b.querySelector('#f-rule').value.trim() || null;
-        H.upsertHabit({ id, name, rule, category: b.querySelector('#f-cat').value, frequency: freq, target, xp, auto, autoAfter,
-          grace: b.querySelector('#f-grace').checked,
-          kind: lim ? 'limit' : 'goal', limitSince: lim ? (limit0 && cur.limitSince) || dayKey(appNow()) : null });
-        if (lim && !limit0 && !isNew) H.clearPeriodXP(H.getHabits().find((x) => x.id === id)); // its taps this period become uses, not XP
+        H.upsertHabit({
+          id, name, rule: val('#f-rule'), category: b.querySelector('#f-cat').value, frequency: 'daily', xp, auto, autoAfter,
+          kind: cur.kind || 'goal', days: special ? 'daily' : b.querySelector('#f-days').value,
+          target: special ? clampInt(b.querySelector('#f-target').value, 1, 14, cur.target) : 1,
+          twoMin: val('#f-twomin'), full: val('#f-full'), cue: val('#f-cue'), craving: val('#f-craving'), response: val('#f-response'), reward: val('#f-reward'),
+          ...(isNew ? { since: dayKey(appNow()) } : {}),
+        });
         recheckFood();
         R.sync();
         sheet.close();

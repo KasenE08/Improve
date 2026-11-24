@@ -18,7 +18,7 @@ export function render(root) {
   const daysSince = last ? Math.floor((Date.now() - new Date(last)) / 86400000) : null;
 
   const streakList = streaks.length
-    ? streaks.slice(0, 10).map((s) => `<div class="prof-streak${R.tier(s.count, s.h.frequency) >= 4 ? (s.atRisk ? ' is-silver' : ' is-gold') : ''}${s.atRisk ? ' is-risk' : ''}"><span>${esc(s.h.name)}</span>${streakBadge({ count: s.count, atRisk: s.atRisk, lv: Math.max(1, R.tier(s.count, s.h.frequency)), unit: R.UNIT[s.h.frequency][s.count === 1 ? 0 : 1], warn: H.isLimit(s.h) ? 'stay under today' : 'do it today' })}</div>`).join('')
+    ? streaks.slice(0, 10).map((s) => `<div class="prof-streak${R.tier(s.count, s.h.frequency) >= 4 ? (s.atRisk ? ' is-silver' : ' is-gold') : ''}${s.atRisk ? ' is-risk' : ''}"><span>${esc(s.h.name)}</span>${streakBadge({ count: s.count, atRisk: s.atRisk, lv: Math.max(1, R.tier(s.count, s.h.frequency)), unit: R.unitOf(s.h)[s.count === 1 ? 0 : 1], warn: H.isFastFood(s.h) ? 'no passes left' : 'go Full today' })}</div>`).join('')
     : `<p class="imp-muted prof-note">Complete a habit in back-to-back periods to start a streak.</p>`;
 
   const lastTxt = last ? (daysSince ? `${daysSince} day${daysSince === 1 ? '' : 's'} ago` : 'today') : 'never';

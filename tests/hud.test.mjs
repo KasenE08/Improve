@@ -23,31 +23,31 @@ eq(T.toggleTheme(at(21)), 'light', 'switch at night → light');
 eq([T.currentTheme(at(23)), T.currentTheme(at(4, 1, 31))], ['light', 'light'], 'light until 4 AM, then light anyway');
 eq(T.currentTheme(at(20, 0, 31)), 'dark', 'next evening is automatic again');
 
-// Day circles: share of daily habits done; Perfect Day solid
-const { dayStatus, weekStatus } = await import(J('hud.js'));
-const dailies = H.getHabits().filter((h) => h.frequency === 'daily');
-const goals = dailies.filter((h) => !H.isLimit(h) && !h.auto);
-const day = '2026-10-27';
-const st0 = dayStatus(day);
-eq([st0.total, st0.done], [dailies.length, dailies.filter((h) => H.isLimit(h)).length], 'empty day: only limits (at or under) count as done');
+// Day circles: share of the day's habits done; Perfect Day (all Full) solid; a 2-min keeps it hollow
+const { dayStatus } = await import(J('hud.js'));
+H.saveHabits(H.getAllHabits().map((h) => ({ ...h, since: null })));
+const day = '2026-10-27'; // a Tuesday (no Sunday check-in, no payday set up, no lift yet)
 const tue = new Date(2026, 9, 27, 12);
+const st0 = dayStatus(day);
+eq([st0.total, st0.done], [12, 1], 'empty Tuesday: 12 habits show; fast food (none yet) counts as done');
+const goals = H.getHabits().filter((h) => !H.isFastFood(h) && !H.isLift(h) && !h.days?.match(/sun|payday/));
 H.step(goals[0], +1, tue);
 eq(dayStatus(day).done, st0.done + 1, 'a tick fills the circle');
 H.setExcused(goals[1], day, true);
 eq(dayStatus(day).total, st0.total - 1, 'a day off is left out');
-for (const h of dailies) if (!H.isLimit(h)) while (H.progress(h, tue) < h.target) { if (!H.step(h, +1, tue) && H.progress(h, tue) < h.target) H.setDone(h, day, true, new Date(2026, 9, 28, 12)); }
+H.setExcused(goals[1], day, false);
+const lift = H.getHabits().find((h) => H.isLift(h));
+H.setLevel(lift, day, H.FULL);
+eq(dayStatus(day).total, st0.total + 1, 'a lift session that day counts');
+for (const h of goals) H.setLevel(h, day, h.twoMin ? H.MIN : H.FULL);
 R.sync(tue);
-const st1 = dayStatus(day);
-eq([st1.done, st1.total, st1.perfect], [st1.total, st1.total, true], 'everything done: Perfect Day');
+let st1 = dayStatus(day);
+eq([st1.done, st1.total, st1.perfect], [st1.total, st1.total, false], 'everything done but some 2-min: full ring, not a Perfect Day');
+for (const h of goals) H.setLevel(h, day, H.FULL);
+R.sync(tue);
+st1 = dayStatus(day);
+eq([st1.done, st1.total, st1.perfect], [st1.total, st1.total, true], 'everything Full: Perfect Day');
 eq(dayStatus('2026-10-20'), null, 'before launch: blank');
-
-// Weekly bar: weekly habits only
-const weeklies = H.getHabits().filter((h) => h.frequency === 'weekly');
-const w0 = weekStatus(tue);
-eq(w0.total, weeklies.length, 'weekly bar counts weekly habits only');
-const wg = weeklies.find((h) => !H.isLimit(h) && !h.auto);
-for (let i = 0; i < wg.target; i++) H.step(wg, +1, tue);
-eq(weekStatus(tue).done, w0.done + 1, 'finishing a weekly habit moves the bar');
 
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all passed');

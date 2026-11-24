@@ -13,23 +13,26 @@ eq(D.periodRange('monthly', new Date(2027, 1, 10)), ['2027-02-01', '2027-02-28']
 eq(D.dayKey(new Date(2026, 9, 24, 23, 59)), '2026-10-24', 'day key before midnight');
 eq(D.dayKey(new Date(2026, 9, 25, 0, 0)), '2026-10-25', 'day key after midnight');
 H.init();
-const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep'), cut = H.getHabits().find(h => h.id === 'haircut');
-eq(H.getHabits().length, 30, '30 preloaded habits (Budget review put away)');
+const lift = H.getHabits().find(h => h.id === 'lift'), sleep = H.getHabits().find(h => h.id === 'sleep');
+eq(H.getHabits().length, 15, '15 preloaded habits, all daily');
+eq(H.getHabits().every((h) => h.frequency === 'daily'), true, 'every habit is daily');
 const sat = new Date(2026, 9, 24, 10), sun = new Date(2026, 9, 25, 10), mon = new Date(2026, 9, 26, 10);
 H.step(sleep, 1, sat); eq(H.progress(sleep, sat), 1, 'sleep done Sat');
 eq(H.progress(sleep, sun), 0, 'daily resets Sun');
 for (let i = 0; i < 6; i++) H.step(lift, 1, i < 3 ? sat : sun);
-eq(H.progress(lift, sun), 5, 'lift capped at 5/week');
-eq(H.progress(lift, mon), 0, 'weekly resets Monday');
-eq(H.step(cut, 1, new Date(2026, 9, 30, 12)), 0, 'monthly habits locked before November');
-H.step(cut, 1, new Date(2026, 11, 8, 12)); eq(H.progress(cut, new Date(2026, 11, 20, 12)), 1, 'monthly counts across month');
-eq(H.progress(cut, new Date(2026, 11, 31, 12)), 1, 'Dec 31 is still December');
-eq(H.progress(cut, new Date(2027, 0, 1, 12)), 0, 'monthly resets on the 1st');
-eq(H.setDone({ ...cut, auto: 'x' }, '2026-10-30', true, new Date(2026, 9, 30, 12)), false, 'auto ticks blocked for monthly before November too');
-eq(H.xpOnDay('2026-10-24'), 30 + 120, 'XP Sat = sleep 30 + 3 lifts');
-H.step(lift, -1, mon); eq(H.progress(lift, sun), 5, 'undo Monday cannot touch last week');
-H.step(lift, -1, sun); eq(H.progress(lift, sun), 4, 'undo on Sun removes one');
-eq(JSON.parse(mem.imp_log)['2026-10-25'].lift.n, 1, 'undo took Sunday entry first');
+eq(H.progress(lift, sun), 2, 'lift: one session a day (Sat + Sun = 2 this week)');
+eq(H.progress(lift, mon), 0, 'lift week resets Monday');
+eq(H.xpOnDay('2026-10-24'), 30 + 40, 'XP Sat = sleep 30 + one lift 40');
+H.step(lift, -1, mon); eq(H.progress(lift, sun), 2, 'undo Monday cannot touch last week');
+H.step(lift, -1, sun); eq(H.progress(lift, sun), 1, 'undo on Sun removes that session');
+eq('lift' in (JSON.parse(mem.imp_log)['2026-10-25'] || {}), false, 'undo took the Sunday entry');
+H.setLevel(sleep, '2026-10-27', H.MIN);
+eq([H.levelOn(sleep, '2026-10-27'), JSON.parse(mem.imp_log)['2026-10-27'].sleep.min, JSON.parse(mem.imp_log)['2026-10-27'].sleep.xp], [1, true, 15], '2-min: level 1, half the XP');
+H.setLevel(sleep, '2026-10-27', H.FULL);
+eq([H.levelOn(sleep, '2026-10-27'), JSON.parse(mem.imp_log)['2026-10-27'].sleep.xp], [2, 30], 'Full: level 2, full XP');
+const noTv = H.getHabits().find((h) => h.id === 'no-tv');
+H.setLevel(noTv, '2026-10-27', H.MIN);
+eq(H.levelOn(noTv, '2026-10-27'), 2, 'a Full-only habit can\'t be 2-min');
 eq(Object.keys(mem).every(k => k.startsWith('imp_')), true, 'all keys imp_');
 
 // ---- 4 AM day end (late-night check-ins count for the day you're finishing) ----
@@ -41,10 +44,9 @@ eq(D.periodRange('weekly', D.appNow(new Date(2026, 9, 26, 1, 0))), ['2026-10-19'
 eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 2, 0))), ['2026-10-01', '2026-10-31'], 'Nov 1, 2 AM: still October (day starts 4:01 AM)');
 eq(D.periodRange('monthly', D.appNow(new Date(2026, 10, 1, 4, 1))), ['2026-11-01', '2026-11-30'], 'Nov 1, 4:01 AM: November');
 {
-  const lift = H.getHabits().find((h) => h.id === 'lift');
-  const before = H.progress(lift, new Date(2026, 9, 25, 12));
-  H.step(lift, 1, D.appNow(new Date(2026, 9, 26, 1, 0)));
-  eq(H.progress(lift, new Date(2026, 9, 25, 12)), Math.min(before + 1, lift.target), 'tick at Mon 1 AM lands in last week');
+  const read = H.getHabits().find((h) => h.id === 'read');
+  H.step(read, 1, D.appNow(new Date(2026, 9, 26, 1, 0)));
+  eq([H.progress(read, new Date(2026, 9, 25, 12)), H.progress(read, new Date(2026, 9, 26, 12))], [1, 0], 'tick at Mon 1 AM lands on Sunday');
 }
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 25, 12))), '2026-10-26', 'next week starts Monday Oct 26');
 eq(D.dayKey(D.nextStart('weekly', new Date(2026, 9, 26, 12))), '2026-11-02', 'from Monday: next is Nov 2');
@@ -64,7 +66,7 @@ const up = H.getHabits();
 eq(up.map((h) => h.id), ['journal', 'kept-word', 'proactive', 'fast-food'], 'upgrade: Be proactive sits right after Kept my word');
 const pro = up.find((h) => h.id === 'proactive');
 eq([pro.name, pro.category, pro.frequency, pro.target, pro.xp, pro.auto], ['Be proactive', 'mind', 'daily', 1, 30, null], 'upgrade: added with Kept my word\'s category (XP then re-rated to 30 in schema 7)');
-eq(mem.imp_log, '{"2026-11-03":{"kept-word":{"n":1,"xp":15}}}', 'upgrade: history untouched');
+eq(mem.imp_log, '{"2026-11-03":{"kept-word":{"n":1,"xp":30}}}', 'upgrade: history kept (schema 7 then doubles XP for habits not on the built-in list)');
 H.init();
 eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs once');
 
@@ -191,16 +193,15 @@ eq(H.getHabits().filter((h) => h.id === 'proactive').length, 1, 'upgrade runs on
   eq(H.getAllHabits().find((h) => h.id === 'mobility').archived, true, 'cut habits are archived (history kept)');
 }
 
-// ---- A reset streak counts only from its start day ----
+// ---- A kept streak (streakBase) carries on under the new rules ----
 {
   const R2 = await import(new URL('../js/rewards.js', import.meta.url).href);
   for (const k of Object.keys(mem)) delete mem[k];
   H.init();
   const sl = H.getHabits().find((h) => h.id === 'sleep');
-  for (const day of [5, 6, 7, 8, 9, 10]) H.step(sl, 1, new Date(2026, 10, day, 12));
-  eq(R2.streak(sl, new Date(2026, 10, 10, 12)).count, 6, 'streak before a reset: 6 days');
-  H.upsertHabit({ ...sl, streakFrom: '2026-11-09' });
+  H.upsertHabit({ ...sl, since: null, streakBase: { count: 10, day: '2026-11-08', min: false } });
   const s2 = H.getHabits().find((h) => h.id === 'sleep');
-  eq(R2.streak(s2, new Date(2026, 10, 10, 12)).count, 2, 'reset on Nov 9: only Nov 9–10 count');
-  eq(R2.streak(s2, new Date(2026, 10, 8, 12)).count, 0, 'nothing counts before the reset');
+  eq(R2.streak(s2, new Date(2026, 10, 9, 12)).count, 10, 'kept streak: 10, today not done yet');
+  for (const day of [9, 10]) H.step(s2, 1, new Date(2026, 10, day, 12));
+  eq(R2.streak(s2, new Date(2026, 10, 10, 12)).count, 12, 'two Full days → 12');
 }

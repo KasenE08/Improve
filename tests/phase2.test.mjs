@@ -10,7 +10,7 @@ const H = await import(J('habits.js'));
 const R = await import(J('rewards.js'));
 const S = await import(J('stats.js'));
 const B = await import(J('backup.js'));
-const { addDays } = await import(J('dates.js'));
+const { addDays, dayKey } = await import(J('dates.js'));
 
 let fails = 0;
 const eq = (a, b, m) => {
@@ -42,24 +42,25 @@ const { DEFAULT_HABITS, DEFAULT_CATEGORIES } = await import(J('defaults.js'));
 mem.imp_habits = JSON.stringify(DEFAULT_HABITS); mem.imp_categories = JSON.stringify(DEFAULT_CATEGORIES);
 mem.imp_profile = JSON.stringify({ name: 'TESTER' });
 // Phase 1 style log (no "c" field): a perfect day on Oct 20
-const dailies = DEFAULT_HABITS.filter((h) => h.frequency === 'daily');
-mem.imp_log = JSON.stringify({ '2026-10-20': Object.fromEntries(dailies.map((h) => [h.id, { n: h.target, xp: h.xp }])) });
+const dailies = DEFAULT_HABITS;
+// (the schema 6 upgrade adds "Be proactive", so it's done that day too)
+mem.imp_log = JSON.stringify({ '2026-10-20': { ...Object.fromEntries(dailies.map((h) => [h.id, { n: h.target, xp: h.xp }])), proactive: { n: 1, xp: 30 } } });
 const found = H.init();
 eq(found, 1, 'init reports old schema 1');
 eq(H.getProfile().name, 'TESTER', 'profile kept');
 R.awardPastPerfectDays(new Date(2026, 9, 24));
 eq(R.getBonus()['2026-10-20']?.perfect?.xp, 100, 'past perfect day awarded on upgrade');
-eq(S.compute().total, 455 + 100, 'total XP = 455 dailies + 100 bonus');
-eq(S.compute().categories.find((c) => c.id === 'body').xp, 60, 'old entries count toward category via habit');
+const dayXP = H.xpOnDay('2026-10-20');
+H.archiveHabit('proactive');
+eq(S.compute().total, dayXP + 100, 'total XP = that day + 100 bonus');
 
-// ---- Perfect Day: earned and undone ----
+// ---- Perfect Day: every habit showing today done Full ----
 const sat = new Date(2026, 9, 24, 10);
 const hs = H.getHabits();
-for (const h of hs.filter((h) => h.frequency === 'daily')) for (let i = 0; i < h.target; i++) H.step(h, 1, sat);
+const fullDay = (d) => { for (const h of H.getHabits()) if (!H.isFastFood(h) && !H.isLift(h) && R.isScheduled(h, dayKey(d))) H.setLevel(h, dayKey(d), H.FULL); };
+fullDay(sat);
 let added = R.sync(sat);
-eq(added.some((b) => b.type === 'perfect'), true, 'perfect day added when all dailies done');
-eq(S.today(sat).earned, 455 + 100, 'daily meter includes bonus');
-eq(S.today(sat).max, 455 + 100, 'daily meter full on perfect day');
+eq(added.some((b) => b.type === 'perfect'), true, 'perfect day added when every habit is done Full');
 H.step(hs.find((h) => h.id === 'journal'), -1, sat);
 R.sync(sat);
 eq(!!R.getBonus()['2026-10-24']?.perfect, false, 'undo removes perfect day');
@@ -70,66 +71,74 @@ R.sync(sat);
 const sleep = H.getHabits().find((h) => h.id === 'sleep');
 const start = new Date(2026, 10, 1, 8);
 for (let i = 0; i < 6; i++) { H.step(sleep, 1, addDays(start, i)); R.sync(addDays(start, i)); }
+const first = Object.keys(R.getBonus()).find((k) => R.getBonus()[k]['streak:sleep']);
 eq(R.streak(sleep, addDays(start, 5)).count, 6, '6-day streak');
-eq(R.streak(sleep, addDays(start, 6)), { count: 6, current: false, atRisk: false }, 'streak alive before today is done');
+eq(R.streak(sleep, addDays(start, 6)), { count: 6, current: false, level: 0, atRisk: false, min: false }, 'streak alive before today is done');
 H.step(sleep, 1, addDays(start, 6));
 added = R.sync(addDays(start, 6));
 eq(added.map((b) => [b.type, b.n, b.xp]), [['streak', 7, 50]], '7-day milestone +50');
+eq(first, '2026-11-03', 'the 3-day milestone came first');
 eq(R.sync(addDays(start, 6)).length, 0, 'milestone not awarded twice');
 H.step(sleep, -1, addDays(start, 6)); R.sync(addDays(start, 6));
-eq(Object.values(R.getBonus()['2026-11-07'] || {}).length, 0, 'undo removes milestone');
-eq(R.streak(sleep, addDays(start, 7)), { count: 6, current: false, atRisk: true }, 'one missed day: streak alive, at risk');
-eq(R.streak(sleep, addDays(start, 8)).count, 0, 'two missed days in a row reset the streak');
+eq(Object.values(R.getBonus()['2026-11-07'] || {}).filter((b) => b.type === 'streak').length, 0, 'undo removes milestone');
+eq(R.streak(sleep, addDays(start, 7)).count, 0, 'a missed day breaks the streak (no grace day)');
 
-// ---- Daily grace: one missed day doesn't count but doesn't break ----
+// ---- Minimum (2-min) and Full ----
 {
   const g0 = new Date(2027, 1, 1, 9); // Mon Feb 1 2027
-  for (const i of [0, 1, 3, 4]) H.step(sleep, 1, addDays(g0, i)); // miss Feb 3
-  eq(R.streak(sleep, addDays(g0, 2)), { count: 2, current: false, atRisk: false }, 'not done today, yesterday done: not at risk');
-  eq(R.streak(sleep, addDays(g0, 3)).count, 3, 'missed day skipped: 3 days (doesn\'t count, doesn\'t break)');
-  eq(R.streak(sleep, addDays(g0, 4)).count, 4, 'run continues after the missed day');
-  eq(R.streak(sleep, addDays(g0, 5)), { count: 4, current: false, atRisk: false }, 'day after a done day: fine');
-  eq(R.streak(sleep, addDays(g0, 6)), { count: 4, current: false, atRisk: true }, 'missed yesterday: at risk');
-  H.step(sleep, 1, addDays(g0, 6));
-  eq(R.streak(sleep, addDays(g0, 6)), { count: 5, current: true, atRisk: false }, 'ticked today: relit, 5 days');
-  eq(R.streak(sleep, addDays(g0, 9)).count, 0, 'two misses (Feb 8–9) break it');
-  // Grace day turned off: one miss breaks it, no "at risk"
-  H.upsertHabit({ ...sleep, grace: false });
-  const s0 = H.getHabits().find((h) => h.id === 'sleep');
-  eq(R.streak(s0, addDays(g0, 4)).count, 2, 'grace off: the Feb 3 miss breaks it (Feb 4–5 only)');
-  eq(R.streak(s0, addDays(g0, 6)), { count: 1, current: true, atRisk: false }, 'grace off: never at risk, a miss resets');
-  H.upsertHabit({ ...s0, grace: true });
-  eq([R.milestoneXP(3), R.milestoneXP(14), R.milestoneXP(200), R.milestoneXP(150)], [20, 100, 600, 0], 'daily milestones 3…100, every 100');
-  eq([R.milestoneXP(7, 'weekly'), R.milestoneXP(4, 'weekly'), R.milestoneXP(104, 'weekly')], [0, 50, 800], 'weekly milestones 4…52, every 52');
-  eq([R.milestoneXP(3, 'monthly'), R.milestoneXP(24, 'monthly'), R.milestoneXP(7, 'monthly')], [100, 800, 0], 'monthly milestones 3, 6, 12, every 12');
-  eq([R.tier(2), R.tier(6), R.tier(7), R.tier(30), R.tier(100), R.tier(3, 'weekly'), R.tier(4, 'weekly'), R.tier(12, 'monthly')], [1, 1, 2, 3, 4, 1, 2, 4], 'flame levels');
+  const L2 = (i, lv) => H.setLevel(sleep, dayKey(addDays(g0, i)), lv);
+  L2(0, H.FULL); L2(1, H.FULL);
+  eq(R.streak(sleep, addDays(g0, 1)).count, 2, 'Full, Full → 2');
+  L2(2, H.MIN);
+  eq(R.streak(sleep, addDays(g0, 2)).count, 2, '2-min holds (2)');
+  eq(R.streak(sleep, addDays(g0, 3)).atRisk, true, 'after a 2-min: today needs Full (at risk)');
+  L2(3, H.FULL);
+  eq(R.streak(sleep, addDays(g0, 3)), { count: 3, current: true, level: 2, atRisk: false, min: false }, 'Full after a 2-min → 3');
+  L2(4, H.MIN); L2(5, H.MIN);
+  eq(R.streak(sleep, addDays(g0, 5)).count, 0, '2-min two days in a row breaks it');
+  L2(6, H.FULL);
+  eq(R.streak(sleep, addDays(g0, 6)).count, 1, 'starts again with Full');
+  eq([R.milestoneXP(3), R.milestoneXP(60), R.milestoneXP(180), R.milestoneXP(365), R.milestoneXP(730), R.milestoneXP(50)], [20, 300, 800, 1500, 1500, 0], 'milestones 3, 7, 14, 30, 60, 100, 180, 365, then every 365');
+  eq([R.tier(2), R.tier(6), R.tier(7), R.tier(30), R.tier(100)], [1, 1, 2, 3, 4], 'flame levels');
 }
 
-// ---- Weekly streak milestone stays for the week ----
-const fam = H.getHabits().find((h) => h.id === 'family');
-const mon = new Date(2026, 11, 7, 9); // Monday Dec 7
-for (let w = 0; w < 8; w++) { const d = addDays(mon, w * 7 + 2); H.step(fam, 1, d); R.sync(d); }
-const lastWeekDay = addDays(mon, 7 * 7 + 2);
-eq(R.streak(fam, lastWeekDay).count, 8, '8-week streak');
-const holder = Object.keys(R.getBonus()).find((k) => R.getBonus()[k]['streak:family']?.n === 8);
-eq(holder, '2027-01-27', 'weekly milestone stored on completion day');
-R.sync(addDays(lastWeekDay, 2));
-eq(!!R.getBonus()['2027-01-27']['streak:family'], true, 'later sync same week keeps it');
-
-// ---- Monthly streak counts first-Monday months ----
+// ---- Lift: counts sessions, 5 a week ----
 {
-  const cut = H.getHabits().find((h) => h.id === 'haircut');
-  for (const d of [new Date(2027, 2, 10, 12), new Date(2027, 3, 12, 12), new Date(2027, 4, 4, 12)]) H.step(cut, 1, d); // Mar 1–Apr 4, Apr 5–May 2, May 3–Jun 6
-  eq(R.streak(cut, new Date(2027, 4, 20, 12)).count, 3, '3-month streak across Monday-months');
-  eq(R.streak(cut, new Date(2027, 5, 10, 12)), { count: 3, current: false, atRisk: false }, 'next month (Jun 7–) not done yet: streak alive');
+  const lift = H.getHabits().find((h) => H.isLift(h));
+  const m = new Date(2027, 2, 1, 12); // Mon Mar 1 2027
+  const day = (i) => dayKey(addDays(m, i));
+  for (const i of [0, 1, 2]) H.setLevel(lift, day(i), H.FULL);
+  H.setLevel(lift, day(3), H.MIN);
+  eq(R.streak(lift, addDays(m, 4)).count, 3, '3 Full sessions + a 2-min = 3 (2-min holds; days off don\'t count)');
+  H.setLevel(lift, day(5), H.FULL);
+  eq([R.liftDone(lift, addDays(m, 5)), R.isScheduled(lift, day(6))], [5, false], '5/5 this week: hidden for the rest of the week');
+  eq(R.streak(lift, addDays(m, 7)).count, 4, 'week of 5 sessions: kept (4)');
+  H.setLevel(lift, day(7), H.MIN); H.setLevel(lift, day(9), H.MIN);
+  eq(R.streak(lift, addDays(m, 9)).count, 0, '2-min sessions twice in a row break it');
+  H.setLevel(lift, day(9), H.FULL);
+  eq(R.streak(lift, addDays(m, 13)).count, 5, 'still this week: alive (5)');
+  eq(R.streak(lift, addDays(m, 14)).count, 0, 'the week ended under 5/5: broken');
 }
 
-// ---- Category meters are scaled ----
+// ---- Fast food: 2 passes a week ----
+{
+  const m = new Date(2027, 3, 5, 12); // Mon Apr 5 2027
+  H.upsertHabit({ ...H.getHabits().find((h) => H.isFastFood(h)), since: dayKey(m) });
+  const ff = H.getHabits().find((h) => H.isFastFood(h));
+  eq(R.streak(ff, addDays(m, 3)).count, 3, 'three days with none → 3 (today counts once it\'s over)');
+  H.step(ff, +1, addDays(m, 3));
+  eq(R.streak(ff, addDays(m, 4)).count, 3, 'a pass holds the streak');
+  H.step(ff, +1, addDays(m, 4));
+  eq([R.passesUsed(ff, addDays(m, 4)), R.streak(ff, addDays(m, 5)).count], [2, 3], 'second pass: 2/2, still holds');
+  eq(R.streak(ff, addDays(m, 5)).atRisk, true, 'no passes left: at risk');
+  H.step(ff, +1, addDays(m, 5));
+  eq(R.streak(ff, addDays(m, 5)).count, 0, 'a third in one week resets it to 0');
+  eq(R.passesUsed(ff, addDays(m, 7)), 0, 'passes reset Monday');
+}
+
+// ---- Category meters ----
 const st = S.compute();
-const pot = S.weeklyPotential();
-eq(Math.round(pot.total), Math.round(455 * 7 + 440 + 270 * 12 / 52), 'weekly potential total');
-const people = st.categories.find((c) => c.id === 'people');
-eq(people.scale < 0.05, true, 'People curve scaled down');
+eq(S.weeklyPotential().total > 0, true, 'weekly potential');
 eq(st.categories.every((c) => c.level >= 1), true, 'all categories have a level');
 
 // ---- Ranks editable ----

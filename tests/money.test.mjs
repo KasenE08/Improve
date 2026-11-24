@@ -131,45 +131,47 @@ eq([habits['log-spending'], habits['save-paycheck'], habits['budget-review']], [
 const M = await import(J('money/store.js'));
 const A = await import(J('money/autocheck.js'));
 const done = (id, key) => !!H.getLog()[key]?.[id];
-A.recheckMoney(payWeek, payWeek);
-eq(done('save-paycheck', '2026-10-21'), false, 'not set up: save habit untouched');
+const fri = new Date(2026, 9, 24, 12); // the day after payday Fri Oct 23
+A.recheckMoney(payWeek, fri);
+eq(done('save-paycheck', '2026-10-23'), false, 'not set up: save habit untouched');
 M.saveSettings({ pay: bi, setup: true });
-A.recheckMoney(offWeek, offWeek);
-eq([done('save-paycheck', '2026-10-28'), H.isExcused('save-paycheck', '2026-10-26')], [false, true], 'week with no payday: week off (no tick, no XP)');
-A.recheckMoney(payWeek, payWeek);
-eq(done('save-paycheck', '2026-10-21'), false, 'payday week: not yet');
+const R = await import(J('rewards.js'));
+const save = { ...H.getHabits().find((h) => h.id === 'save-paycheck'), since: null };
+eq([R.isScheduled(save, '2026-10-23'), R.isScheduled(save, '2026-10-22'), R.isScheduled(save, '2026-10-30')], [true, false, false], 'Save % shows on paydays only (every 2 weeks)');
+A.recheckMoney(offWeek, new Date(2026, 10, 1, 12));
+eq(Object.keys(H.getLog()).some((k) => H.getLog()[k]['save-paycheck']), false, 'week with no payday: nothing to tick');
+A.recheckMoney(payWeek, fri);
+eq(done('save-paycheck', '2026-10-23'), false, 'payday: not yet');
 M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
-A.recheckMoney(payWeek, payWeek);
-eq(done('save-paycheck', '2026-10-21'), false, 'saved $40 but paycheck not logged yet: pending');
+A.recheckMoney(payWeek, fri);
+eq(done('save-paycheck', '2026-10-23'), false, 'saved $40 but paycheck not logged yet: pending');
 eq(M.getState().settings.split, { rest: 'checking', parts: [{ account: 'savings', mode: 'amount', value: 4000 }] }, 'old "save $40 per paycheck" becomes the split');
 M.upsertEntry({ kind: 'income', amount: 50000, date: '2026-10-23', note: '' });
-A.recheckMoney(payWeek, payWeek);
-eq(done('save-paycheck', '2026-10-21'), true, 'paycheck logged + $40 saved: ticked');
-{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
-eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 1, 'rechecking later in the week adds no second check-in');
+A.recheckMoney(payWeek, fri);
+eq(done('save-paycheck', '2026-10-23'), true, 'paycheck logged + $40 saved: payday ticked');
+A.recheckMoney(fri, fri);
+eq(Object.keys(H.getLog()).filter((k) => H.getLog()[k]['save-paycheck']).length, 1, 'rechecking later in the week adds no second tick');
 const id = M.getState().entries[0].id;
 M.deleteEntry(id);
-{ const _d = new Date(2026, 9, 24, 12); A.recheckMoney(_d, _d); };
-eq(done('save-paycheck', '2026-10-21'), false, 'deleting the saving unticks the week');
-// A saving logged later but dated in an earlier payday week ticks that week
+A.recheckMoney(fri, fri);
+eq(done('save-paycheck', '2026-10-23'), false, 'deleting the saving unticks the payday');
+// Streak counts paydays only (the days in between don't count)
 {
-  const later = new Date(2026, 10, 2, 12); // the next Monday
-  A.recheckMoney(payWeek, later);
-  eq(done('save-paycheck', '2026-10-21'), false, 'payday week without saving stays unticked');
-  M.upsertEntry({ kind: 'saving', amount: 4000, date: '2026-10-23', note: '' });
-  A.recheckMoney(new Date(2026, 9, 23, 12), later);
-  eq(Object.keys(H.getLog()).some((k) => k >= '2026-10-19' && k <= '2026-10-25' && H.getLog()[k]['save-paycheck']), true, 'back-dated saving ticks its own week');
+  mem.imp_log = '{}';
+  H.setDone(save, '2026-11-06', true, new Date(2026, 10, 6, 20));
+  H.setDone(save, '2026-11-20', true, new Date(2026, 10, 20, 20));
+  const s0 = { ...save, since: '2026-11-01' };
+  eq(R.streak(s0, new Date(2026, 10, 25, 12)).count, 2, 'saving streak: 2 paydays (Nov 6, Nov 20)');
+  eq(R.streak(s0, new Date(2026, 11, 4, 12)).count, 2, 'next payday Dec 4 not done yet today: streak alive');
+  eq(R.streak(s0, new Date(2026, 11, 5, 12)).count, 0, 'Dec 4 passed without saving: broken');
 }
-// Weeks off don't break the saving streak
+// Sunday check-in: Sundays only; a check-in any day that week ticks Sunday
 {
-  const R = await import(J('rewards.js'));
-  const save = H.getHabits().find((h) => h.id === 'save-paycheck');
-  mem.imp_log = '{}'; mem.imp_excused = '{}';
-  H.setPeriodDone(save, new Date(2026, 10, 4, 12), true, new Date(2026, 10, 4, 12)); // payday week Nov 2
-  H.setExcused(save, '2026-11-09', true);                                            // no payday Nov 9
-  H.setPeriodDone(save, new Date(2026, 10, 18, 12), true, new Date(2026, 10, 18, 12)); // payday week Nov 16
-  eq(R.streak(save, new Date(2026, 10, 18, 12)).count, 2, 'saving streak skips the week off (2 payday weeks)');
-  eq(R.streak(save, new Date(2026, 10, 25, 12)), { count: 2, current: false, atRisk: false }, 'next week not done yet: streak alive');
+  const ci = { ...H.getHabits().find((h) => h.id === 'log-spending'), since: null };
+  eq([R.isScheduled(ci, '2026-11-22'), R.isScheduled(ci, '2026-11-21')], [true, false], 'Sunday check-in shows on Sundays only');
+  M.upsertEntry({ kind: 'checkin', balances: {}, amount: 0, date: '2026-11-19', note: '' });
+  A.recheckMoney(new Date(2026, 10, 19, 12), new Date(2026, 10, 22, 12));
+  eq(done('log-spending', '2026-11-22'), true, 'checked in Thursday → Sunday ticked');
 }
 eq(Object.keys(mem).every((k) => k.startsWith('imp_')), true, 'only imp_ keys');
 

@@ -6,7 +6,7 @@ export const DEFAULT_MIN_WORDS = 25;
 
 export function getJournal() {
   const j = store.get(KEY, null) || {};
-  return { settings: { minWords: DEFAULT_MIN_WORDS, ...(j.settings || {}) }, days: j.days || {} };
+  return { settings: { minWords: DEFAULT_MIN_WORDS, shortWords: 25, ...(j.settings || {}) }, days: j.days || {} };
 }
 
 export const getDay = (key) => getJournal().days[key] || '';

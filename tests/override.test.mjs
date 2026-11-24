@@ -12,14 +12,13 @@ const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fails++
 
 // A daily auto habit ("100 oz water"); the auto check is played by hand here: day off / done / not done
 const work = H.getHabits().find((h) => h.auto === 'food:water');
-const save = H.getHabits().find((h) => h.auto === 'money:save');
 const D = '2026-10-29';
 const noon = new Date(2026, 9, 29, 12);
 const late = new Date(2026, 9, 29, 16);
 const entry = () => H.getLog()[D]?.[work.id];
 const auto = (state) => { // what an auto check would do
   if (state === 'off') H.setExcused(work, D, true);
-  else H.setPeriodDone(work, late, state === 'done', late);
+  else H.setDone(work, D, state === 'done', late);
 };
 
 auto('off');
@@ -42,16 +41,17 @@ eq(!!entry(), true, 'back to auto: done ticks it again');
 H.setOverride(work, true, noon);
 eq(H.isOverridden(work, new Date(2026, 9, 30, 12)), false, 'override lasts only for its own day');
 
-// Weekly auto habit: one tick for the week, period-done can't remove it
-const wk = new Date(2026, 9, 28, 12); // Wed
-H.setOverride(save, true, wk);
-const weekTicks = () => Object.values(H.getLog()).reduce((n, d) => n + (d[save.id]?.n || 0), 0);
-eq(weekTicks(), 1, 'weekly override: one tick');
-eq(H.setPeriodDone(save, new Date(2026, 9, 30, 12), false), false, 'weekly auto check leaves it alone later in the week');
-eq(H.setExcused(save, '2026-10-26', true), false, 'weekly override beats a week off');
-eq(weekTicks(), 1, 'still ticked');
-H.setOverride(save, false, wk);
-eq(weekTicks(), 0, 'weekly undo clears it');
+// Ticked by hand as 2-min: the auto check leaves that alone too; back to auto clears it
+{
+  const d2 = new Date(2026, 9, 31, 12);
+  H.setOverride(work, true, d2, H.MIN);
+  eq(H.levelOn(work, '2026-10-31'), H.MIN, 'override at 2-min');
+  eq(H.setDone(work, '2026-10-31', H.FULL, d2), false, 'auto check leaves a 2-min override alone');
+  H.setOverride(work, false, d2);
+  eq(H.levelOn(work, '2026-10-31'), 0, 'back to auto clears it');
+  eq(H.setDone(work, '2026-10-31', H.MIN, d2), true, 'auto can set 2-min');
+  eq(H.levelOn(work, '2026-10-31'), H.MIN, '… and it shows as 2-min');
+}
 
 if (fails) { console.log(fails + ' failed'); process.exit(1); }
 console.log('all passed');

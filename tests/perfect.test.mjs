@@ -15,7 +15,9 @@ const eq = (a, b, m) => {
 };
 
 const perfectRange = (from, n) => { const b = R.getBonus(); for (let i = 0; i < n; i++) (b[dayKey(addDays(from, i))] ||= {}).perfect = { type: 'perfect', xp: 100 }; localStorage.setItem('imp_bonus', JSON.stringify(b)); };
-const doAllDailies = (d) => { for (const h of H.getHabits().filter((x) => x.frequency === 'daily' && !H.isLimit(x))) while (H.progress(h, d) < h.target) H.step(h, 1, d); };
+H.saveHabits(H.getAllHabits().map((h) => ({ ...h, since: null })));
+// Every habit showing that day done Full (Lift has no session: it doesn't count; fast food: none)
+const doAllDailies = (d) => { for (const h of H.getHabits()) if (!H.isFastFood(h) && !H.isLift(h) && R.isScheduled(h, dayKey(d))) H.setLevel(h, dayKey(d), H.FULL); };
 
 // Week of Mon Feb 1 – Sun Feb 7, 2027: Mon–Sat already perfect, finish Sunday
 const mon = new Date(2027, 1, 1, 12);
@@ -33,7 +35,7 @@ eq(R.perfectCounts().weeks, 1, 'You tab: 1 Perfect Week');
 eq(R.allPerfect(R.getBonus(), '2027-02-08', '2027-02-14'), false, 'next week empty');
 
 // Undo on Sunday removes it
-const daily = H.getHabits().find((x) => x.frequency === 'daily' && !H.isLimit(x));
+const daily = H.getHabits().find((x) => !H.isLimit(x) && !x.auto && !H.isLift(x));
 H.step(daily, -1, sun);
 R.sync(sun);
 eq([!!R.getBonus()['2027-02-07']?.perfect, !!R.getBonus()['2027-02-07']?.perfectWeek], [false, false], 'undo removes Perfect Day and Week');
@@ -50,6 +52,22 @@ eq(R.perfectCounts(), { days: 28, weeks: 4, months: 1 }, 'totals: 28 days, 4 wee
 // A month with one missed day isn't perfect
 const b = R.getBonus(); delete b['2027-02-15']; localStorage.setItem('imp_bonus', JSON.stringify(b));
 eq(R.perfectCounts(), { days: 27, weeks: 3, months: 0 }, 'one missed day: no Perfect Month, that week gone');
+
+// A single 2-min and it isn't a Perfect Day (Minimum doesn't count)
+{
+  const d = new Date(2027, 2, 3, 12);
+  doAllDailies(d);
+  eq(R.sync(d).some((b) => b.type === 'perfect'), true, 'all Full: Perfect Day');
+  const withMin = H.getHabits().find((h) => H.hasMin(h) && !h.auto);
+  H.setLevel(withMin, dayKey(d), H.MIN);
+  R.sync(d);
+  eq(!!R.getBonus()[dayKey(d)]?.perfect, false, 'one 2-min: not a Perfect Day');
+  H.setLevel(withMin, dayKey(d), H.FULL);
+  const ff = H.getHabits().find((h) => H.isFastFood(h));
+  H.step(ff, +1, d);
+  R.sync(d);
+  eq(!!R.getBonus()[dayKey(d)]?.perfect, false, 'a fast food pass today: not a Perfect Day');
+}
 
 console.log(fails ? `\n${fails} FAILED` : '\nall passed');
 if (fails) process.exit(1);

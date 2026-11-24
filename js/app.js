@@ -12,6 +12,7 @@ import * as Money from './screens/money.js';
 import * as Journal from './screens/journal.js';
 import { recheckJournal } from './journal/autocheck.js';
 import { recheckMoney } from './money/autocheck.js';
+import { migrate22 } from './migrate.js';
 import * as Profile from './screens/profile.js';
 import * as Home from './screens/home.js';
 import { celebrate } from './screens/today.js';
@@ -34,6 +35,7 @@ function boot() {
   wipeTestData();
   // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
   const foundSchema = H.init();
+  if (foundSchema > 0 && foundSchema < 22) migrate22(); // Nov 2026: every habit daily, Minimum / Full, streaks kept
   reloadFood(); // the Food tab keeps its data in memory: re-read it after the launch wipe and upgrades (e.g. schema 11 water)
   if (foundSchema === 1) R.awardPastPerfectDays();
   Food.recheckToday();

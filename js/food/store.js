@@ -7,9 +7,11 @@ const KEY = 'food';
 
 // Goals: calorie + protein goal, plus the rules for auto-checking habits.
 //   calRange   "Hit calories" = within ±calRange % of calGoal
-//   proteinMin "Hit protein"  = at least proteinMin grams (goal can be higher)
+//   proteinMin protein Minimum (2-min version): at least this many grams; proteinGoal = Full
+//   calMax     calories Minimum: at most this many (Full = within ±calRange % of calGoal)
+//   waterMin   water Minimum (oz); waterGoal = Full
 //   waterGoal  "Hit water" = at least this many oz
-export const DEFAULT_GOALS = { calGoal: 2600, proteinGoal: 150, proteinMin: 120, calRange: 10, waterGoal: 100 };
+export const DEFAULT_GOALS = { calGoal: 2200, proteinGoal: 130, proteinMin: 115, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 };
 
 const empty = () => ({
   version: 1,

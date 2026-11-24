@@ -397,3 +397,67 @@
 .imp-switch:checked { background: var(--imp-accent); border-color: var(--imp-accent); }
 .imp-switch:checked::after { transform: translateX(20px); }
 .imp-switch:focus-visible { outline: 3px solid var(--imp-accent); outline-offset: 2px; }
+
+/* ---- Habits (Nov 2026): 2-min / Full, cards, picker, completion bursts --------------------------- */
+.hab-head { display: flex; justify-content: space-between; align-items: baseline; margin: 0 4px; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
+.hab-head b { color: var(--imp-text); font-size: 15px; }
+.hab-item { border-bottom: 1px solid var(--imp-divider); }
+.hab-item:last-child { border-bottom: 0; }
+.hab-item .imp-row { border-bottom: 0; cursor: pointer; }
+.hab-box { flex: none; display: grid; place-items: center; width: 40px; height: 40px; margin: -8px -4px -8px -8px; border-radius: 12px; }
+.hab-box:active { transform: scale(.92); }
+.hab-box .imp-check { width: 26px; height: 26px; border-radius: 8px; }
+/* 2-min (Minimum): soft fill and an accent tick; Full: solid */
+.imp-check.is-min { border-color: var(--imp-accent); background: var(--imp-accent-dim); color: var(--imp-accent); }
+.imp-check.is-min .imp-icon { visibility: visible; opacity: .9; animation: imp-tick .25s var(--imp-ease); }
+.hab-row.is-min .imp-row__title { color: var(--imp-text); }
+.hab-tag { display: inline-flex; padding: 1px 7px; border-radius: 999px; font: 700 11px var(--imp-font-head); color: var(--imp-accent); background: var(--imp-accent-dim); }
+.hab-sub-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font: 500 12.5px var(--imp-font-head); color: var(--imp-muted); }
+.hab-sub-line b { color: var(--imp-text); font-variant-numeric: tabular-nums; }
+.hab-sub-line .imp-pips { margin-top: 0; }
+.imp-pip.is-half { background: linear-gradient(90deg, var(--imp-accent) 50%, var(--imp-sunken) 50%); box-shadow: inset 0 0 0 1.5px var(--imp-accent); }
+/* Fast food: a round "log a meal" button */
+.hab-ff { border: 2px dashed var(--imp-frame); border-radius: 50%; width: 34px; height: 34px; margin: -4px 3px -4px -2px; color: var(--imp-muted); }
+.hab-ff .imp-icon { width: 16px; height: 16px; }
+.hab-ff__n { font: 800 15px var(--imp-font-head); color: var(--imp-protein); }
+.hab-row.is-ff.is-clean .hab-ff { border-style: solid; border-color: var(--imp-good); color: var(--imp-good); }
+.hab-row.is-ff.is-over .hab-ff { border-style: solid; border-color: var(--imp-danger); }
+.hab-row.is-ff .imp-pip.is-on { background: var(--imp-protein); }
+/* The card: cue / craving / response / reward / 2-min / full */
+.hab-card { display: grid; gap: 8px; margin: 0 0 12px 40px; padding: 12px 14px; border-radius: 14px; background: var(--imp-sunken); animation: hab-card-in .22s var(--imp-ease); }
+.hab-card[hidden] { display: none; }
+.hab-card__row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; }
+.hab-card dt { font: 700 11px var(--imp-font-head); letter-spacing: .05em; text-transform: uppercase; color: var(--imp-accent); padding-top: 2px; }
+.hab-card dd { margin: 0; font: 400 14px/1.4 var(--imp-font-body); color: var(--imp-text); }
+@keyframes hab-card-in { from { opacity: 0; transform: translateY(-4px); } }
+.hab-ta { min-height: 44px; resize: vertical; font: inherit; line-height: 1.35; }
+/* The picker: 2-min / Full (/ Undo) slide in over the right side of the row */
+.imp-row, .hq__row { position: relative; }
+.hab-pick { position: absolute; right: 0; top: 50%; z-index: 5; display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: var(--imp-surface); box-shadow: 0 6px 22px rgba(0, 0, 0, .18), 0 0 0 1px var(--imp-frame);
+  transform: translate(10px, -50%) scale(.96); opacity: 0; transition: transform .16s var(--imp-ease), opacity .16s; }
+.hab-pick.is-open { transform: translate(0, -50%); opacity: 1; }
+.hab-pick__btn { min-width: 58px; padding: 9px 12px; border-radius: 10px; font: 700 14px var(--imp-font-head); background: var(--imp-sunken); color: var(--imp-text); }
+.hab-pick__btn--min { color: var(--imp-accent); background: var(--imp-accent-dim); }
+.hab-pick__btn--full { color: #fff; background: var(--imp-accent); }
+.hab-pick__btn--undo, .hab-pick__btn--auto { color: var(--imp-muted); }
+.hab-pick__btn.is-on { box-shadow: 0 0 0 2px var(--imp-text); }
+.hab-pick__btn:active { transform: scale(.94); }
+/* Day details: a 2-min habit */
+.dd__row.is-min .dd__mark { color: var(--imp-accent); background: var(--imp-accent-dim); border-color: var(--imp-accent); }
+
+/* Completion bursts (several looks, picked at random) */
+.tick-fx { position: fixed; z-index: 90; width: 0; height: 0; pointer-events: none; }
+.tick-fx > * { position: absolute; left: 0; top: 0; }
+.tick-fx__dot, .tick-fx__bit, .tick-fx__star { opacity: 0; animation: tick-fly var(--t) cubic-bezier(.15, .7, .3, 1) forwards; }
+.tick-fx__dot { width: 7px; height: 7px; margin: -3.5px; border-radius: 50%; background: var(--c); }
+.tick-fx__bit { width: 6px; height: 10px; margin: -5px -3px; border-radius: 2px; background: var(--c); }
+.tick-fx__star { width: 11px; height: 11px; margin: -5.5px; background: var(--c); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.tick-fx__ring { width: 30px; height: 30px; margin: -15px; border-radius: 50%; border: 3px solid var(--c); opacity: 0; animation: tick-ring .55s ease-out forwards; }
+.tick-fx__ring--2 { animation-delay: .12s; }
+.tick-fx__word { left: 0; top: -30px; transform: translateX(-50%); white-space: nowrap; font: 800 15px var(--imp-font-head); color: var(--imp-accent); text-shadow: 0 1px 0 var(--imp-surface), 0 0 8px var(--imp-surface); animation: tick-word 1.3s ease-out forwards; }
+@keyframes tick-fly { 0% { opacity: 1; transform: rotate(var(--a)) translateY(0) rotate(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(calc(var(--d) * -1)) rotate(var(--r)); } }
+@keyframes tick-ring { 0% { opacity: .9; transform: scale(.5); } 100% { opacity: 0; transform: scale(2.2); } }
+@keyframes tick-word { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.05); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -14px); } }
+.is-popped .imp-check, .imp-check.is-popped { animation: tick-pop .35s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes tick-pop { 0% { transform: scale(.7); } 60% { transform: scale(1.18); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .hab-card, .hab-pick { animation: none; transition: none; } }

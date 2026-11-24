@@ -12,37 +12,47 @@ import { MEALS, MEAL_LABELS, totals } from './food/logic.js';
 import { fmtMoney } from './money/logic.js';
 import { dayKey, appNow, addDays, fromDayKey, weekStart } from './dates.js';
 import { START } from './launch.js';
-import { esc, icon, xpbar, sheet, pct, confirmBox, toast } from './ui.js';
+import { esc, icon, sheet, confirmBox, toast } from './ui.js';
 import { currentTheme, toggleTheme } from './theme.js';
 import { DEV, seedDev } from './devmode.js';
 
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const fmt = (k, o) => fromDayKey(k).toLocaleDateString('en-US', o);
 
-/** Daily habits for a day: { done, total, perfect, items: [{ h, n, done, off }] } (null before launch / future). */
+/**
+ * The habits on a day: { done, total, perfect, items: [{ h, n, level, done, off }] } (null before launch / future).
+ * Only habits scheduled that day count (Lift only on a day with a session). level 1 = 2-min, 2 = Full;
+ * fast food: 2 = none, 1 = a pass used, 0 = over the week's passes. A day with any 2-min isn't a Perfect Day.
+ */
 export function dayStatus(key, ctx = context()) {
   const today = dayKey();
   if (key < START || key > today) return null;
-  const items = ctx.habits.filter((h) => h.frequency === 'daily').map((h) => {
-    const n = ctx.log[key]?.[h.id]?.n || 0;
-    return { h, n, done: H.isDone(h, n), off: H.isExcused(h.id, key, ctx.ex) };
-  });
-  const counted = items.filter((i) => !i.off);
-  const done = counted.filter((i) => i.done).length;
-  return { done, total: counted.length, perfect: !!ctx.bonus[key]?.perfect, items };
-}
-
-/** This week's weekly habits: { done, total }. Weeks off don't count; a limit counts while you're at or under it. */
-export function weekStatus(date = appNow(), ctx = context()) {
-  const ws = ctx.habits.filter((h) => h.frequency === 'weekly' && !H.offIn(h, date, ctx.ex) && !H.notStarted(h, date));
-  return { done: ws.filter((h) => H.isDone(h, H.progress(h, date, ctx.log))).length, total: ws.length };
+  const items = [];
+  for (const h of ctx.habits) {
+    if (H.isExcused(h.id, key, ctx.ex)) continue;
+    if (H.isFastFood(h)) {
+      const n = H.usesOn(h, key, ctx.log);
+      const over = n > 0 && R.passesUsed(h, fromDayKey(key), ctx.log) > h.target;
+      items.push({ h, n, level: over ? 0 : n ? 1 : 2, off: false });
+      continue;
+    }
+    if (!R.isScheduled(h, key, ctx.rc)) continue;
+    const level = H.levelOn(h, key, ctx.log);
+    if (H.isLift(h) && !level) continue;
+    items.push({ h, n: level ? 1 : 0, level, off: false });
+  }
+  for (const i of items) i.done = i.level > 0;
+  const done = items.filter((i) => i.done).length;
+  return { done, total: items.length, perfect: !!ctx.bonus[key]?.perfect, items };
 }
 
 function context() {
-  return { habits: H.getHabits(), log: H.getLog(), ex: H.getExcused(), bonus: R.getBonus() };
+  const log = H.getLog();
+  return { habits: H.getHabits(), log, ex: H.getExcused(), bonus: R.getBonus(), rc: R.makeCtx(log) };
 }
 
-// A day as a progress circle. Today is filled dark; a Perfect Day is solid red.
+// A day as a progress circle. Today is filled dark; a Perfect Day is solid. A day with every habit done but
+// some only 2-min is a full ring that stays hollow.
 function dayCircle(key, st, { today, small = false, i = 0 } = {}) {
   const p = st && st.total ? Math.round((st.done / st.total) * 100) : 0;
   const cls = ['hday', small ? 'hday--sm' : '', key === today ? 'is-today' : '', st?.perfect ? 'is-perfect' : '', st ? '' : 'is-blank'].filter(Boolean).join(' ');
@@ -58,7 +68,6 @@ export function renderHud(el) {
   const today = dayKey(now);
   const ws = weekStart(now);
   const days = Array.from({ length: 7 }, (_, i) => dayKey(addDays(ws, i)));
-  const wk = weekStatus(now, ctx);
   const perfectWeek = days.every((k) => ctx.bonus[k]?.perfect); // all 7 days Perfect Days: the strip turns gold
   const theme = currentTheme();
   const name = H.getProfile().name;
@@ -76,7 +85,7 @@ export function renderHud(el) {
     </div>
     <div class="hud__week${perfectWeek ? ' is-gold' : ''}">${days.map((k, i) => dayCircle(k, dayStatus(k, ctx), { today, i })).join('')}</div>
     ${perfectWeek ? `<span class="hud__pweek">${icon('star')}Perfect Week</span>` : ''}
-    ${wk.total ? `<div class="hud__wbar"><div class="hud__wtop"><span>This week</span><span><b>${wk.done}</b> of ${wk.total} weekly habits</span></div>${xpbar(pct(wk.done, wk.total), 'imp-xpbar--sm')}</div>` : ''}`;
+`;
 }
 
 // ---- Month calendar --------------------------------------------------------------------------
@@ -110,7 +119,7 @@ function monthBody(mk) {
       <button class="cal__arrow" data-cal="${mkOf(next)}" aria-label="Next month"${canNext ? '' : ' disabled'}>${icon('next')}</button>
     </div>
     <div class="cal__grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span class="cal__wd">${d}</span>`).join('')}${cells.join('')}</div>
-    <div class="cal__legend"><span><i class="cal__dot"></i>Ring = daily habits done</span><span><i class="cal__dot is-solid"></i>Perfect Day</span></div>
+    <div class="cal__legend"><span><i class="cal__dot"></i>Ring = habits done</span><span><i class="cal__dot is-solid"></i>Perfect Day (all Full)</span></div>
     ${tracked ? `<p class="cal__sum"><b>${perfect}</b> Perfect ${perfect === 1 ? 'Day' : 'Days'} this month</p>` : ''}
   </div>`;
 }
@@ -143,16 +152,12 @@ function dayBody(key) {
 
   // Habits
   if (st) {
-    const rows = st.items.map((i) => `<li class="dd__row${i.done ? ' is-done' : ''}${i.off ? ' is-off' : ''}">
-      <span class="dd__mark">${i.off ? '–' : i.done ? icon('check') : ''}</span>
+    const rows = st.items.map((i) => `<li class="dd__row${i.level === 2 ? ' is-done' : i.level === 1 ? ' is-min' : ''}">
+      <span class="dd__mark">${i.level ? icon('check') : ''}</span>
       <span class="dd__name">${esc(i.h.name)}</span>
-      <span class="dd__val">${i.off ? 'Day off' : H.isLimit(i.h) ? `${i.n}/${i.h.target} max` : i.h.target > 1 ? `${Math.min(i.n, i.h.target)}/${i.h.target}` : ''}</span></li>`).join('');
-    const others = Object.entries(ctx.log[key] || {})
-      .map(([id, e]) => ({ h: ctx.habits.find((x) => x.id === id), e }))
-      .filter(({ h }) => h && h.frequency !== 'daily')
-      .map(({ h, e }) => `<li class="dd__row is-done"><span class="dd__mark">${icon('check')}</span><span class="dd__name">${esc(h.name)}</span><span class="dd__val">${h.frequency === 'weekly' ? 'Weekly' : 'Monthly'}${e.n > 1 ? ` ×${e.n}` : ''}</span></li>`).join('');
-    const perfect = st.perfect ? `<div class="dd__perfect">${icon('star')}Perfect Day: every daily habit done</div>` : '';
-    parts.push(section('Habits', `${st.done}/${st.total}`, `${perfect}<ul class="dd__list">${rows}</ul>${others ? `<p class="dd__sub">Weekly &amp; monthly</p><ul class="dd__list">${others}</ul>` : ''}`));
+      <span class="dd__val">${H.isFastFood(i.h) ? (i.n ? `${i.n} meal${i.n > 1 ? 's' : ''}${i.level ? ' · pass' : ' · over'}` : 'None') : i.level === 1 ? '2-min' : i.level === 2 ? 'Full' : ''}</span></li>`).join('');
+    const perfect = st.perfect ? `<div class="dd__perfect">${icon('star')}Perfect Day: every habit done Full</div>` : '';
+    parts.push(section('Habits', `${st.done}/${st.total}`, `${perfect}<ul class="dd__list">${rows}</ul>`));
   }
 
   // Food + water

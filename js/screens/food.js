@@ -8,7 +8,7 @@ import * as Auto from '../food/autocheck.js';
 import * as Imp from '../food/import.js';
 import * as Stats from '../stats.js';
 import { celebrate } from './today.js';
-import { esc, icon, xpbar, toast, sheet } from '../ui.js';
+import { esc, icon, xpbar, toast, sheet, waterWin } from '../ui.js';
 
 const now = () => new Date();
 const today = () => L.appDateFor(now());
@@ -134,7 +134,8 @@ function hero(day) {
   const hits = Auto.hitsFor(ui.date);
   const oz = F.waterFor(ui.date);
   const lo = Math.round(g.calGoal * (1 - g.calRange / 100)), hi = Math.round(g.calGoal * (1 + g.calRange / 100));
-  const tick = (on, label, hint) => `<span class="food-hit${on ? ' is-on' : ''}"><span class="imp-check${on ? ' is-on' : ''}">${icon('check')}</span><span>${label}<small>${hint}</small></span></span>`;
+  // level: 0 not yet, 1 Minimum (half check), 2 Full
+  const tick = (lv, label, hint) => `<span class="food-hit${lv ? ' is-on' : ''}"><span class="imp-check${lv === 2 ? ' is-on' : lv === 1 ? ' is-min' : ''}">${icon('check')}</span><span>${label}${lv === 1 ? ' · 2-min' : ''}<small>${hint}</small></span></span>`;
   return `<div class="food-hero${cal.over ? ' is-over' : ''}">
     <div class="food-big" data-testid="remaining">${L.formatSigned(cal.remaining)}</div>
     <div class="food-cap">cal remaining</div>
@@ -146,7 +147,7 @@ function hero(day) {
       ${xpbar(Math.min(100, Math.round((oz / g.waterGoal) * 100)), 'imp-xpbar--water')}
       <div class="food-water"><span class="food-unit"><input class="imp-input" id="water-oz" type="number" inputmode="decimal" min="1" aria-label="Ounces of water" value="${esc(g.lastWaterOz ?? '')}" placeholder="oz"><span>oz</span></span>
         <button class="imp-btn imp-btn--secondary food-water-plus" data-f="water-add" aria-label="Add water">${icon('plus')}</button></div></div>
-    <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinMin)} g+`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz+`)}</div>
+    <div class="food-hits">${tick(hits['food:calories'], 'Hit calories', `${fmt(lo)}–${fmt(hi)} · 2-min ≤ ${fmt(g.calMax || 0)}`)}${tick(hits['food:protein'], 'Hit protein', `${fmt(g.proteinGoal)} g · 2-min ${fmt(g.proteinMin)} g`)}${tick(hits['food:water'], 'Hit water', `${fmt(g.waterGoal)} oz · 2-min ${fmt(g.waterMin || 0)} oz`)}</div>
   </div>`;
 }
 
@@ -236,12 +237,13 @@ const field = (id, label, value, unit, mode = 'numeric', cls = '') =>
 function renderGoals() {
   const g = F.getGoals();
   return `${box('Daily goals', `<div class="food-stack">
-      <div class="imp-field-row">${field('g-cal', 'Calorie goal', g.calGoal, 'cal', 'numeric', 'food-c')}${field('g-range', 'Hit range ±', g.calRange, '%')}</div>
-      <div class="imp-field-row">${field('g-pro', 'Protein goal', g.proteinGoal, 'g', 'numeric', 'food-p')}${field('g-min', 'Hit at least', g.proteinMin, 'g')}</div>
-      <div class="imp-field-row">${field('g-water', 'Water goal', g.waterGoal, 'oz', 'numeric', 'food-w')}</div>
+      <div class="imp-field-row">${field('g-cal', 'Calorie goal', g.calGoal, 'cal', 'numeric', 'food-c')}${field('g-range', 'Full range ±', g.calRange, '%')}</div>
+      <div class="imp-field-row">${field('g-calmax', '2-min: at most', g.calMax || 0, 'cal', 'numeric', 'food-c')}</div>
+      <div class="imp-field-row">${field('g-pro', 'Protein (Full)', g.proteinGoal, 'g', 'numeric', 'food-p')}${field('g-min', 'Protein (2-min)', g.proteinMin, 'g')}</div>
+      <div class="imp-field-row">${field('g-water', 'Water (Full)', g.waterGoal, 'oz', 'numeric', 'food-w')}${field('g-wmin', 'Water (2-min)', g.waterMin || 0, 'oz')}</div>
       <p class="food-err" id="g-err"></p>
       <button class="imp-btn imp-btn--primary imp-btn--block" data-f="save-goals">Save goals</button>
-      <p class="food-note">"Hit calories" ticks when you're within the range of your goal. "Hit protein" ticks at the minimum. Your water habit ticks at the water goal. They update as you log.</p></div>`)}
+      <p class="food-note">Your calories, protein and water habits tick themselves as you log: Full at the goal (calories within the range), 2-min at the smaller number (calories at or under the 2-min cap).</p></div>`)}
     ${box('Copy from Calorie Tracker', `<div class="food-stack">
       <p class="food-note">One-time copy of your old app's foods, meals and log. The old app is only read, never changed.</p>
       <p class="food-note">On iPhone: open Calorie Tracker → Settings → Export backup → Save to Files. Then pick that file here.</p>
@@ -449,9 +451,10 @@ export function bind(root) {
         const oz = Number(input?.value);
         if (!(oz > 0) || oz > 400) { toast('Type how many oz'); input?.focus(); break; }
         F.saveGoals({ lastWaterOz: oz }); // next time the box starts at this amount
+        const oz0 = F.waterFor(ui.date);
         const after = changed(ui.date, () => F.addWater(ui.date, oz));
         rerender();
-        toast(`+${fmtOz(oz)} oz water`);
+        if (!waterWin(oz0, F.waterFor(ui.date), F.getGoals().waterGoal)) toast(`+${fmtOz(oz)} oz water`);
         after();
         break;
       }
@@ -544,15 +547,16 @@ export function bind(root) {
         break;
 
       case 'save-goals': {
-        const calGoal = num('g-cal'), calRange = num('g-range'), proteinGoal = num('g-pro'), proteinMin = num('g-min'), waterGoal = num('g-water');
+        const calGoal = num('g-cal'), calRange = num('g-range'), proteinGoal = num('g-pro'), proteinMin = num('g-min'), waterGoal = num('g-water'), calMax = num('g-calmax'), waterMin = num('g-wmin');
         const err = document.getElementById('g-err');
         if (!(calGoal > 0)) { err.textContent = 'Enter a calorie goal above 0.'; break; }
         if (!(calRange >= 0 && calRange <= 50)) { err.textContent = 'Hit range must be 0–50 %.'; break; }
         if (!(proteinGoal > 0)) { err.textContent = 'Enter a protein goal above 0.'; break; }
         if (!(proteinMin > 0)) { err.textContent = 'Enter a protein minimum above 0.'; break; }
         if (!(waterGoal > 0 && waterGoal <= 400)) { err.textContent = 'Enter a water goal from 1 to 400 oz.'; break; }
+        if (!(calMax >= 0) || !(waterMin >= 0)) { err.textContent = 'The 2-min numbers must be 0 or more.'; break; }
         // New goals apply from today's food day on; past days keep their result.
-        const after = changed(today(), () => F.saveGoals({ calGoal: Math.round(calGoal), calRange, proteinGoal: Math.round(proteinGoal), proteinMin: Math.round(proteinMin), waterGoal: Math.round(waterGoal) }));
+        const after = changed(today(), () => F.saveGoals({ calGoal: Math.round(calGoal), calRange, proteinGoal: Math.round(proteinGoal), proteinMin: Math.round(proteinMin), waterGoal: Math.round(waterGoal), calMax: Math.round(calMax), waterMin: Math.round(waterMin) }));
         rerender();
         toast('Goals saved');
         after();
