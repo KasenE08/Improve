@@ -416,13 +416,12 @@
 .hab-sub-line b { color: var(--imp-text); font-variant-numeric: tabular-nums; }
 .hab-sub-line .imp-pips { margin-top: 0; }
 .imp-pip.is-half { background: linear-gradient(90deg, var(--imp-accent) 50%, var(--imp-sunken) 50%); box-shadow: inset 0 0 0 1.5px var(--imp-accent); }
-/* Fast food: a round "log a meal" button */
-.hab-ff { border: 2px dashed var(--imp-frame); border-radius: 50%; width: 34px; height: 34px; margin: -4px 3px -4px -2px; color: var(--imp-muted); }
-.hab-ff .imp-icon { width: 16px; height: 16px; }
-.hab-ff__n { font: 800 15px var(--imp-font-head); color: var(--imp-protein); }
-.hab-row.is-ff.is-clean .hab-ff { border-style: solid; border-color: var(--imp-good); color: var(--imp-good); }
-.hab-row.is-ff.is-over .hab-ff { border-style: solid; border-color: var(--imp-danger); }
+/* Fast food: Lift's look; the box shows today's meals in orange */
+.hab-row.is-ff .imp-check.is-count { border-color: var(--imp-protein); background: color-mix(in srgb, var(--imp-protein) 14%, transparent); }
+.hab-row.is-ff .imp-check__count { color: var(--imp-protein); }
 .hab-row.is-ff .imp-pip.is-on { background: var(--imp-protein); }
+.hab-row.is-ff.is-over .imp-check.is-count { border-color: var(--imp-danger); }
+.hab-row.is-ff.is-over .imp-check__count { color: var(--imp-danger); }
 /* The card: cue / craving / response / reward / 2-min / full */
 .hab-card { display: grid; gap: 8px; margin: 0 0 12px 40px; padding: 12px 14px; border-radius: 14px; background: var(--imp-sunken); animation: hab-card-in .22s var(--imp-ease); }
 .hab-card[hidden] { display: none; }

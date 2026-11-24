@@ -97,7 +97,7 @@ function habitRow(h, st, manual, rc) {
     ${badge(h, st)}</div>${card(h)}</div>`;
 }
 
-// Fast food: the box logs a meal; the row shows the week's passes
+// Fast food: looks like Lift. The box logs a meal (it shows today's count); the line under it is the week's passes.
 function fastFoodRow(h, st, rc) {
   const now = appNow();
   const used = R.passesUsed(h, now, rc.log);
@@ -105,11 +105,12 @@ function fastFoodRow(h, st, rc) {
   const today = H.usesOn(h, dayKey(now), rc.log);
   const over = used > max;
   const pips = Array.from({ length: Math.max(max, used) }, (_, i) => `<span class="imp-pip${i < used ? (i >= max ? ' is-over' : ' is-on') : ''}"></span>`).join('');
-  return `<div class="hab-item" data-item="${esc(h.id)}"><div class="imp-row hab-row is-ff${over ? ' is-over' : today ? '' : ' is-clean'}${rowLook(st)}" data-id="${esc(h.id)}">
-    <button class="hab-box hab-ff" data-act="meal" aria-label="Log a fast food meal">${today ? `<span class="hab-ff__n">${today}</span>` : icon('plus')}</button>
+  const box = `<span class="imp-check${today ? ' is-count' : ''}">${today ? `<span class="imp-check__count">${today}</span>` : ''}</span>`;
+  const note = over ? '<span class="imp-row__sub"><b class="imp-missed">Over the passes: streak reset</b></span>' : '';
+  return `<div class="hab-item" data-item="${esc(h.id)}"><div class="imp-row hab-row is-ff${over ? ' is-over' : ''}${rowLook(st)}" data-id="${esc(h.id)}">
+    <button class="hab-box" data-act="meal" aria-label="Log a fast food meal (${today} today)">${box}</button>
     <span class="imp-row__main" data-act="card"><span class="imp-row__title">${esc(h.name)}</span>
-      <span class="hab-sub-line">Passes used <b>${Math.min(used, 99)}/${max}</b> this week <span class="imp-pips">${pips}</span></span>
-      <span class="imp-row__sub">${over ? '<b class="imp-missed">Over: streak reset</b>' : today ? `${today} today · streak holds` : 'None today'}</span></span>
+      <span class="hab-sub-line"><b>${Math.min(used, 99)}/${max}</b> this week <span class="imp-pips">${pips}</span></span>${note}</span>
     ${badge(h, st)}</div>${card(h)}</div>`;
 }
 
@@ -128,12 +129,12 @@ export function bind(root) {
     clearTimeout(holdTimer);
     const onBox = e.target.closest('[data-act="check"]');
     const onMeal = e.target.closest('[data-act="meal"]');
-    if (onMeal) return; // holding the fast food button does nothing extra
     holdTimer = setTimeout(() => {
       held = true;
       navigator.vibrate?.(10);
       const h = H.getAllHabits().find((x) => x.id === r.dataset.id);
-      if (onBox) holdBox(h, r);
+      if (onMeal) undoMeal(h);
+      else if (onBox) holdBox(h, r);
       else openHabitForm(h);
     }, HOLD_MS);
   });
@@ -211,6 +212,17 @@ function handBack(h) {
   const added = R.sync();
   ctx.refresh();
   toast(`Back to auto (${autoTab(h)} tab)`);
+  celebrate(before, Stats.compute(), added);
+}
+
+// Hold the fast food box: take back the last meal logged this week
+function undoMeal(h) {
+  if (!h || !R.passesUsed(h)) return toast('No meals this week');
+  const before = Stats.compute();
+  H.step(h, -1);
+  const added = R.sync();
+  ctx.refresh();
+  toast(`Meal removed · ${R.passesUsed(h)}/${h.target} this week`);
   celebrate(before, Stats.compute(), added);
 }
 
