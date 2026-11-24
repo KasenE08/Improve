@@ -51,7 +51,7 @@
 .hring span { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: var(--imp-surface); font: 700 12px var(--imp-font-head); font-variant-numeric: tabular-nums; }
 .hring.is-perfect span { background: var(--imp-accent); color: #fff; }
 .hq { display: grid; }
-.hq__row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--imp-divider); font-size: 15px; text-align: left; }
+.hq__row { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--imp-divider); font-size: 15px; text-align: left; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .hq__row:last-child { border-bottom: 0; }
 .hq__row small { color: var(--imp-muted); font-size: 12px; }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; font: 500 13px var(--imp-font-head); color: var(--imp-muted); }
@@ -431,17 +431,6 @@
 .hab-card dd { margin: 0; font: 400 14px/1.4 var(--imp-font-body); color: var(--imp-text); }
 @keyframes hab-card-in { from { opacity: 0; transform: translateY(-4px); } }
 .hab-ta { min-height: 44px; resize: vertical; font: inherit; line-height: 1.35; }
-/* The picker: 2-min / Full (/ Undo) slide in over the right side of the row */
-.imp-row, .hq__row { position: relative; }
-.hab-pick { position: absolute; right: 0; top: 50%; z-index: 5; display: flex; gap: 6px; padding: 5px; border-radius: 14px; background: var(--imp-surface); box-shadow: 0 6px 22px rgba(0, 0, 0, .18), 0 0 0 1px var(--imp-frame);
-  transform: translate(10px, -50%) scale(.96); opacity: 0; transition: transform .16s var(--imp-ease), opacity .16s; }
-.hab-pick.is-open { transform: translate(0, -50%); opacity: 1; }
-.hab-pick__btn { min-width: 58px; padding: 9px 12px; border-radius: 10px; font: 700 14px var(--imp-font-head); background: var(--imp-sunken); color: var(--imp-text); }
-.hab-pick__btn--min { color: var(--imp-accent); background: var(--imp-accent-dim); }
-.hab-pick__btn--full { color: #fff; background: var(--imp-accent); }
-.hab-pick__btn--undo, .hab-pick__btn--auto { color: var(--imp-muted); }
-.hab-pick__btn.is-on { box-shadow: 0 0 0 2px var(--imp-text); }
-.hab-pick__btn:active { transform: scale(.94); }
 /* Day details: a 2-min habit */
 .dd__row.is-min .dd__mark { color: var(--imp-accent); background: var(--imp-accent-dim); border-color: var(--imp-accent); }
 
@@ -460,4 +449,4 @@
 @keyframes tick-word { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 20% { opacity: 1; transform: translate(-50%, 0) scale(1.05); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -14px); } }
 .is-popped .imp-check, .imp-check.is-popped { animation: tick-pop .35s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes tick-pop { 0% { transform: scale(.7); } 60% { transform: scale(1.18); } 100% { transform: none; } }
-@media (prefers-reduced-motion: reduce) { .hab-card, .hab-pick { animation: none; transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hab-card { animation: none; } }
