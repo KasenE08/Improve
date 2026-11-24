@@ -36,35 +36,6 @@ export const check = (on, count = '') =>
 export const checkLevel = (level) =>
   `<span class="imp-check${level === 2 ? ' is-on' : level === 1 ? ' is-min' : ''}">${icon('check')}</span>`;
 
-// ---- Minimum / Full picker: two (or three) options that slide in on the row ----
-// opts: { level (0/1/2), hasMin, auto (an auto habit), overridden }. Resolves 'min' | 'full' | 'undo' | 'auto' | null.
-let pickClose = null;
-export function pickLevel(row, { level = 0, hasMin = true, auto = false, overridden = false } = {}) {
-  pickClose?.(null);
-  return new Promise((resolve) => {
-    const el = document.createElement('div');
-    el.className = 'hab-pick';
-    el.setAttribute('role', 'group');
-    el.setAttribute('aria-label', 'How did it go?');
-    const b = (val, label, on) => `<button type="button" class="hab-pick__btn${on ? ' is-on' : ''} hab-pick__btn--${val}" data-pick="${val}">${label}</button>`;
-    el.innerHTML = [hasMin ? b('min', '2-min', level === 1) : '', b('full', 'Full', level === 2),
-      auto && overridden ? b('auto', 'Auto', false) : level ? b('undo', 'Undo', false) : ''].join('');
-    row.appendChild(el);
-    requestAnimationFrame(() => el.classList.add('is-open'));
-    const done = (v) => {
-      document.removeEventListener('pointerdown', outside, true);
-      pickClose = null;
-      el.classList.remove('is-open');
-      setTimeout(() => el.remove(), 160);
-      resolve(v);
-    };
-    const outside = (e) => { if (!el.contains(e.target)) { e.stopPropagation(); done(null); } };
-    el.addEventListener('click', (e) => { const v = e.target.closest('[data-pick]')?.dataset.pick; if (v) { e.stopPropagation(); done(v); } });
-    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
-    pickClose = done;
-  });
-}
-
 // ---- Completion feedback: a small burst from the box, different every time ----
 // level 2 (Full) is bigger than level 1 (Minimum); now and then a Full gets a surprise.
 const COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#ec4899'];

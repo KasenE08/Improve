@@ -11,7 +11,7 @@ import * as Journal from '../journal/store.js';
 import { totals } from '../food/logic.js';
 import { dayKey } from '../dates.js';
 import { isAuto } from '../auto.js';
-import { esc, icon, check, xpbar, pct, toast, waterWin, pickLevel, tickReward } from '../ui.js';
+import { esc, icon, check, xpbar, pct, toast, waterWin, tickReward } from '../ui.js';
 import { dayStatus } from '../hud.js';
 import { celebrate } from './today.js';
 
@@ -32,7 +32,7 @@ export function render(root, refresh) {
   const habits = card('today', 'Habits', 'today', 'All',
     `<div class="hcard__row"><div class="hring${st?.perfect ? ' is-perfect' : ''}" style="--p:${ring}"><span>${st ? `${st.done}/${st.total}` : '–'}</span></div>
       <div><div class="hcard__big hcard__big--sm">${st?.perfect ? 'Perfect Day' : left ? `${left} left today` : 'All done'}</div>
-      <div class="hcard__sub">${next.length ? 'Up next, tap to tick:' : st?.perfect ? 'Every habit done Full' : left ? 'The rest tick on their own' : 'Some were 2-min: Full for a Perfect Day'}</div></div></div>
+      <div class="hcard__sub">${next.length ? 'Up next · tap = Full, hold = 2-min:' : st?.perfect ? 'Every habit done Full' : left ? 'The rest tick on their own' : 'Some were 2-min: Full for a Perfect Day'}</div></div></div>
     ${next.length ? `<div class="hq">${next.map((i) => `<button class="hq__row" data-tick="${esc(i.h.id)}">${check(false)}<span>${esc(i.h.name)}${i.h.target > 1 ? ` <small>${i.n}/${i.h.target}</small>` : ''}</span></button>`).join('')}</div>` : ''}`);
 
 
@@ -70,14 +70,9 @@ export function render(root, refresh) {
   root.innerHTML = `<div class="screen home">${habits}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
 }
 
-// Up next: habits with a 2-minute version ask 2-min or Full right on the row
-async function tickHome(h, row) {
-  let level = H.FULL;
-  if (H.hasMin(h)) {
-    const v = await pickLevel(row, { level: 0, hasMin: true });
-    if (!v || v === 'undo') return;
-    level = v === 'min' ? H.MIN : H.FULL;
-  }
+// Up next: tap = Full, hold = the 2-minute version
+async function tickHome(h, row, level = H.FULL) {
+  if (level === H.MIN && !H.hasMin(h)) return toast('Full only: no 2-min version');
   const before = Stats.compute();
   const r = row.querySelector('.imp-check')?.getBoundingClientRect();
   H.setLevel(h, dayKey(), level);
@@ -87,10 +82,26 @@ async function tickHome(h, row) {
   celebrate(before, Stats.compute(), added);
 }
 
+let holdT = null, holdDone = false;
 export function bind(root) {
+  root.addEventListener('pointerdown', (e) => {
+    const tick = root.dataset.tab === 'home' && e.target.closest('[data-tick]');
+    holdDone = false;
+    clearTimeout(holdT);
+    if (!tick) return;
+    holdT = setTimeout(() => {
+      holdDone = true;
+      navigator.vibrate?.(10);
+      const h = H.getHabits().find((x) => x.id === tick.dataset.tick);
+      if (h) tickHome(h, tick, H.MIN);
+    }, 450);
+  });
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) root.addEventListener(ev, () => clearTimeout(holdT));
+  root.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-tick]')) e.preventDefault(); });
   root.addEventListener('click', (e) => {
     if (root.dataset.tab !== 'home') return;
     const tick = e.target.closest('[data-tick]');
+    if (tick && holdDone) { holdDone = false; return; }
     if (tick) {
       const h = H.getHabits().find((x) => x.id === tick.dataset.tick);
       if (!h) return;

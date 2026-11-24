@@ -1,7 +1,7 @@
 // Habits tab: one daily list, grouped by category. A habit shows only on the days it's scheduled
 // (Sunday check-in on Sundays, Save % on paydays, Lift until 5 sessions this week).
-// Tap the box: done (habits with a 2-minute version: pick 2-min or Full). Tap the row: its cue / craving /
-// response / reward card. Hold: edit.
+// Tap the box: Full. Hold the box: 2-min. Tap the rest of the row: its cue / craving / response / reward card.
+// Hold the rest of the row: edit.
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
@@ -12,7 +12,7 @@ import { recheckMoney } from '../money/autocheck.js';
 import { recheckJournal } from '../journal/autocheck.js';
 import { appDateFor } from '../food/logic.js';
 const recheckFood = () => { recheck(appDateFor(new Date())); recheckMoney(); recheckJournal(); };
-import { esc, icon, checkLevel, streakBadge, streakBurst, perfectBurst, toast, sheet, confirmBox, pickLevel, tickReward, PICKER_ICONS } from '../ui.js';
+import { esc, icon, checkLevel, streakBadge, streakBurst, perfectBurst, toast, sheet, confirmBox, tickReward, PICKER_ICONS } from '../ui.js';
 
 // Auto habits show the icon of the tab they tick from
 const AUTO_ICON = { food: 'food', money: 'wallet', journal: 'quill' };
@@ -43,7 +43,7 @@ export function render(root, refresh) {
     ? `<section class="imp-panel hab-list"><div class="imp-panel__body">${groups + orphanHtml}</div></section>`
     : '<p class="hab-empty">Nothing scheduled today. Tap + to add a habit.</p>';
   const head = `<div class="hab-head"><span><b>${done}</b>/${shown.length} today</span>${hidden ? `<span>${hidden} not on today</span>` : ''}</div>`;
-  const foot = `<div class="hab-foot"><span>Tap a habit for its card · hold to edit</span><button class="hab-cats" data-act="cats">Edit categories</button></div>`;
+  const foot = `<div class="hab-foot"><span>Tap ✓ Full · hold ✓ 2-min · tap a habit for its card · hold it to edit</span><button class="hab-cats" data-act="cats">Edit categories</button></div>`;
   root.innerHTML = `<div class="screen hab">${head}${sections}${foot}</div>`;
 }
 
@@ -113,7 +113,7 @@ function fastFoodRow(h, st, rc) {
     ${badge(h, st)}</div>${card(h)}</div>`;
 }
 
-// ---- Interaction: tap the box = done (2-min / Full), tap the row = card, hold = edit ----
+// ---- Interaction: tap the box = Full, hold the box = 2-min; tap the rest = card, hold the rest = edit ----
 const HOLD_MS = 450;
 let holdTimer = null, held = false, startXY = null;
 
@@ -122,14 +122,19 @@ export function bind(root) {
   root.addEventListener('pointerdown', (e) => {
     if (!mine()) return;
     const r = e.target.closest('.imp-row[data-id]');
-    if (!r || e.target.closest('.hab-pick')) return;
+    if (!r) return;
     held = false;
     startXY = [e.clientX, e.clientY];
     clearTimeout(holdTimer);
+    const onBox = e.target.closest('[data-act="check"]');
+    const onMeal = e.target.closest('[data-act="meal"]');
+    if (onMeal) return; // holding the fast food button does nothing extra
     holdTimer = setTimeout(() => {
       held = true;
       navigator.vibrate?.(10);
-      openHabitForm(H.getAllHabits().find((h) => h.id === r.dataset.id));
+      const h = H.getAllHabits().find((x) => x.id === r.dataset.id);
+      if (onBox) holdBox(h, r);
+      else openHabitForm(h);
     }, HOLD_MS);
   });
   const cancel = () => clearTimeout(holdTimer);
@@ -144,8 +149,8 @@ export function bind(root) {
     if (!mine()) return;
     if (e.target.closest('[data-act="cats"]')) return openCategories();
     const r = e.target.closest('.imp-row[data-id]');
-    if (!r || e.target.closest('.hab-pick')) return;
-    if (held) { held = false; return; } // the long-press opened the editor
+    if (!r) return;
+    if (held) { held = false; return; } // a hold already did its thing
     const h = H.getHabits().find((x) => x.id === r.dataset.id);
     if (!h) return;
     const act = e.target.closest('[data-act]')?.dataset.act;
@@ -162,16 +167,21 @@ function toggleCard(id, r) {
   r.classList.toggle('is-open', open.has(id));
 }
 
-// Box tap: habits with a 2-minute version (and auto habits) ask 2-min or Full; the rest toggle Full / undo
-async function tapBox(h, r) {
-  const today = dayKey(appNow());
-  const level = H.levelOn(h, today);
-  const auto = isAuto(h);
-  if (!H.hasMin(h) && !auto) return setLevel(h, level ? 0 : H.FULL, r);
-  const v = await pickLevel(r, { level, hasMin: H.hasMin(h), auto, overridden: auto && H.isOverridden(h) });
-  if (!v) return;
-  if (v === 'auto') return handBack(h);
-  setLevel(h, v === 'undo' ? 0 : v === 'min' ? H.MIN : H.FULL, r);
+// Tap the box: Full (tap again to undo). An auto habit you ticked by hand goes back to auto.
+function tapBox(h, r) {
+  const level = H.levelOn(h, dayKey(appNow()));
+  if (isAuto(h) && H.isOverridden(h)) return handBack(h);
+  if (isAuto(h) && level === H.FULL) return toast(`Done Full (auto from ${autoTab(h)})`);
+  setLevel(h, level === H.FULL ? 0 : H.FULL, r);
+}
+
+// Hold the box: the 2-minute version (hold again to undo). Full-only habits don't have one.
+function holdBox(h, r) {
+  if (!h || H.isFastFood(h)) return;
+  if (!H.hasMin(h)) return toast('Full only: no 2-min version');
+  const level = H.levelOn(h, dayKey(appNow()));
+  if (isAuto(h) && H.isOverridden(h)) return handBack(h);
+  setLevel(h, level === H.MIN ? 0 : H.MIN, r);
 }
 
 function setLevel(h, level, r) {
@@ -193,14 +203,14 @@ function setLevel(h, level, r) {
   celebrate(before, Stats.compute(), added);
 }
 
-async function handBack(h) {
-  const ok = await confirmBox({ title: 'Back to auto?', text: `Removes your manual tick. The ${autoTab(h)} tab decides today again.`, ok: 'Back to auto', icon: 'info' });
-  if (!ok) return;
+// Hand a habit you ticked yourself back to its auto-check
+function handBack(h) {
   const before = Stats.compute();
   H.setOverride(h, false);
   recheckFood();
   const added = R.sync();
   ctx.refresh();
+  toast(`Back to auto (${autoTab(h)} tab)`);
   celebrate(before, Stats.compute(), added);
 }
 
