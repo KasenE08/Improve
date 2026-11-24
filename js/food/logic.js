@@ -161,6 +161,15 @@ export function hitWater(oz, goal) {
   return goal > 0 && oz >= goal;
 }
 
+// Minimum / Full levels for the auto habits: 0 = not yet, 1 = Minimum, 2 = Full
+export function calLevel(eaten, g) {
+  if (!(eaten > 0)) return 0;
+  if (hitCalories(eaten, g.calGoal, g.calRange)) return 2;
+  return eaten <= (g.calMax || 0) ? 1 : 0;
+}
+export const proteinLevel = (eaten, g) => (eaten >= g.proteinGoal ? 2 : g.proteinMin > 0 && eaten >= g.proteinMin ? 1 : 0);
+export const waterLevel = (oz, g) => (g.waterGoal > 0 && oz >= g.waterGoal ? 2 : g.waterMin > 0 && oz >= g.waterMin ? 1 : 0);
+
 export function hitProtein(eaten, min) {
   return min > 0 && eaten >= min;
 }

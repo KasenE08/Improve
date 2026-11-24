@@ -11,7 +11,7 @@ import * as Journal from '../journal/store.js';
 import { totals } from '../food/logic.js';
 import { dayKey } from '../dates.js';
 import { isAuto } from '../auto.js';
-import { esc, icon, check, xpbar, pct, toast } from '../ui.js';
+import { esc, icon, check, xpbar, pct, toast, waterWin, pickLevel, tickReward } from '../ui.js';
 import { dayStatus } from '../hud.js';
 import { celebrate } from './today.js';
 
@@ -32,7 +32,7 @@ export function render(root, refresh) {
   const habits = card('today', 'Habits', 'today', 'All',
     `<div class="hcard__row"><div class="hring${st?.perfect ? ' is-perfect' : ''}" style="--p:${ring}"><span>${st ? `${st.done}/${st.total}` : '–'}</span></div>
       <div><div class="hcard__big hcard__big--sm">${st?.perfect ? 'Perfect Day' : left ? `${left} left today` : 'All done'}</div>
-      <div class="hcard__sub">${next.length ? 'Up next, tap to tick:' : st?.perfect ? 'Every daily habit done' : 'The rest tick on their own'}</div></div></div>
+      <div class="hcard__sub">${next.length ? 'Up next, tap to tick:' : st?.perfect ? 'Every habit done Full' : left ? 'The rest tick on their own' : 'Some were 2-min: Full for a Perfect Day'}</div></div></div>
     ${next.length ? `<div class="hq">${next.map((i) => `<button class="hq__row" data-tick="${esc(i.h.id)}">${check(false)}<span>${esc(i.h.name)}${i.h.target > 1 ? ` <small>${i.n}/${i.h.target}</small>` : ''}</span></button>`).join('')}</div>` : ''}`);
 
 
@@ -70,6 +70,23 @@ export function render(root, refresh) {
   root.innerHTML = `<div class="screen home">${habits}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
 }
 
+// Up next: habits with a 2-minute version ask 2-min or Full right on the row
+async function tickHome(h, row) {
+  let level = H.FULL;
+  if (H.hasMin(h)) {
+    const v = await pickLevel(row, { level: 0, hasMin: true });
+    if (!v || v === 'undo') return;
+    level = v === 'min' ? H.MIN : H.FULL;
+  }
+  const before = Stats.compute();
+  const r = row.querySelector('.imp-check')?.getBoundingClientRect();
+  H.setLevel(h, dayKey(), level);
+  const added = R.sync();
+  ctx.refresh();
+  if (r) { const ghost = document.createElement('span'); ghost.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;pointer-events:none`; document.body.appendChild(ghost); tickReward(ghost, level); setTimeout(() => ghost.remove(), 1600); }
+  celebrate(before, Stats.compute(), added);
+}
+
 export function bind(root) {
   root.addEventListener('click', (e) => {
     if (root.dataset.tab !== 'home') return;
@@ -77,20 +94,18 @@ export function bind(root) {
     if (tick) {
       const h = H.getHabits().find((x) => x.id === tick.dataset.tick);
       if (!h) return;
-      const before = Stats.compute();
-      H.step(h, +1);
-      const added = R.sync();
-      ctx.refresh();
-      return celebrate(before, Stats.compute(), added);
+      tickHome(h, tick);
+      return;
     }
     const w = e.target.closest('[data-water]');
     if (w) {
       const oz = Number(w.dataset.water);
       const before = Stats.compute();
+      const oz0 = Food.waterFor(dayKey());
       Food.addWater(dayKey(), oz);
       const added = FoodAuto.recheck(dayKey());
       ctx.refresh();
-      toast(`+${oz} oz water`);
+      if (!waterWin(oz0, Food.waterFor(dayKey()), Food.getGoals().waterGoal)) toast(`+${oz} oz water`);
       return celebrate(before, Stats.compute(), added);
     }
     const go = e.target.closest('[data-go]');

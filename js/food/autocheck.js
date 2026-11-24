@@ -1,4 +1,4 @@
-// Ticks "Hit calories" / "Hit protein" on the Today tab from the food log.
+// Ticks the calories / protein / water habits from the food log: 0 = not yet, 1 = Minimum, 2 = Full.
 // Habits opt in with habit.auto = 'food:calories' or 'food:protein'.
 // The food day (4:01 AM → 4:00 AM) maps to the same date in the habit log.
 import * as H from '../habits.js';
@@ -13,9 +13,9 @@ export function hitsFor(date) {
   const g = F.getGoals();
   const t = L.totals(F.entriesFor(date));
   return {
-    'food:calories': L.hitCalories(t.cal, g.calGoal, g.calRange),
-    'food:protein': L.hitProtein(t.protein, g.proteinMin),
-    'food:water': L.hitWater(F.waterFor(date), g.waterGoal),
+    'food:calories': L.calLevel(t.cal, g),
+    'food:protein': L.proteinLevel(t.protein, g),
+    'food:water': L.waterLevel(F.waterFor(date), g),
   };
 }
 

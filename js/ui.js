@@ -32,6 +32,91 @@ export const statRow = ({ icon: ic, name, value, p }) =>
 export const check = (on, count = '') =>
   `<span class="imp-check${on ? ' is-on' : ''}">${icon('check')}${count !== '' ? `<span class="imp-check__count">${count}</span>` : ''}</span>`;
 
+/** A habit's box by level: 0 empty, 1 Minimum (soft fill), 2 Full (solid) */
+export const checkLevel = (level) =>
+  `<span class="imp-check${level === 2 ? ' is-on' : level === 1 ? ' is-min' : ''}">${icon('check')}</span>`;
+
+// ---- Minimum / Full picker: two (or three) options that slide in on the row ----
+// opts: { level (0/1/2), hasMin, auto (an auto habit), overridden }. Resolves 'min' | 'full' | 'undo' | 'auto' | null.
+let pickClose = null;
+export function pickLevel(row, { level = 0, hasMin = true, auto = false, overridden = false } = {}) {
+  pickClose?.(null);
+  return new Promise((resolve) => {
+    const el = document.createElement('div');
+    el.className = 'hab-pick';
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', 'How did it go?');
+    const b = (val, label, on) => `<button type="button" class="hab-pick__btn${on ? ' is-on' : ''} hab-pick__btn--${val}" data-pick="${val}">${label}</button>`;
+    el.innerHTML = [hasMin ? b('min', '2-min', level === 1) : '', b('full', 'Full', level === 2),
+      auto && overridden ? b('auto', 'Auto', false) : level ? b('undo', 'Undo', false) : ''].join('');
+    row.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('is-open'));
+    const done = (v) => {
+      document.removeEventListener('pointerdown', outside, true);
+      pickClose = null;
+      el.classList.remove('is-open');
+      setTimeout(() => el.remove(), 160);
+      resolve(v);
+    };
+    const outside = (e) => { if (!el.contains(e.target)) { e.stopPropagation(); done(null); } };
+    el.addEventListener('click', (e) => { const v = e.target.closest('[data-pick]')?.dataset.pick; if (v) { e.stopPropagation(); done(v); } });
+    setTimeout(() => document.addEventListener('pointerdown', outside, true), 0);
+    pickClose = done;
+  });
+}
+
+// ---- Completion feedback: a small burst from the box, different every time ----
+// level 2 (Full) is bigger than level 1 (Minimum); now and then a Full gets a surprise.
+const COLORS = ['#2563eb', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#ec4899'];
+const WORDS = ['Vote cast', 'Locked in', "That's who you are", 'Stacked', 'Another rep', 'Built different', 'Keep going'];
+const rnd = (a, b) => a + Math.random() * (b - a);
+export function tickReward(el, level = 2, { surprise = Math.random() < 0.12 } = {}) {
+  if (!el || typeof document === 'undefined') return;
+  if (matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const layer = document.createElement('div');
+  layer.className = 'tick-fx';
+  layer.style.cssText = `left:${cx}px;top:${cy}px`;
+  const big = level === 2 && surprise;
+  const style = big ? 'confetti' : level === 2 ? ['spark', 'ring', 'stars', 'confetti'][Math.floor(Math.random() * 4)] : 'soft';
+  const hue = COLORS[Math.floor(Math.random() * COLORS.length)];
+  const parts = [];
+  const n = { soft: 5, spark: 12, ring: 8, stars: 7, confetti: big ? 42 : 16 }[style];
+  if (style === 'ring' || style === 'soft') parts.push(`<i class="tick-fx__ring" style="--c:${level === 2 ? hue : 'var(--imp-accent)'}"></i>`);
+  if (style === 'ring') parts.push(`<i class="tick-fx__ring tick-fx__ring--2" style="--c:${COLORS[(COLORS.indexOf(hue) + 2) % COLORS.length]}"></i>`);
+  for (let i = 0; i < n; i++) {
+    const a = (360 / n) * i + rnd(-12, 12);
+    const d = style === 'soft' ? rnd(14, 22) : big ? rnd(60, 150) : rnd(26, 52);
+    const c = style === 'spark' ? hue : COLORS[i % COLORS.length];
+    const shape = style === 'stars' ? 'tick-fx__star' : style === 'confetti' ? 'tick-fx__bit' : 'tick-fx__dot';
+    parts.push(`<i class="${shape}" style="--a:${a}deg;--d:${d}px;--c:${c};--r:${Math.round(rnd(-300, 300))}deg;--t:${rnd(0.45, big ? 1.1 : 0.7).toFixed(2)}s"></i>`);
+  }
+  if (big) parts.push(`<b class="tick-fx__word">${WORDS[Math.floor(Math.random() * WORDS.length)]}</b>`);
+  layer.innerHTML = parts.join('');
+  document.body.appendChild(layer);
+  el.classList.remove('is-popped'); void el.offsetWidth; el.classList.add('is-popped');
+  navigator.vibrate?.(level === 2 ? (big ? [12, 40, 12] : 12) : 6);
+  setTimeout(() => layer.remove(), big ? 1500 : 900);
+}
+
+/** Water: a small win for each 40 oz bottle, a bigger one at the goal. Returns true if it showed something. */
+export function waterWin(before, after, goal = 100, bottle = 40) {
+  if (!(after > before)) return false;
+  if (before < goal && after >= goal) {
+    burst({ icon: 'skin', title: `${goal} oz`, big: '', sub: 'Water done for today' });
+    return true;
+  }
+  const b0 = Math.floor(before / bottle), b1 = Math.floor(after / bottle);
+  if (b1 > b0) {
+    toast(`Bottle ${b1} down · ${Math.max(0, goal - after)} oz to go`);
+    const hud = document.querySelector('.hcard--water, .food-bar') || document.body;
+    tickReward(hud.querySelector('.hcard__big, .food-val') || hud, 2, { surprise: false });
+    return true;
+  }
+  return false;
+}
+
 export const chip = (xp, on) => `<span class="imp-chip${on ? ' is-on' : ''}">+${xp}<small>XP</small></span>`;
 
 export const pips = (n, total) =>

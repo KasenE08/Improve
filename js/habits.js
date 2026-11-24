@@ -3,9 +3,13 @@
 // Storage (all under the imp_ prefix):
 //   imp_schema      number, data format version
 //   imp_categories  [{ id, name, icon }]
-//   imp_habits      [{ id, name, category, frequency: daily|weekly|monthly, target, xp, order, archived, auto }]
+//   imp_habits      [{ id, name, category, frequency: 'daily', target, xp, order, archived, auto, kind, days,
+//                      twoMin, full, cue, craving, response, reward, streakBase }]
+//                   Every habit is daily (Nov 23, 2026). kind: 'goal' (default) | 'lift' (sessions, 5 a week) |
+//                   'fastfood' (meals; 2 passes a week). days: 'daily' (default) | 'sun' | 'payday'.
 //   imp_profile     { name }
-//   imp_log         { "YYYY-MM-DD": { habitId: { n: count, xp: xpPerCompletionAtTheTime, c: categoryAtTheTime } } }
+//   imp_log         { "YYYY-MM-DD": { habitId: { n: count, xp: xpPerCompletionAtTheTime, c: categoryAtTheTime, min?: true } } }
+//                   min = done as the 2-minute version (Minimum); no min = Full. Fast food: n = meals that day.
 //   imp_bonus       { "YYYY-MM-DD": { bonusId: { type, xp, c?, habit?, n? } } }   (see rewards.js)
 //   imp_ranks       [{ min, name }]                                             (see levels.js)
 //   imp_last_backup ISO date of the last export
@@ -22,9 +26,14 @@ import { MONTHLY_START } from './launch.js';
 
 // Habit kinds: a goal ("do it N times", the default) or a limit ("at most N times", e.g. fast food ≤ 2 a week).
 // Taps on a limit habit only count uses (no XP); its XP comes when the period ends at or under the limit (rewards.js).
-export const isLimit = (h) => h?.kind === 'limit';
-// Done for the period: goal reached, or for a limit, still at or under it
-export const isDone = (h, n) => (isLimit(h) ? n <= h.target : n >= h.target);
+export const isLimit = (h) => h?.kind === 'limit' || h?.kind === 'fastfood';
+export const isFastFood = (h) => h?.kind === 'fastfood' || h?.kind === 'limit';
+export const isLift = (h) => h?.kind === 'lift';
+/** Has a 2-minute version (Minimum). Habits without one are Full only. */
+export const hasMin = (h) => !!(h?.twoMin && String(h.twoMin).trim());
+export const MIN = 1, FULL = 2;
+// Done for the day: goal reached, or for fast food, still within the week's passes
+export const isDone = (h, n) => (isLimit(h) ? n <= h.target : n >= Math.min(1, h.target || 1));
 export const LIMIT_MAX_USES = 99;
 
 // Monthly habits wait for the first month after launch (see launch.js)
@@ -32,7 +41,7 @@ export const LIMIT_MAX_USES = 99;
 export const startOf = (habit) => [habit.startsOn, habit.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop() || null;
 export const notStarted = (habit, date = appNow()) => { const s = startOf(habit); return !!s && dayKey(date) < s; };
 
-export const SCHEMA = 21;
+export const SCHEMA = 22;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -43,7 +52,7 @@ export function init() {
     store.set('categories', DEFAULT_CATEGORIES);
     // Limit habits are judged from install day on (no payout for weeks before the app was used)
     const today = dayKey(appNow());
-    store.set('habits', DEFAULT_HABITS.map((h) => (h.kind === 'limit' ? { ...h, limitSince: today } : h)));
+    store.set('habits', DEFAULT_HABITS.map((h) => ({ ...h, since: today })));
     store.set('profile', DEFAULT_PROFILE);
     store.set('log', {});
     store.set('bonus', {});
@@ -266,54 +275,73 @@ export function archiveHabit(id) {
 export const getLog = () => store.get('log', {});
 const saveLog = (log) => store.set('log', log);
 
-// Completions of a habit in the period containing `date`
+// Completions in the period that matters for the habit: fast food and lift count the Mon–Sun week
+// (meals / sessions), everything else the day.
 export function progress(habit, date = appNow(), log = getLog()) {
-  const [start, end] = periodRange(habit.frequency, date);
+  const [start, end] = periodRange(isLift(habit) || isFastFood(habit) ? 'weekly' : 'daily', date);
   let n = 0;
   for (const day in log) {
-    if (day >= start && day <= end && log[day][habit.id]) n += log[day][habit.id].n;
+    if (day >= start && day <= end && log[day][habit.id]) n += isLift(habit) ? (log[day][habit.id].n > 0 ? 1 : 0) : log[day][habit.id].n;
   }
   return n;
 }
 
-// Add (+1) or remove (-1) one completion. Returns the XP change (0 if nothing changed).
+/** 0 = not done, 1 = Minimum (2-min version), 2 = Full. */
+export function levelOn(habit, day, log = getLog()) {
+  const e = log[day]?.[habit.id];
+  if (!e || !(e.n > 0)) return 0;
+  return e.min ? MIN : FULL;
+}
+/** Fast food meals logged on a day */
+export const usesOn = (habit, day, log = getLog()) => log[day]?.[habit.id]?.n || 0;
+
+/** Set a day to not done / Minimum / Full. Returns true if anything changed. */
+export function setLevel(habit, day, level, log = getLog()) {
+  if (!hasMin(habit) && level === MIN) level = FULL;
+  const cur = levelOn(habit, day, log);
+  if (cur === level) return false;
+  if (!level) {
+    delete log[day][habit.id];
+    if (!Object.keys(log[day]).length) delete log[day];
+  } else {
+    const xp = level === FULL ? habit.xp : Math.round(habit.xp / 2);
+    (log[day] ||= {})[habit.id] = { n: 1, xp, c: habit.category, ...(level === MIN ? { min: true } : {}) };
+  }
+  saveLog(log);
+  return true;
+}
+
+// +1 = Full today (fast food: one more meal), -1 = undo today (fast food: one meal less, today or earlier this week)
 export function step(habit, delta, date = appNow()) {
   const log = getLog();
   const today = dayKey(date);
-  const done = progress(habit, date, log);
-
-  if (delta > 0 && isLimit(habit)) {
-    if (done >= LIMIT_MAX_USES || notStarted(habit, date)) return 0;
-    const e = ((log[today] ||= {})[habit.id] ||= { n: 0, xp: 0 });
-    e.n += 1;
-    e.xp = 0;
-    e.c = habit.category;
+  if (isFastFood(habit)) {
+    if (delta > 0) {
+      if (notStarted(habit, date)) return 0;
+      const e = ((log[today] ||= {})[habit.id] ||= { n: 0, xp: 0 });
+      e.n = Math.min(LIMIT_MAX_USES, e.n + 1);
+      e.xp = 0;
+      e.c = habit.category;
+      saveLog(log);
+      return 0; // meals never give XP
+    }
+    const [start] = periodRange('weekly', date);
+    const days = Object.keys(log).filter((d) => d >= start && d <= today && log[d][habit.id]?.n > 0).sort();
+    const day = days.includes(today) ? today : days[days.length - 1];
+    if (!day) return 0;
+    const e = log[day][habit.id];
+    e.n -= 1;
+    if (e.n <= 0) delete log[day][habit.id];
+    if (!Object.keys(log[day]).length) delete log[day];
     saveLog(log);
-    return 0; // uses never give XP directly
+    return 0;
   }
   if (delta > 0) {
-    if (done >= habit.target || notStarted(habit, date)) return 0;
-    const day = (log[today] ||= {});
-    const e = (day[habit.id] ||= { n: 0, xp: habit.xp });
-    e.n += 1;
-    e.xp = habit.xp;
-    e.c = habit.category;
-    saveLog(log);
-    return habit.xp;
+    if (notStarted(habit, date)) return 0;
+    return setLevel(habit, today, FULL, log) ? habit.xp : 0;
   }
-
-  if (done <= 0) return 0;
-  // Undo today's completion first, otherwise the most recent day in this period
-  const [start] = periodRange(habit.frequency, date);
-  const days = Object.keys(log).filter((d) => d >= start && d <= today && log[d][habit.id]?.n > 0).sort();
-  const day = days.includes(today) ? today : days[days.length - 1];
-  const e = log[day][habit.id];
-  e.n -= 1;
-  const xp = e.xp;
-  if (e.n <= 0) delete log[day][habit.id];
-  if (!Object.keys(log[day]).length) delete log[day];
-  saveLog(log);
-  return -xp;
+  const had = log[today]?.[habit.id]?.xp || 0;
+  return setLevel(habit, today, 0, log) ? -had : 0;
 }
 
 // Days/weeks off: a period a habit had nothing to do ("Finished today's work" with nothing planned,
@@ -322,7 +350,7 @@ export function step(habit, delta, date = appNow()) {
 //   imp_excused { "YYYY-MM-DD": { habitId: true } }
 export const getExcused = () => store.get('excused', {});
 export const isExcused = (habitId, day, ex = getExcused()) => !!ex[day]?.[habitId];
-export const offIn = (habit, date = appNow(), ex = getExcused()) => isExcused(habit.id, periodRange(habit.frequency, date)[0], ex);
+export const offIn = (habit, date = appNow(), ex = getExcused()) => isExcused(habit.id, dayKey(date), ex);
 export function setExcused(habit, day, on) {
   if (on && isOverridden(habit, day)) on = false; // a manual tick beats a day off
   const ex = getExcused();
@@ -341,41 +369,26 @@ export function setExcused(habit, day, on) {
 // Stored under the period's first day:  imp_override { "YYYY-MM-DD": { habitId: true } }
 export const getOverrides = () => store.get('override', {});
 export function isOverridden(habit, date = appNow(), ov = getOverrides()) {
-  const d = typeof date === 'string' ? fromDayKey(date) : date;
-  return !!ov[periodRange(habit.frequency, d)[0]]?.[habit.id];
+  const d = typeof date === 'string' ? date : dayKey(date);
+  return !!ov[d]?.[habit.id];
 }
-export function setOverride(habit, on, date = appNow()) {
+// on: tick it yourself today at `level` (Full by default); off: hand it back to the auto-check
+export function setOverride(habit, on, date = appNow(), level = FULL) {
   const ov = getOverrides();
-  const start = periodRange(habit.frequency, date)[0];
+  const day = typeof date === 'string' ? date : dayKey(date);
   if (on) {
-    (ov[start] ||= {})[habit.id] = true;
+    (ov[day] ||= {})[habit.id] = true;
     store.set('override', ov);
-    setExcused(habit, start, false);
-    const log = getLog();
-    const [s, e] = periodRange(habit.frequency, date);
-    const n = Object.keys(log).filter((d) => d >= s && d <= e).reduce((t, d) => t + (log[d][habit.id]?.n || 0), 0);
-    const want = habit.frequency === 'daily' ? Math.max(1, habit.target) : 1;
-    if (n < want) {
-      const today = dayKey(date);
-      (log[today] ||= {})[habit.id] = { n: (log[today][habit.id]?.n || 0) + want - n, xp: habit.xp, c: habit.category };
-      saveLog(log);
-    }
+    setExcused(habit, day, false);
+    setLevel(habit, day, level);
     return;
   }
-  if (ov[start]) {
-    delete ov[start][habit.id];
-    if (!Object.keys(ov[start]).length) delete ov[start];
+  if (ov[day]) {
+    delete ov[day][habit.id];
+    if (!Object.keys(ov[day]).length) delete ov[day];
     store.set('override', ov);
   }
-  // Clear the period's ticks; the auto-check puts them back if the other tab says it's earned
-  const log = getLog();
-  const [s, e] = periodRange(habit.frequency, date);
-  for (const d of Object.keys(log)) {
-    if (d < s || d > e || !log[d][habit.id]) continue;
-    delete log[d][habit.id];
-    if (!Object.keys(log[d]).length) delete log[d];
-  }
-  saveLog(log);
+  setLevel(habit, day, 0); // the auto-check puts it back if the other tab says it's earned
 }
 
 // When a habit becomes a limit: its taps this period become plain uses (no XP)
@@ -398,46 +411,13 @@ export function autoTimeReached(habit, day, now = new Date()) {
   return late(now.getHours() * 60 + now.getMinutes()) >= late(habit.autoAfter);
 }
 
-// Set a habit done / not done on a date (used by auto-checks from other tabs).
-// Returns true if anything changed.
-export function setDone(habit, day, done, now = new Date()) {
+// Set a habit's level on a date from an auto-check (another tab). `level`: 0 / 1 (Minimum) / 2 (Full),
+// or true / false for Full / not done. Returns true if anything changed.
+export function setDone(habit, day, level, now = new Date()) {
   if (isOverridden(habit, day)) return false; // ticked by hand: auto leaves it alone
-  if (done && !autoTimeReached(habit, day, now)) done = false;
-  const log = getLog();
-  const cur = log[day]?.[habit.id]?.n || 0;
-  const want = done ? Math.max(1, habit.frequency === 'daily' ? habit.target : 1) : 0;
-  if (cur === want) return false;
-  if (want) (log[day] ||= {})[habit.id] = { n: want, xp: habit.xp, c: habit.category };
-  else {
-    delete log[day][habit.id];
-    if (!Object.keys(log[day]).length) delete log[day];
-  }
-  saveLog(log);
-  return true;
-}
-
-// Weekly / monthly version for auto-checks: done = exactly one completion somewhere in the
-// period containing `date` (added on that date if missing); not done = none in the period.
-// Returns true if anything changed.
-export function setPeriodDone(habit, date, done, now = new Date()) {
-  if (habit.frequency === 'daily') return setDone(habit, dayKey(date), done, now);
-  if (isOverridden(habit, date)) return false;
-  if (done && !autoTimeReached(habit, dayKey(date), now)) done = false;
-  const log = getLog();
-  const [start, end] = periodRange(habit.frequency, date);
-  const days = Object.keys(log).filter((d) => d >= start && d <= end && log[d][habit.id]);
-  if (done) {
-    if (days.length) return false;
-    (log[dayKey(date)] ||= {})[habit.id] = { n: 1, xp: habit.xp, c: habit.category };
-  } else {
-    if (!days.length) return false;
-    for (const d of days) {
-      delete log[d][habit.id];
-      if (!Object.keys(log[d]).length) delete log[d];
-    }
-  }
-  saveLog(log);
-  return true;
+  let lv = level === true ? FULL : level === false ? 0 : level || 0;
+  if (lv && !autoTimeReached(habit, day, now)) lv = 0;
+  return setLevel(habit, day, lv);
 }
 
 // Index: counts[habitId][day] = n  (fast lookups for streaks and stats)
