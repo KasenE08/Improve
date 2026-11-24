@@ -16,10 +16,10 @@ const done = (id) => !!H.getLog()[day]?.[id];
 
 const lv = (id, d = day) => H.levelOn({ id }, d); // 0 not yet, 1 = 2-min, 2 = Full
 
-eq(F.getGoals(), { calGoal: 2200, proteinGoal: 130, proteinMin: 115, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 }, 'default goals: 2200 cal ±10% (2-min ≤ 2700), protein 130 g (2-min 115), water 100 oz (2-min 80)');
+eq(F.getGoals(), { calGoal: 2200, proteinGoal: 130, proteinMin: 115, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 }, 'default goals: 2200 cal ±10% (2-min 1980–2700), protein 130 g (2-min 115), water 100 oz (2-min 80)');
 F.quickAdd({ date: day, meal: 'lunch', label: 'A', cal: 1000, protein: 114 });
 A.recheck(day);
-eq([lv('calories'), lv('protein')], [1, 0], '1000 cal / 114 g: calories 2-min (under 2700), protein not yet');
+eq([lv('calories'), lv('protein')], [0, 0], '1000 cal / 114 g: under 1980 is not done; protein not yet');
 const e = F.quickAdd({ date: day, meal: 'dinner', label: 'B', cal: 1100, protein: 1 });
 A.recheck(day);
 eq([lv('calories'), lv('protein')], [2, 1], '2100 cal / 115 g: calories Full, protein 2-min');
@@ -36,7 +36,13 @@ eq(lv('calories'), 2, 'wider range ±30% (max 2860): Full again');
 F.saveGoals({ calRange: 10 });
 F.deleteEntry(e.id);
 A.recheck(day);
-eq([lv('calories'), lv('protein')], [1, 0], 'delete entry: back to 1000 cal / 114 g');
+eq([lv('calories'), lv('protein')], [0, 0], 'delete entry: back to 1000 cal / 114 g');
+// Calories 2-min band: 1980–2700 (Full 1980–2420)
+{
+  const g = F.getGoals();
+  const L = await import(J('food/logic.js'));
+  eq([1979, 1980, 2420, 2421, 2700, 2701].map((c) => L.calLevel(c, g)), [0, 2, 2, 1, 1, 0], 'calories: under 1980 not done, 1980–2420 Full, 2421–2700 2-min, over 2700 not done');
+}
 // Water: 2-min at 80 oz, Full at 100 oz (per food day)
 {
   const wday = '2026-10-25';

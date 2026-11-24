@@ -41,7 +41,7 @@ export const LIMIT_MAX_USES = 99;
 export const startOf = (habit) => [habit.startsOn, habit.frequency === 'monthly' ? MONTHLY_START : null].filter(Boolean).sort().pop() || null;
 export const notStarted = (habit, date = appNow()) => { const s = startOf(habit); return !!s && dayKey(date) < s; };
 
-export const SCHEMA = 22;
+export const SCHEMA = 23;
 export const FREQS = ['daily', 'weekly', 'monthly'];
 
 // Seeds a fresh install. Returns the schema version found before (0 = fresh),
@@ -235,6 +235,10 @@ export function init() {
         target: 1, xp: 40, order: all.reduce((m, h) => Math.max(m, h.order + 1), 0), archived: false, auto: null, kind: 'goal' });
       store.set('habits', all);
     }
+  }
+  // Schema 23: calories 2-min is 1,980–2,700 (under 1,980 isn't done)
+  if (found > 0 && found < 23) {
+    store.set('habits', store.get('habits', []).map((h) => (h.auto === 'food:calories' && h.twoMin === '≤ 2,700 (maintenance)' ? { ...h, twoMin: '1,980–2,700' } : h)));
   }
   if (found < SCHEMA) store.set('schema', SCHEMA);
   return found;
