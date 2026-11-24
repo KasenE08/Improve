@@ -416,10 +416,9 @@
 .hab-sub-line b { color: var(--imp-text); font-variant-numeric: tabular-nums; }
 .hab-sub-line .imp-pips { margin-top: 0; }
 .imp-pip.is-half { background: linear-gradient(90deg, var(--imp-accent) 50%, var(--imp-sunken) 50%); box-shadow: inset 0 0 0 1.5px var(--imp-accent); }
-/* Fast food: Lift's look; the box shows today's meals in orange */
-.hab-row.is-ff .imp-check.is-count { border-color: var(--imp-protein); background: color-mix(in srgb, var(--imp-protein) 14%, transparent); }
-.hab-row.is-ff .imp-check__count { color: var(--imp-protein); }
-.hab-row.is-ff .imp-pip.is-on { background: var(--imp-protein); }
+/* Fast food: Lift's look; the box shows today's meals in the app blue */
+.hab-row.is-ff .imp-check.is-count { border-color: var(--imp-accent); background: var(--imp-accent-dim); }
+.hab-row.is-ff .imp-check__count { color: var(--imp-accent); }
 .hab-row.is-ff.is-over .imp-check.is-count { border-color: var(--imp-danger); }
 .hab-row.is-ff.is-over .imp-check__count { color: var(--imp-danger); }
 /* The card: cue / craving / response / reward / 2-min / full */
