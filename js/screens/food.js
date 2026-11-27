@@ -151,6 +151,23 @@ function hero(day) {
   </div>`;
 }
 
+// Fast food this week: tick a box for each meal (the max is 2 a week); the box on the left logs one on this day
+function fastFoodBox() {
+  const max = F.getGoals().fastFoodMax || 2;
+  const week = F.fastFoodWeek(ui.date);
+  const day = F.fastFoodOn(ui.date);
+  const over = week > max;
+  const boxes = Array.from({ length: Math.max(max, week) }, (_, i) => `<span class="ff-pass${i < week ? (i >= max ? ' is-over' : ' is-on') : ''}">${i < week ? icon('check') : ''}</span>`).join('');
+  const when = ui.date === today() ? 'today' : 'this day';
+  return box('Fast food', `<div class="ff-row${over ? ' is-over' : ''}">
+      <button class="ff-add" data-f="ff-add" aria-label="Log a fast food meal ${when}">${icon('plus')}</button>
+      <span class="ff-mid"><span class="ff-title"><b>${week}/${max}</b> this week</span>
+        <span class="ff-sub">${over ? 'Over the limit this week' : week === max ? 'No more this week' : `${max - week} left this week`}${day ? ` · ${day} ${when}` : ''}</span></span>
+      <span class="ff-passes">${boxes}</span>
+    </div>
+    ${week ? `<button class="food-link ff-undo" data-f="ff-undo">Remove one</button>` : ''}`);
+}
+
 function renderDay() {
   const entries = F.entriesFor(ui.date);
   const day = L.totals(entries);
@@ -166,6 +183,7 @@ function renderDay() {
   const date = L.fromISODate(ui.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
   return `${box(`${dayTitle(ui.date)} · ${date}`, `${weekStrip()}${hero(day)}`, ui.date === today() ? '' : '<button class="imp-btn imp-btn--sm imp-btn--secondary" data-f="go-today">Today</button>')}
+    ${fastFoodBox()}
     <section class="imp-panel">
       <header class="imp-panel__head"><h2 class="imp-panel__title">Food</h2><span class="imp-panel__meta">${calPro(day.cal, day.protein)}</span></header>
       <div class="imp-panel__body">
@@ -446,6 +464,18 @@ export function bind(root) {
       case 'week': changeWeek(Number(el.dataset.dir)); break;
       case 'go-today': selectDate(today()); rerender(); break;
 
+      case 'ff-add': {
+        const max = F.getGoals().fastFoodMax || 2;
+        if (F.fastFoodWeek(ui.date) >= max && !confirm(`That's ${F.fastFoodWeek(ui.date) + 1} this week (max ${max}). Log it anyway?`)) break;
+        F.addFastFood(ui.date, 1);
+        rerender();
+        const w = F.fastFoodWeek(ui.date);
+        toast(w > max ? `Over the limit: ${w}/${max} this week` : `Fast food ${w}/${max} this week`);
+        break;
+      }
+      case 'ff-undo':
+        if (F.removeFastFood(ui.date)) { rerender(); toast(`Removed · ${F.fastFoodWeek(ui.date)}/${F.getGoals().fastFoodMax || 2} this week`); }
+        break;
       case 'water-add': {
         const input = document.getElementById('water-oz');
         const oz = Number(input?.value);

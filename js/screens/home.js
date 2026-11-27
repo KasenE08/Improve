@@ -1,5 +1,6 @@
 // Home: the one screen. The header (week circles) sits above; each card shows an area at a glance
-// and opens its full page. Small actions (tick a habit, add water) work right here.
+// and opens its full page. Small actions (add water) work right here. (The Habits card shows only while there
+// are habits; the Habits section was retired on Nov 27, 2026.)
 import * as H from '../habits.js';
 import * as R from '../rewards.js';
 import * as Stats from '../stats.js';
@@ -67,7 +68,7 @@ export function render(root, refresh) {
   const journal = card('journal', 'Journal', 'quill', `${words} / ${min} words`,
     `<div class="jprompt${words ? ' is-on' : ''}">${words ? esc(Journal.getDay(today).trim().slice(0, 90)) + (Journal.getDay(today).trim().length > 90 ? '…' : '') : 'How did today go?'}</div>`);
 
-  root.innerHTML = `<div class="screen home">${habits}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
+  root.innerHTML = `<div class="screen home">${H.getHabits().length ? habits : ''}<div class="tiles">${food}${waterCard}</div>${money}${journal}</div>`;
 }
 
 // Up next: tap = Full, hold = the 2-minute version

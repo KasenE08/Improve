@@ -6,13 +6,13 @@ import { dayKey } from './dates.js';
 import { icon } from './ui.js';
 import { renderHud as drawHud, bindHud } from './hud.js';
 import { startTheme } from './theme.js';
-import * as Today from './screens/today.js';
 import * as Food from './screens/food.js';
 import * as Money from './screens/money.js';
 import * as Journal from './screens/journal.js';
 import { recheckJournal } from './journal/autocheck.js';
 import { recheckMoney } from './money/autocheck.js';
 import { migrate22 } from './migrate.js';
+import { retireHabits } from './retire.js';
 import * as Profile from './screens/profile.js';
 import * as Home from './screens/home.js';
 import { celebrate } from './screens/today.js';
@@ -21,7 +21,7 @@ import { reload as reloadFood } from './food/store.js';
 import * as store from './store.js';
 
 // One screen: Home (header + cards). Each card opens a full page with "‹ Home" at the top.
-const PAGES = { home: '', today: 'Habits', food: 'Food & water', money: 'Money', journal: 'Journal', profile: 'You' };
+const PAGES = { home: '', food: 'Food & water', money: 'Money', journal: 'Journal', profile: 'You' };
 
 const hud = document.getElementById('hud');
 const screen = document.getElementById('screen');
@@ -36,6 +36,7 @@ function boot() {
   // First launch seeds data; an upgrade from Phase 1 awards Perfect Days already earned.
   const foundSchema = H.init();
   if (foundSchema > 0 && foundSchema < 22) migrate22(); // Nov 2026: every habit daily, Minimum / Full, streaks kept
+  retireHabits(); // Nov 27, 2026: no Habits section; fast food moves to Food (once)
   reloadFood(); // the Food tab keeps its data in memory: re-read it after the launch wipe and upgrades (e.g. schema 11 water)
   if (foundSchema === 1) R.awardPastPerfectDays();
   Food.recheckToday();
@@ -54,8 +55,7 @@ function boot() {
     hud.className = tab === 'home' ? 'hud' : 'phead';
     if (tab === 'home') drawHud(hud);
     else {
-      const end = tab === 'today' ? `<button class="phead__more" data-act="new-habit" aria-label="New habit">${icon('plus')}</button>`
-        : tab === 'food' ? `<button class="phead__more" data-act="food-menu" aria-label="Saved foods, meals and goals">${icon('more')}</button>`
+      const end = tab === 'food' ? `<button class="phead__more" data-act="food-menu" aria-label="Saved foods, meals and goals">${icon('more')}</button>`
         : tab === 'money' ? `<button class="phead__more" data-act="money-menu" aria-label="Budgets and paychecks">${icon('more')}</button>`
         : tab === 'journal' ? `<button class="phead__more" data-act="journal-menu" aria-label="Journal settings">${icon('more')}</button>` : '';
       hud.innerHTML = `<button class="phead__back" data-act="home">${icon('prev')}Home</button><h1 class="phead__title">${PAGES[tab]}</h1><span class="phead__end">${end}</span>`;
@@ -70,7 +70,6 @@ function boot() {
     Journal.flush(); // save anything still being typed before the screen changes
     screen.dataset.tab = tab;
     if (tab === 'home') Home.render(screen, refresh);
-    else if (tab === 'today') Today.render(screen, refresh);
     else if (tab === 'food') Food.render(screen, refresh);
     else if (tab === 'money') Money.render(screen, refresh);
     else if (tab === 'journal') Journal.render(screen, refresh, renderHud);
@@ -78,14 +77,12 @@ function boot() {
   }
 
   Home.bind(screen);
-  Today.bind(screen);
   Food.bind(screen);
   Money.bind(screen);
   Journal.bind(screen);
   Profile.bind(screen, refresh);
   bindHud(hud, { rename: () => Profile.openNameSheet(refresh), refresh });
   hud.addEventListener('click', (e) => {
-    if (e.target.closest('[data-act="new-habit"]')) return Today.openHabitForm(null);
     if (e.target.closest('[data-act="food-menu"]')) { if (currentTab() === 'food') Food.openMenu(); return; }
     if (e.target.closest('[data-act="money-menu"]')) { if (currentTab() === 'money') Money.openMenu(); return; }
     if (e.target.closest('[data-act="journal-menu"]')) { if (currentTab() === 'journal') Journal.openMenu(); return; }
@@ -115,7 +112,7 @@ function boot() {
     if (after.total === before.total && !added.length && JSON.stringify(H.getExcused()) === offBefore) return;
     renderHud();
     // Redraw lists that show ticks; leave Food/Money/Journal alone so typing isn't interrupted
-    if (['home', 'today', 'profile'].includes(currentTab())) refresh();
+    if (['home', 'profile'].includes(currentTab())) refresh();
     celebrate(before, after, added);
   };
   setInterval(checkDay, 30000);

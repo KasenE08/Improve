@@ -1,7 +1,8 @@
 // Food data, adapted from KasenE08/calorie-tracker js/store.js.
 // Same shape as the original app, saved as one blob under Improve's own key: imp_food.
 import * as store from '../store.js';
-import { scale, entryFieldsFromItem } from './logic.js';
+import { scale, entryFieldsFromItem, fromISODate } from './logic.js';
+import { periodRange } from '../dates.js';
 
 const KEY = 'food';
 
@@ -11,7 +12,7 @@ const KEY = 'food';
 //   calMax     calories Minimum: at most this many (Full = within ±calRange % of calGoal)
 //   waterMin   water Minimum (oz); waterGoal = Full
 //   waterGoal  "Hit water" = at least this many oz
-export const DEFAULT_GOALS = { calGoal: 2200, proteinGoal: 130, proteinMin: 105, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 };
+export const DEFAULT_GOALS = { calGoal: 2200, proteinGoal: 130, proteinMin: 105, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80, fastFoodMax: 2 };
 
 const empty = () => ({
   version: 1,
@@ -20,6 +21,7 @@ const empty = () => ({
   entries: [],    // { id, kind: 'food'|'quick', name, date, meal, cal, protein, … }
   savedMeals: [], // { id, name, category, items }
   water: {},      // { 'YYYY-MM-DD': oz } per food day
+  fastFood: {},   // { 'YYYY-MM-DD': meals } fast food meals per food day (fastFoodMax a Mon–Sun week)
 });
 
 let state = load();
@@ -107,6 +109,29 @@ export function addWater(date, oz) {
   if (v) state.water[date] = v; else delete state.water[date];
   save();
   return v;
+}
+
+// ---------- Fast food (meals per food day; the week runs Mon–Sun) ----------
+export const fastFoodOn = (date) => state.fastFood?.[date] || 0;
+export function addFastFood(date, delta) {
+  state.fastFood ||= {};
+  const v = Math.max(0, fastFoodOn(date) + delta);
+  if (v) state.fastFood[date] = v; else delete state.fastFood[date];
+  save();
+  return v;
+}
+/** Meals in the Mon–Sun week containing `date` */
+export function fastFoodWeek(date) {
+  const [s, e] = periodRange('weekly', fromISODate(date));
+  return Object.entries(state.fastFood || {}).reduce((t, [k, n]) => (k >= s && k <= e ? t + n : t), 0);
+}
+/** Take back one meal: the given day if it has one, else the latest earlier day that week */
+export function removeFastFood(date) {
+  const [s] = periodRange('weekly', fromISODate(date));
+  const days = Object.keys(state.fastFood || {}).filter((k) => k >= s && k <= date && state.fastFood[k] > 0).sort();
+  const day = days.includes(date) ? date : days[days.length - 1];
+  if (day) addFastFood(day, -1);
+  return !!day;
 }
 
 // ---------- Saved meals ----------
