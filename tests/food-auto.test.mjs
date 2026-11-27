@@ -16,7 +16,7 @@ const done = (id) => !!H.getLog()[day]?.[id];
 
 const lv = (id, d = day) => H.levelOn({ id }, d); // 0 not yet, 1 = 2-min, 2 = Full
 
-eq(F.getGoals(), { calGoal: 2200, proteinGoal: 130, proteinMin: 105, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80 }, 'default goals: 2200 cal ±10% (2-min 1980–2700), protein 130 g (2-min 105), water 100 oz (2-min 80)');
+eq(F.getGoals(), { calGoal: 2200, proteinGoal: 130, proteinMin: 105, calRange: 10, calMax: 2700, waterGoal: 100, waterMin: 80, fastFoodMax: 2 }, 'default goals: 2200 cal ±10% (2-min 1980–2700), protein 130 g (2-min 105), water 100 oz (2-min 80)');
 F.quickAdd({ date: day, meal: 'lunch', label: 'A', cal: 1000, protein: 104 });
 A.recheck(day);
 eq([lv('calories'), lv('protein')], [0, 0], '1000 cal / 104 g: under 1980 is not done; protein not yet (2-min starts at 105)');

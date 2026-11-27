@@ -43,7 +43,7 @@ export function dayStatus(key, ctx = context()) {
   }
   for (const i of items) i.done = i.level > 0;
   const done = items.filter((i) => i.done).length;
-  return { done, total: items.length, perfect: !!ctx.bonus[key]?.perfect, items };
+  return { done, total: items.length, perfect: items.length > 0 && !!ctx.bonus[key]?.perfect, items };
 }
 
 function context() {
@@ -68,7 +68,7 @@ export function renderHud(el) {
   const today = dayKey(now);
   const ws = weekStart(now);
   const days = Array.from({ length: 7 }, (_, i) => dayKey(addDays(ws, i)));
-  const perfectWeek = days.every((k) => ctx.bonus[k]?.perfect); // all 7 days Perfect Days: the strip turns gold
+  const perfectWeek = days.every((k) => dayStatus(k, ctx)?.perfect); // all 7 days Perfect Days: the strip turns gold
   const theme = currentTheme();
   const name = H.getProfile().name;
   el.innerHTML = `
@@ -111,7 +111,7 @@ function monthBody(mk) {
   const mkOf = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   const canNext = mkOf(next) <= today.slice(0, 7);
   const canPrev = mkOf(prev) >= START.slice(0, 7);
-  const perfectMonth = perfect === count; // every day of the month a Perfect Day: gold frame + label
+  const perfectMonth = ctx.habits.length > 0 && perfect === count; // every day of the month a Perfect Day: gold frame + label
   return `<div class="cal${perfectMonth ? ' is-gold' : ''}">
     <div class="cal__nav">
       <button class="cal__arrow" data-cal="${mkOf(prev)}" aria-label="Previous month"${canPrev ? '' : ' disabled'}>${icon('prev')}</button>
@@ -119,8 +119,8 @@ function monthBody(mk) {
       <button class="cal__arrow" data-cal="${mkOf(next)}" aria-label="Next month"${canNext ? '' : ' disabled'}>${icon('next')}</button>
     </div>
     <div class="cal__grid">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => `<span class="cal__wd">${d}</span>`).join('')}${cells.join('')}</div>
-    <div class="cal__legend"><span><i class="cal__dot"></i>Ring = habits done</span><span><i class="cal__dot is-solid"></i>Perfect Day (all Full)</span></div>
-    ${tracked ? `<p class="cal__sum"><b>${perfect}</b> Perfect ${perfect === 1 ? 'Day' : 'Days'} this month</p>` : ''}
+    ${ctx.habits.length ? `<div class="cal__legend"><span><i class="cal__dot"></i>Ring = habits done</span><span><i class="cal__dot is-solid"></i>Perfect Day (all Full)</span></div>
+    ${tracked ? `<p class="cal__sum"><b>${perfect}</b> Perfect ${perfect === 1 ? 'Day' : 'Days'} this month</p>` : ''}` : '<p class="cal__sum">Tap a day to see its food, money and journal</p>'}
   </div>`;
 }
 
@@ -150,8 +150,8 @@ function dayBody(key) {
   const st = dayStatus(key, ctx);
   const parts = [];
 
-  // Habits
-  if (st) {
+  // Habits (only while there are habits)
+  if (st && st.total) {
     const rows = st.items.map((i) => `<li class="dd__row${i.level === 2 ? ' is-done' : i.level === 1 ? ' is-min' : ''}">
       <span class="dd__mark">${i.level ? icon('check') : ''}</span>
       <span class="dd__name">${esc(i.h.name)}</span>

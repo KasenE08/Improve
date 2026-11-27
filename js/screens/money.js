@@ -103,25 +103,36 @@ function goalPanel(s) {
   </div></section>`;
 }
 
+// This week: the two money jobs as tick boxes. Tap one to do it (check-in sheet / Payday page).
+function weekPanel(s) {
+  const [ws, we] = periodRange('weekly');
+  const ci = L.checkins(s).filter((e) => !e.source && e.date >= ws && e.date <= we).pop();
+  const paid = thisWeekPaydays(s).pop();
+  const next = L.nextPayday(s.settings.pay, today());
+  const when = next === today() ? 'today' : next ? shortDate(next) : '';
+  const row = (done, m, page, title, sub) => `<button class="mon-week__row${done ? ' is-done' : ''}" data-m="${m}"${page ? ` data-page="${page}"` : ''}>
+      <span class="imp-check${done ? ' is-on' : ''}">${icon('check')}</span>
+      <span class="mon-row__mid"><span class="mon-week__title">${title}</span><span class="mon-row__sub">${esc(sub)}</span></span>${icon('next', 'mon-row__go')}</button>`;
+  const ciSub = ci ? `Done ${shortDate(ci.date)}` : we === today() ? 'Today' : `Due ${shortDate(we)}`;
+  const paySub = paid ? `Done ${shortDate(paid.date)} · ${paid.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ')}`
+    : `${when ? `Payday ${when} · ` : ''}${paydayRule(s)}`;
+  return box('This week', `${row(!!ci, 'checkin', '', 'Sunday check-in', ciSub)}${row(!!paid, 'page', 'payday', 'Split my paycheck', paySub)}`,
+    `${(ci ? 1 : 0) + (paid ? 1 : 0)}/2`);
+}
+
 // The weekly check-in: what you spent and saved, worked out from your bank balances
 function checkinPanel(s) {
   const last = L.lastCheckin(s);
-  const thisWeek = L.checkedInWeek(s);
-  const r = last ? L.checkinResult(s, last) : null;
-  const saved = r ? (r.change.savings ?? 0) : 0;
-  const spent = last ? L.weekSpent(s, new Date(last.at)) : 0;
-  const lastLine = last
-    ? `<div class="mon-ci__stats">
+  if (!last) return '';
+  const r = L.checkinResult(s, last);
+  const saved = r.change.savings ?? 0;
+  const spent = L.weekSpent(s, new Date(last.at));
+  return box('Last check-in', `<div class="mon-stack">
+      <div class="mon-ci__stats">
         <div><span>Spent that week</span><b>${money(s, spent)}</b></div>
-        <div><span>Savings</span><b class="${saved >= 0 ? 'mon-in' : 'mon-over'}">${saved >= 0 ? '+' : '−'}${money(s, Math.abs(saved))}</b></div>
+        <div><span>${esc(acctName(s, 'savings'))}</span><b class="${saved >= 0 ? 'mon-in' : 'mon-over'}">${saved >= 0 ? '+' : '−'}${money(s, Math.abs(saved))}</b></div>
         ${r.extra ? `<div><span>Extra in</span><b class="mon-in">+${money(s, r.extra)}</b></div>` : ''}
-      </div>
-      <p class="mon-note">Last check-in ${shortDate(last.date)}</p>`
-    : '<p class="mon-note">Every Sunday, type in what your bank shows. Improve works out what you spent and saved.</p>';
-  return box('Weekly check-in', `<div class="mon-stack">
-      ${lastLine}
-      <button class="imp-btn ${thisWeek ? 'imp-btn--secondary' : 'imp-btn--primary'} imp-btn--block" data-m="checkin">${thisWeek ? 'Check in again' : `${icon('check')}Check in`}</button>
-    </div>`, thisWeek ? `<span class="mon-done">${icon('check')}Done this week</span>` : '');
+      </div></div>`, shortDate(last.date));
 }
 
 // Graph: one line per account, every check-in, all time
@@ -184,7 +195,7 @@ function graphPanel(s) {
 
 function main(s) {
   if (!s.accounts?.length) return `${goalPanel(s)}${accountsPanel(s)}`;
-  return `${goalPanel(s)}${paydayCard(s)}${checkinPanel(s)}${accountsPanel(s)}${graphPanel(s)}${history(s)}`;
+  return `${goalPanel(s)}${weekPanel(s)}${checkinPanel(s)}${accountsPanel(s)}${graphPanel(s)}${history(s)}`;
 }
 
 // ---- Accounts ----
@@ -508,20 +519,6 @@ function cashbackBox(s) {
 // ---------- Payday ----------
 // Each Friday: type the paycheck and the Spend (checking) balance; Improve says how much goes where in Greenlight.
 const thisWeekPaydays = (s) => { const [a, b] = periodRange('weekly'); return L.paydays(s).filter((e) => e.date >= a && e.date <= b); };
-
-// The card at the top of Money
-function paydayCard(s) {
-  const done = thisWeekPaydays(s).pop();
-  const next = L.nextPayday(s.settings.pay, today());
-  const when = next === today() ? 'today' : next ? shortDate(next) : '';
-  const sub = done
-    ? `Done ${shortDate(done.date)} · ${done.splits.map((x) => `${acctName(s, x.account)} ${money(s, x.amount)}`).join(' · ')}`
-    : `${when ? `Next payday ${when} · ` : ''}${paydayRule(s)}`;
-  return `<section class="imp-panel mon-paycard${done ? ' is-done' : ''}"><button class="mon-paycard__btn" data-m="page" data-page="payday">
-    ${icon(done ? 'check' : 'cash', 'mon-paycard__icon')}
-    <span class="mon-row__mid"><span class="mon-paycard__title">${done ? 'Paycheck split' : 'Split my paycheck'}</span><span class="mon-row__sub">${esc(sub)}</span></span>
-    ${icon('next', 'mon-row__go')}</button></section>`;
-}
 
 // What's typed on the Payday page (kept across re-renders), with the defaults filled in
 function paydayInputs(s) {

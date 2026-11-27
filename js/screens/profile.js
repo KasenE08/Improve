@@ -12,6 +12,7 @@ const fmt = (n) => Math.floor(n).toLocaleString('en-US');
 export function render(root) {
   const p = H.getProfile();
   const st = Stats.compute();
+  const habitsOn = H.getHabits().length > 0; // the Habits section was retired Nov 27, 2026
   const streaks = R.allStreaks();
   const pc = R.perfectCounts();
   const last = Backup.lastBackup();
@@ -27,15 +28,15 @@ export function render(root) {
     <section class="imp-panel"><div class="imp-panel__body">
       <button class="prof-me" data-act="edit-name" aria-label="Rename"><span class="prof-avatar">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span>
         <span class="prof-me__name">${esc(p.name)}</span>${icon('edit', 'prof-go')}</button>
-      <div class="prof-totals">
+      ${habitsOn ? `<div class="prof-totals">
         <div><b>${fmt(pc.days)}</b><span>Perfect Days</span></div>
         <div${pc.weeks ? ' class="is-gold"' : ''}><b>${fmt(pc.weeks)}</b><span>Perfect Weeks</span></div>
         <div${pc.months ? ' class="is-gold"' : ''}><b>${fmt(pc.months)}</b><span>Perfect Months</span></div>
         <div><b>${fmt(st.checkins)}</b><span>Check-ins</span></div>
         <div><b>${fmt(streaks.length)}</b><span>Streaks</span></div>
-      </div>
+      </div>` : ''}
     </div></section>
-    ${streaks.length ? panel({ title: 'Streaks', body: streakList }) : ''}
+    ${habitsOn && streaks.length ? panel({ title: 'Streaks', body: streakList }) : ''}
     <section class="imp-panel"><header class="imp-panel__head"><h2 class="imp-panel__title">Backup</h2><span class="imp-panel__meta ${daysSince == null || daysSince > 7 ? 'prof-warn' : ''}">Last: ${lastTxt}</span></header>
       <div class="imp-panel__body"><div class="group prof-group">
         ${row('export', 'scroll', 'Export backup', 'Save a file to Files or iCloud')}

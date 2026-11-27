@@ -145,3 +145,12 @@
 .mon-total .mon-row__name { font-weight: 700; }
 .mon-total .mon-row__amt { font-weight: 800; }
 .mon-update { margin: 8px 0 4px; }
+
+/* This week: Sunday check-in + paycheck split as tick boxes */
+.mon-week__row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 0; min-height: 56px; border-bottom: 1px solid var(--imp-divider); text-align: left; }
+.mon-week__row:last-child { border-bottom: 0; }
+.mon-week__row:active { background: var(--imp-sunken); }
+.mon-week__row .imp-check { width: 26px; height: 26px; border-radius: 8px; }
+.mon-week__title { font: 600 16px var(--imp-font-body); }
+.mon-week__row.is-done .mon-week__title { color: var(--imp-muted); }
+.mon-week__row .mon-row__sub { white-space: normal; }
